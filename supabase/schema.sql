@@ -85,7 +85,6 @@ CREATE POLICY "Insertion de ses propres etapes" ON etapes FOR INSERT WITH CHECK 
 CREATE POLICY "Modification de ses propres etapes" ON etapes FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Suppression de ses propres etapes" ON etapes FOR DELETE USING (auth.uid() = user_id);
 
--- Mêmes politiques pour toutes les tables
 CREATE POLICY "Lecture de ses propres cours" ON cours FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Insertion de ses propres cours" ON cours FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Modification de ses propres cours" ON cours FOR UPDATE USING (auth.uid() = user_id);
@@ -110,16 +109,3 @@ CREATE POLICY "Lecture de son propre emploi du temps" ON emploi_du_temps FOR SEL
 CREATE POLICY "Insertion de son propre emploi du temps" ON emploi_du_temps FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Modification de son propre emploi du temps" ON emploi_du_temps FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Suppression de son propre emploi du temps" ON emploi_du_temps FOR DELETE USING (auth.uid() = user_id);
-
--- -- Insertion des données initiales (optionnel, pour avoir des données de démo)
--- INSERT INTO etapes (numero, nom, echeance, statut, prochaine_action) VALUES
--- (1, 'Inscriptions SCAP semestre 1', '17 août → 7 sept. 2026', 'a_faire', 'Compte "Mon Paris" + pièce d\'identité prêts'),
--- (2, 'Certificat médical (< 3 mois)', 'Avant l\'inscription sport', 'a_faire', 'Prendre RDV médecin traitant'),
--- (3, 'Inscription sport — En Avant! de Paris', 'Fin août / début sept. 2026', 'a_faire', 'Chèque 600 € + certificat'),
--- (4, 'Candidature DU Paris 1 (eCandidat)', '1er sept. → 30 nov. 2026', 'a_faire', 'Réunir CV, diplômes, justificatifs'),
--- (5, 'Réponses candidatures SCAP', '8 → 25 sept. 2026', 'a_venir', 'Régler en ligne (CB)'),
--- (6, 'Rentrée des cours SCAP (S1)', '28 sept. 2026', 'a_venir', ''),
--- (7, 'Confirmer le règlement du DU', 'À l\'admission (déc. 2026)', 'a_venir', 'Paiement en une fois'),
--- (8, 'Rentrée du DU Paris 1', '15 janv. 2027', 'a_venir', ''),
--- (9, 'Inscriptions SCAP semestre 2', '5 → 25 janv. 2027', 'a_venir', 'À faire seulement si soirée libre'),
--- (10, 'Fin du DU', '4 juil. 2027', 'a_venir', 'Lancer la recherche active de poste');
