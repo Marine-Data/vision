@@ -3,8 +3,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../supabaseConfig.js';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// true tant que les valeurs par défaut n'ont pas été remplacées
-export const supabaseConfigured =
-  !SUPABASE_URL.includes('TON-PROJET') && !SUPABASE_ANON_KEY.includes('https://osqyczwawbbwjwaubtvc.supabase.co/rest/v1/');
-nano src/lib/supabase.js
-
+// Vérifie si les valeurs par défaut ont été remplacées
+export const supabaseConfigured = 
+    SUPABASE_URL !== 'https://osqyczwawbbwjwaubtvc.supabase.co/rest/v1/' && 
+    SUPABASE_ANON_KEY !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zcXljendhd2Jid2p3YXVidHZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5Nzk1MjUsImV4cCI6MjA5NzU1NTUyNX0.Lk2iuL3v_AGuXbyG5yU_-cfvnOtmYoWxiYdyCVKxXzg';
