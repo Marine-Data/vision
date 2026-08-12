@@ -20,7 +20,7 @@ export default function App() {
   // charge l'état des cases quand connectée
   useEffect(() => {
     if (!session) return
-    supabase.from('progress').select('item_key, done').then(({ data }) => {
+    supabase.from('vision_progress').select('item_key, done').then(({ data }) => {
       if (!data) return
       const m = {}
       for (const r of data) m[r.item_key] = r.done
@@ -32,7 +32,7 @@ export default function App() {
     const next = !progress[key]
     setProgress((p) => ({ ...p, [key]: next }))           // optimiste
     const { error } = await supabase
-      .from('progress')
+      .from('vision_progress')
       .upsert({ item_key: key, done: next }, { onConflict: 'user_id,item_key' })
     if (error) setProgress((p) => ({ ...p, [key]: !next })) // rollback si échec
   }
