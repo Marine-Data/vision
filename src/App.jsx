@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, supabaseConfigured } from './lib/supabase.js'
 import Auth from './components/Auth.jsx'
 import { Apercu, Planning, Suivi, Budget, Tresorerie, Sport, Pieces } from './components/Sections.jsx'
+import Stats from './components/Charts.jsx'
 import { tabs } from './data/dossier.js'
 
 export default function App() {
@@ -66,6 +67,7 @@ export default function App() {
         {tab === 'suivi' && <Suivi progress={progress} toggle={toggle} />}
         {tab === 'budget' && <Budget />}
         {tab === 'tresorerie' && <Tresorerie />}
+        {tab === 'stats' && <Stats />}
         {tab === 'sport' && <Sport />}
         {tab === 'pieces' && <Pieces progress={progress} toggle={toggle} />}
       </main>
