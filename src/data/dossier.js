@@ -76,15 +76,16 @@ export const budgetMensuel = [
 ]
 
 export const epargneProjection = [
-  { mois: 'Mi-août 2026', ep: '+ 250 €', evt: '—', solde: '13 321,59 €' },
-  { mois: 'Septembre 2026', ep: '+ 500 €', evt: '—', solde: '13 821,59 €' },
-  { mois: 'Octobre 2026', ep: '+ 500 €', evt: '—', solde: '14 321,59 €' },
-  { mois: 'Novembre 2026', ep: '+ 500 €', evt: '—', solde: '14 821,59 €' },
-  { mois: 'Décembre 2026', ep: '+ 500 €', evt: '− 5 660 € (DU)', solde: '9 661,59 €', low: true },
-  { mois: 'Janvier 2027', ep: '+ 500 €', evt: '—', solde: '10 161,59 €' },
-  { mois: 'Février 2027', ep: '+ 500 €', evt: '—', solde: '10 661,59 €' },
-  { mois: 'Mars → juin 2027', ep: '+ 500 €/mois', evt: '—', solde: 'jusqu\u2019à 12 661,59 €' },
-  { mois: 'Juillet 2027', ep: '+ 500 €', evt: 'objectif repassé', solde: '13 161,59 €', ok: true },
+  { mois: 'Mi-août 2026', ep: '+ 250 €', evt: '− 600 € (sport)', solde: '12 721,59 €' },
+  { mois: 'Septembre 2026', ep: '+ 500 €', evt: '− 390 € (SCAP S1)', solde: '12 831,59 €' },
+  { mois: 'Octobre 2026', ep: '+ 500 €', evt: '—', solde: '13 331,59 €' },
+  { mois: 'Novembre 2026', ep: '+ 500 €', evt: '—', solde: '13 831,59 €' },
+  { mois: 'Décembre 2026', ep: '+ 500 €', evt: '− 5 660 € (DU)', solde: '8 671,59 €', low: true },
+  { mois: 'Janvier 2027', ep: '+ 500 €', evt: '—', solde: '9 171,59 €' },
+  { mois: 'Février 2027', ep: '+ 500 €', evt: 'management (130 €) non compté', solde: '9 671,59 €' },
+  { mois: 'Mars → juin 2027', ep: '+ 500 €/mois', evt: '—', solde: 'jusqu’à 11 671,59 €' },
+  { mois: 'Juillet 2027', ep: '+ 500 €', evt: 'encore sous l’objectif', solde: '12 171,59 €' },
+  { mois: 'Sept. 2027', ep: '+ 500 €/mois', evt: 'objectif repassé', solde: '13 171,59 €', ok: true },
 ]
 
 export const vacances = [
@@ -146,14 +147,20 @@ export const tabs = [
 
 // ============================================================
 // Chiffres pour l'onglet Graphiques (source unique).
+// `sorties` = dépenses de reconversion prélevées sur les livrets,
+// positionnées par index de mois (0 = août 2026).
 // ============================================================
 export const stats = {
-  livretsDepart: 13321.59,   // solde livrets mi-août 2026
+  livretsDepart: 13321.59,   // solde livrets mi-août 2026 (matelas déjà atteint)
   epargneMensuelle: 500,     // Livret A 250 + LDD 250
-  coutDU: 5660,              // DU payé en une fois (décembre 2026)
-  duMoisIndex: 4,            // décembre (0 = août 2026)
   cible: 12900,              // matelas = 6 mois de salaire, avant PEA
-  moisLabels: ['Août 26', 'Sep', 'Oct', 'Nov', 'Déc', 'Jan 27', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil'],
+  moisLabels: ['Août 26', 'Sep', 'Oct', 'Nov', 'Déc', 'Jan 27', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août 27', 'Sep 27', 'Oct 27', 'Nov 27', 'Déc 27'],
+  sorties: [
+    { i: 0, montant: 600,  label: 'Sport' },
+    { i: 1, montant: 390,  label: 'SCAP S1' },
+    { i: 4, montant: 5660, label: 'DU' },
+    // { i: 6, montant: 130, label: 'SCAP management' }, // optionnel — décommente si tu le prends
+  ],
   charges: [
     { nom: 'Alimentation',         montant: 410, couleur: '#2e6b4f' },
     { nom: 'Logement & énergie',   montant: 142, couleur: '#8a2f2c' },
