@@ -1,6 +1,7 @@
 import {
   chronologie, semaine, semaineNotes, suivi, budgetEcheancier, budgetRecap, sportSlots, pieces,
   paramLabels, defaultParams, MOIS, getParam, sumKind, marge, vacancesMensuel, projVacances,
+  projLivrets, jalons,
 } from '../data/dossier.js'
 
 const eur = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' €'
@@ -148,6 +149,32 @@ export function Tresorerie(props) {
         ))}
       </div>
 
+      <div className="h3">Projection de l'épargne (livrets)</div>
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="tbl">
+          <thead><tr><th>Mois</th><th>Événement</th><th className="num">Solde livrets</th></tr></thead>
+          <tbody>
+            {(() => {
+              const pts = projLivrets(budget, params)
+              const cible = getParam(params, 'cible', defP('cible'))
+              const { troughIdx, recIdx } = jalons(pts, cible)
+              const ev = {
+                0: '\u2212 ' + eur(getParam(params, 'sport', defP('sport'))) + ' (sport)',
+                1: '\u2212 ' + eur(getParam(params, 'scap_s1', defP('scap_s1'))) + ' (SCAP)',
+                4: '\u2212 ' + eur(getParam(params, 'du_paiement', defP('du_paiement'))) + ' (DU)',
+              }
+              return pts.map((v, i) => (
+                <tr key={i}>
+                  <td>{MOIS[i]}</td>
+                  <td className={i === troughIdx ? 'low' : ''}>{i === recIdx ? 'objectif repassé' : (ev[i] || '\u2014')}</td>
+                  <td className={'num' + (i === troughIdx ? ' low' : i === recIdx ? ' ok' : '')}>{eur(v)}</td>
+                </tr>
+              ))
+            })()}
+          </tbody>
+        </table>
+      </div>
+
       <div className="h3">Voyages — provision {eur(vacMens)}/mois</div>
       <div className="card">
         {(voyages || []).map((v) => (
@@ -162,6 +189,25 @@ export function Tresorerie(props) {
         ))}
         <button className="badd" onClick={addVoyage}>+ Ajouter un voyage</button>
         <div className="note">Plancher de la poche vacances : <b>{eur(vacFloor)}</b>. En dessous de 0, ça déborderait sur les livrets.</div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="tbl">
+          <thead><tr><th>Mois</th><th>Dépense</th><th className="num">Solde vacances</th></tr></thead>
+          <tbody>
+            {vacProj.slice(0, 12).map((v, i) => {
+              const dep = (voyages || []).filter((x) => Number(x.mois_index) === i)
+              const isFloor = v === vacFloor
+              return (
+                <tr key={i}>
+                  <td>{MOIS[i]}</td>
+                  <td className={dep.length ? 'low' : ''}>{dep.length ? dep.map((d) => '\u2212 ' + eur(d.montant) + ' (' + d.label + ')').join(' · ') : '\u2014'}</td>
+                  <td className={'num' + (isFloor ? ' low' : '')}>{eur(v)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </section>
   )
