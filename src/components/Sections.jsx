@@ -128,7 +128,7 @@ export function Tresorerie() {
         </table>
       </div>
 
-      <div className="note red"><b>Objectif : 12 900 € (6 mois de salaire) sur les livrets avant le PEA — déjà atteint</b> (13 321,59 € à la mi-août). Le DU fait plonger le matelas à ≈ 9 660 € fin 2026, puis il remonte au-dessus de 12 900 € vers juillet 2027.</div>
+      <div className="note red"><b>Objectif : 12 900 € (6 mois de salaire) sur les livrets avant le PEA — déjà atteint</b> (13 321,59 € à la mi-août). En comptant toutes les dépenses de reconversion (sport, SCAP, DU) prélevées sur les livrets, le matelas plonge à ≈ 8 672 € en décembre 2026, puis repasse au-dessus de 12 900 € vers septembre 2027.</div>
 
       <div className="h3">Projection épargne (livrets)</div>
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
