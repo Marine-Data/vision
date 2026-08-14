@@ -6,20 +6,32 @@ import { stats } from '../data/dossier.js'
 const eur = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' €'
 const eurShort = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n))
 
-// Série d'épargne mois par mois, reconstituée depuis les hypothèses.
+// Somme des dépenses de reconversion prélevées le mois i.
+const sortieMois = (i) => (stats.sorties || []).filter((s) => s.i === i).reduce((t, s) => t + s.montant, 0)
+
+// Série d'épargne mois par mois : départ − dépenses, puis +épargne chaque mois − dépenses du mois.
 function serieEpargne() {
-  const { livretsDepart, epargneMensuelle, coutDU, duMoisIndex, moisLabels } = stats
-  const p = [livretsDepart]
+  const { livretsDepart, epargneMensuelle, moisLabels } = stats
+  const p = [livretsDepart - sortieMois(0)]
   for (let i = 1; i < moisLabels.length; i++) {
-    p.push(p[i - 1] + epargneMensuelle - (i === duMoisIndex ? coutDU : 0))
+    p.push(p[i - 1] + epargneMensuelle - sortieMois(i))
   }
   return p
+}
+
+// Index du creux et mois où l'on repasse la cible après le creux.
+function jalons(pts) {
+  const troughIdx = pts.indexOf(Math.min(...pts))
+  let recIdx = -1
+  for (let i = troughIdx; i < pts.length; i++) { if (pts[i] >= stats.cible) { recIdx = i; break } }
+  return { troughIdx, recIdx }
 }
 
 /* ---------- Courbe de projection (le héros) ---------- */
 export function EpargneChart() {
   const pts = serieEpargne()
-  const { moisLabels, cible, duMoisIndex, coutDU } = stats
+  const { moisLabels, cible, sorties } = stats
+  const { troughIdx, recIdx } = jalons(pts)
   const W = 680, H = 300, pad = { l: 54, r: 16, t: 18, b: 34 }
   const ix = W - pad.l - pad.r, iy = H - pad.t - pad.b
 
@@ -34,8 +46,8 @@ export function EpargneChart() {
   const area = `${line} L${X(pts.length - 1).toFixed(1)},${Y(min).toFixed(1)} L${X(0).toFixed(1)},${Y(min).toFixed(1)} Z`
   const grid = [0, 1, 2, 3, 4].map((k) => min + (max - min) * k / 4)
 
-  const trough = Math.min(...pts)
-  const troughMonth = moisLabels[pts.indexOf(trough)]
+  // la plus grosse dépense (le DU) porte l'annotation chiffrée
+  const bigSortie = (sorties || []).reduce((a, b) => (b.montant > (a ? a.montant : 0) ? b : a), null)
 
   return (
     <div className="card">
@@ -54,15 +66,20 @@ export function EpargneChart() {
         {moisLabels.map((m, i) => (i % 2 === 0 || i === moisLabels.length - 1) && (
           <text key={i} x={X(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="#6f665c">{m}</text>
         ))}
-        {pts.map((v, i) => (
-          <circle key={i} cx={X(i)} cy={Y(v)} r={i === duMoisIndex ? 4 : 2.5} fill={i === duMoisIndex ? '#946517' : '#8a2f2c'} />
-        ))}
-        <text x={X(duMoisIndex)} y={Y(pts[duMoisIndex]) + 18} textAnchor="middle" fontSize="11" fill="#946517">
-          {'\u2212 '}{eurShort(coutDU)} DU
-        </text>
+        {/* points : ambre là où une dépense est prélevée */}
+        {pts.map((v, i) => {
+          const s = sortieMois(i)
+          return <circle key={i} cx={X(i)} cy={Y(v)} r={s > 0 ? 4 : 2.5} fill={s > 0 ? '#946517' : '#8a2f2c'} />
+        })}
+        {bigSortie && (
+          <text x={X(bigSortie.i)} y={Y(pts[bigSortie.i]) + 18} textAnchor="middle" fontSize="11" fill="#946517">
+            {'\u2212 '}{eurShort(bigSortie.montant)} {bigSortie.label}
+          </text>
+        )}
       </svg>
       <div className="note">
-        Creux à {eur(trough)} en {troughMonth} (paiement du DU), puis retour au-dessus du matelas de {eur(cible)} vers juillet 2027.
+        Sport, SCAP et DU prélevés sur les livrets : creux à {eur(pts[troughIdx])} en {moisLabels[troughIdx]}, puis
+        retour au-dessus du matelas de {eur(cible)} vers {recIdx >= 0 ? moisLabels[recIdx] : 'plus tard'}.
       </div>
     </div>
   )
@@ -72,10 +89,9 @@ export function EpargneChart() {
 export function MatelasGauge() {
   const pts = serieEpargne()
   const { livretsDepart, cible, moisLabels } = stats
+  const { troughIdx, recIdx } = jalons(pts)
   const pct = Math.round(livretsDepart / cible * 100)
   const barW = Math.max(0, Math.min(100, pct))
-  const trough = Math.min(...pts)
-  const troughMonth = moisLabels[pts.indexOf(trough)]
   const atteint = livretsDepart >= cible
 
   return (
@@ -85,7 +101,7 @@ export function MatelasGauge() {
           <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.9rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             {eur(livretsDepart)}
           </span>
-          <span style={{ color: 'var(--slate)', fontSize: 13, marginLeft: 6 }}>sur les livrets</span>
+          <span style={{ color: 'var(--slate)', fontSize: 13, marginLeft: 6 }}>sur les livrets aujourd'hui</span>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ color: 'var(--slate)', fontSize: 13 }}>Cible 6 mois</div>
@@ -100,7 +116,8 @@ export function MatelasGauge() {
         </span>
       </div>
       <div className="note">
-        Objectif atteint. Le DU fait plonger le matelas à {eur(trough)} en {troughMonth}, puis il repasse au-dessus de {eur(cible)} vers juillet 2027 — avant la bascule sur le PEA.
+        Atteint aujourd'hui. Une fois toutes les dépenses de reconversion prélevées, le matelas plonge à {eur(pts[troughIdx])} en {moisLabels[troughIdx]},
+        puis repasse au-dessus de {eur(cible)} vers {recIdx >= 0 ? moisLabels[recIdx] : 'plus tard'} — avant la bascule sur le PEA.
       </div>
     </div>
   )
@@ -151,7 +168,7 @@ export function ChargesDonut() {
   )
 }
 
-/* ---------- Section complète (à brancher comme un onglet) ---------- */
+/* ---------- Section complète (onglet Graphiques) ---------- */
 export default function Stats() {
   const totalCharges = stats.charges.reduce((s, c) => s + c.montant, 0)
   return (
