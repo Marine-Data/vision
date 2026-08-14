@@ -1,7 +1,3 @@
-// Tout le contenu du dossier, sous forme de données.
-// Les "key" des étapes de suivi et des pièces servent à sauvegarder
-// l'état des cases cochées dans Supabase (table "progress").
-
 export const chronologie = [
   { when: '17 août → 7 sept. 2026', what: 'Inscriptions SCAP semestre 1', det: "Ouverture le lundi 17 août à 10h. Anglais pro digital · Droit numérique au travail · IA pour la finance." },
   { when: 'Fin août / début sept. 2026', what: 'Inscription sport — En Avant! de Paris', det: 'Une fois les créneaux SCAP connus. Cotisation 2 cours (600 €, chèque) + certificat médical.' },
@@ -57,46 +53,6 @@ export const budgetRecap = [
   { poste: 'Total avec option', montant: '≈ 6 780 €', total: true },
 ]
 
-export const budgetMensuel = [
-  { poste: 'Revenus', detail: 'Salaire ADEDOM (net)', montant: '+ 2 150 €', pos: true },
-  { poste: '1 · Logement & énergie', detail: 'EDF 28 · ENGIE gaz 98 · chaudière 16', montant: '142 €' },
-  { poste: '2 · Alimentation', detail: 'La Belle Vie 200 · supermarchés 170 · Amazon 40', montant: '410 €' },
-  { poste: '3 · Santé', detail: 'Pharmacies 30 · compléments 30 · actes médicaux 40', montant: '100 €' },
-  { poste: '4 · Vêtements', detail: 'Vinted 40 · provision vacances 30', montant: '70 €' },
-  { poste: '5 · Matériel & high-tech', detail: 'IT 50 · électroménager 50 · bricolage 30', montant: '130 €' },
-  { poste: '6 · Transports', detail: 'Navigo / RATP', montant: '80 €' },
-  { poste: '7 · Impôts (DGFIP)', detail: 'Rattrapage N-1 (dès sept.)', montant: '115 €' },
-  { poste: '8 · Abonnements', detail: 'YouTube · Claude · Mediapart (Deezer résilié)', montant: '57 €' },
-  { poste: '9 · Argent liquide', detail: 'Retraits rares', montant: '30 €' },
-  { poste: '10 · Plaisir / sorties', detail: 'Revolut', montant: '80 €' },
-  { poste: 'Total charges de vie', detail: '', montant: '1 214 €', total: true },
-  { poste: '12 · Épargne obligatoire', detail: 'Livret A 250 · LDD 250 · vacances 430', montant: '930 €' },
-  { poste: 'Total dépenses + épargne', detail: '', montant: '2 144 €', total: true },
-  { poste: 'Marge de sécurité', detail: 'budget à l\u2019équilibre', montant: '≈ 6 €', total: true, pos: true },
-]
-
-export const epargneProjection = [
-  { mois: 'Mi-août 2026', ep: '+ 250 €', evt: '− 600 € (sport)', solde: '12 721,59 €' },
-  { mois: 'Septembre 2026', ep: '+ 500 €', evt: '− 390 € (SCAP S1)', solde: '12 831,59 €' },
-  { mois: 'Octobre 2026', ep: '+ 500 €', evt: '—', solde: '13 331,59 €' },
-  { mois: 'Novembre 2026', ep: '+ 500 €', evt: '—', solde: '13 831,59 €' },
-  { mois: 'Décembre 2026', ep: '+ 500 €', evt: '− 5 660 € (DU)', solde: '8 671,59 €', low: true },
-  { mois: 'Janvier 2027', ep: '+ 500 €', evt: '—', solde: '9 171,59 €' },
-  { mois: 'Février 2027', ep: '+ 500 €', evt: 'management (130 €) non compté', solde: '9 671,59 €' },
-  { mois: 'Mars → juin 2027', ep: '+ 500 €/mois', evt: '—', solde: 'jusqu’à 11 671,59 €' },
-  { mois: 'Juillet 2027', ep: '+ 500 €', evt: 'encore sous l’objectif', solde: '12 171,59 €' },
-  { mois: 'Sept. 2027', ep: '+ 500 €/mois', evt: 'objectif repassé', solde: '13 171,59 €', ok: true },
-]
-
-export const vacances = [
-  { mois: 'Août 2026', v: '+ 430 €', dep: '—', solde: '430 €' },
-  { mois: 'Sept. 2026', v: '+ 430 €', dep: '− 200 € (avion Lisbonne)', solde: '660 €' },
-  { mois: 'Oct. 2026', v: '+ 430 €', dep: '− 230 € (hôtel Lisbonne)', solde: '860 €' },
-  { mois: 'Nov. 2026', v: '+ 430 €', dep: '− 920 € (grand voyage)', solde: '370 €' },
-  { mois: 'Déc. 2026', v: '+ 430 €', dep: '—', solde: '800 €' },
-  { mois: 'Janv. → juil. 2027', v: '+ 430 €/mois', dep: '—', solde: 'jusqu\u2019à 3 810 €' },
-]
-
 export const sportSlots = [
   { di: 'JEU', nom: 'Free Style Gym adulte', quand: 'jeudi · 20h00 – 22h00' },
   { di: 'DIM', nom: 'Free Style Gym adulte', quand: 'dimanche · 14h00 – 16h00' },
@@ -134,6 +90,9 @@ export const pieces = [
   },
 ]
 
+/* ============================================================
+   Onglets
+   ============================================================ */
 export const tabs = [
   { id: 'apercu', label: 'Aperçu' },
   { id: 'planning', label: 'Emploi du temps' },
@@ -145,32 +104,102 @@ export const tabs = [
   { id: 'pieces', label: 'Pièces' },
 ]
 
-// ============================================================
-// Chiffres pour l'onglet Graphiques (source unique).
-// `sorties` = dépenses de reconversion prélevées sur les livrets,
-// positionnées par index de mois (0 = août 2026).
-// ============================================================
-export const stats = {
-  livretsDepart: 13321.59,   // solde livrets mi-août 2026 (matelas déjà atteint)
-  epargneMensuelle: 500,     // Livret A 250 + LDD 250
-  cible: 12900,              // matelas = 6 mois de salaire, avant PEA
-  moisLabels: ['Août 26', 'Sep', 'Oct', 'Nov', 'Déc', 'Jan 27', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août 27', 'Sep 27', 'Oct 27', 'Nov 27', 'Déc 27'],
-  sorties: [
-    { i: 0, montant: 600,  label: 'Sport' },
-    { i: 1, montant: 390,  label: 'SCAP S1' },
-    { i: 4, montant: 5660, label: 'DU' },
-    // { i: 6, montant: 130, label: 'SCAP management' }, // optionnel — décommente si tu le prends
-  ],
-  charges: [
-    { nom: 'Alimentation',         montant: 410, couleur: '#2e6b4f' },
-    { nom: 'Logement & énergie',   montant: 142, couleur: '#8a2f2c' },
-    { nom: 'Matériel & high-tech', montant: 130, couleur: '#946517' },
-    { nom: 'Impôts (DGFIP)',       montant: 115, couleur: '#b5654d' },
-    { nom: 'Santé',                montant: 100, couleur: '#5b8c6e' },
-    { nom: 'Transports',           montant: 80,  couleur: '#4a7a8c' },
-    { nom: 'Plaisir / sorties',    montant: 80,  couleur: '#a88b3f' },
-    { nom: 'Vêtements',            montant: 70,  couleur: '#c08a5e' },
-    { nom: 'Abonnements',          montant: 57,  couleur: '#7d5a86' },
-    { nom: 'Argent liquide',       montant: 30,  couleur: '#6f665c' },
-  ],
+/* ============================================================
+   Données de départ (seed) — utilisées UNIQUEMENT au 1er login,
+   quand la table Supabase correspondante est vide. Les valeurs
+   réelles vivent ensuite dans vision_budget / vision_params / vision_voyages.
+   ============================================================ */
+export const defaultBudget = [
+  { line_key: 'revenu_salaire', kind: 'revenu', poste: 'Salaire ADEDOM (net)', detail: '', montant: 2150, sort: 0 },
+  { line_key: 'c_logement', kind: 'charge', poste: 'Logement & énergie', detail: 'EDF 28 · ENGIE 98 · chaudière 16', montant: 142, sort: 10 },
+  { line_key: 'c_alim', kind: 'charge', poste: 'Alimentation', detail: 'La Belle Vie 200 · supermarchés 170 · Amazon 40', montant: 410, sort: 11 },
+  { line_key: 'c_sante', kind: 'charge', poste: 'Santé / pharmacie', detail: 'Pharmacies · compléments · actes médicaux', montant: 100, sort: 12 },
+  { line_key: 'c_beaute', kind: 'charge', poste: 'Beauté & soins', detail: 'Coiffeur 2×/an (~10€/mois) + manucure/pédicure/épilation visage ~1×/mois (~45€)', montant: 55, sort: 13 },
+  { line_key: 'c_vetements', kind: 'charge', poste: 'Vêtements', detail: 'Vinted 40 · provision vacances 30', montant: 70, sort: 14 },
+  { line_key: 'c_materiel', kind: 'charge', poste: 'Matériel & high-tech', detail: 'IT · électroménager · bricolage', montant: 130, sort: 15 },
+  { line_key: 'c_transports', kind: 'charge', poste: 'Transports', detail: 'Navigo / RATP', montant: 80, sort: 16 },
+  { line_key: 'c_impots', kind: 'charge', poste: 'Impôts (DGFIP)', detail: 'Rattrapage N-1 (dès sept.)', montant: 115, sort: 17 },
+  { line_key: 'c_abos', kind: 'charge', poste: 'Abonnements', detail: 'YouTube · Claude · Mediapart', montant: 57, sort: 18 },
+  { line_key: 'c_liquide', kind: 'charge', poste: 'Argent liquide', detail: 'Retraits rares', montant: 30, sort: 19 },
+  { line_key: 'c_plaisir', kind: 'charge', poste: 'Plaisir / sorties', detail: 'Revolut', montant: 80, sort: 20 },
+  { line_key: 'e_livretA', kind: 'epargne', poste: 'Livret A', detail: '', montant: 250, sort: 40 },
+  { line_key: 'e_ldd', kind: 'epargne', poste: 'LDD', detail: '', montant: 250, sort: 41 },
+  { line_key: 'e_vacances', kind: 'epargne', poste: 'Provision vacances', detail: 'fonds voyages', montant: 375, sort: 42 },
+]
+
+export const defaultParams = [
+  { param_key: 'start_livrets', montant: 13321.59 },
+  { param_key: 'du_paiement', montant: 5660 },
+  { param_key: 'sport', montant: 600 },
+  { param_key: 'scap_s1', montant: 390 },
+  { param_key: 'cible', montant: 12900 },
+]
+
+export const defaultVoyages = [
+  { line_key: 'v_avion_lisbonne', mois_index: 1, label: 'Avion Lisbonne', montant: 200, sort: 0 },
+  { line_key: 'v_hotel_lisbonne', mois_index: 2, label: 'Hôtel Lisbonne', montant: 230, sort: 1 },
+  { line_key: 'v_grand_voyage', mois_index: 3, label: 'Grand voyage', montant: 920, sort: 2 },
+]
+
+/* Libellés des paramètres éditables (Trésorerie) */
+export const paramLabels = {
+  start_livrets: 'Épargne de départ (livrets, mi-août 2026)',
+  du_paiement: 'Coût du DU (payé en déc. 2026)',
+  sport: 'Sport — En Avant! (août 2026)',
+  scap_s1: 'SCAP semestre 1 (sept. 2026)',
+  cible: 'Matelas cible (6 mois de salaire)',
+}
+
+/* ============================================================
+   Calculs partagés — dérivent tout du budget/params/voyages LIVE.
+   Trésorerie et Graphiques utilisent ces mêmes fonctions.
+   ============================================================ */
+export const MOIS = [
+  'Août 26', 'Sep', 'Oct', 'Nov', 'Déc', 'Jan 27', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil',
+  'Août 27', 'Sep 27', 'Oct 27', 'Nov 27', 'Déc 27',
+]
+// index de prélèvement des coûts de reconversion sur les livrets
+export const SORTIE_MOIS = { sport: 0, scap_s1: 1, du_paiement: 4 } // août, sept, déc
+
+const num = (v) => Number(v) || 0
+export const getParam = (params, key, def = 0) => {
+  const p = (params || []).find((x) => x.param_key === key)
+  return p ? num(p.montant) : def
+}
+
+export const sumKind = (budget, kind) => (budget || []).filter((b) => b.kind === kind).reduce((s, b) => s + num(b.montant), 0)
+const isVacances = (b) => b.line_key === 'e_vacances' || /vacances/i.test(b.poste || '')
+export const livretsMensuel = (budget) => (budget || []).filter((b) => b.kind === 'epargne' && !isVacances(b)).reduce((s, b) => s + num(b.montant), 0)
+export const vacancesMensuel = (budget) => { const v = (budget || []).find(isVacances); return v ? num(v.montant) : 0 }
+
+export function marge(budget) {
+  return sumKind(budget, 'revenu') - sumKind(budget, 'charge') - sumKind(budget, 'epargne')
+}
+
+// Projection livrets (matelas), coûts de reconversion déduits
+export function projLivrets(budget, params, horizon = MOIS.length) {
+  const start = getParam(params, 'start_livrets', 13321.59)
+  const mens = livretsMensuel(budget)
+  const sorties = {}
+  for (const [key, i] of Object.entries(SORTIE_MOIS)) sorties[i] = (sorties[i] || 0) + getParam(params, key, 0)
+  const pts = [start - (sorties[0] || 0)]
+  for (let i = 1; i < horizon; i++) pts.push(pts[i - 1] + mens - (sorties[i] || 0))
+  return pts
+}
+
+// Projection poche vacances, voyages déduits à leur mois
+export function projVacances(budget, voyages, horizon = MOIS.length) {
+  const mens = vacancesMensuel(budget)
+  const dep = {}
+  ;(voyages || []).forEach((v) => { dep[num(v.mois_index)] = (dep[num(v.mois_index)] || 0) + num(v.montant) })
+  const pts = []; let bal = 0
+  for (let i = 0; i < horizon; i++) { bal += mens - (dep[i] || 0); pts.push(bal) }
+  return pts
+}
+
+export function jalons(pts, cible) {
+  const troughIdx = pts.indexOf(Math.min(...pts))
+  let recIdx = -1
+  for (let i = troughIdx; i < pts.length; i++) { if (pts[i] >= cible) { recIdx = i; break } }
+  return { troughIdx, recIdx }
 }
