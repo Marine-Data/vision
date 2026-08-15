@@ -3,6 +3,7 @@ import { supabase, supabaseConfigured } from './lib/supabase.js'
 import Auth from './components/Auth.jsx'
 import { Apercu, Planning, Suivi, Budget, Tresorerie, Sport, Pieces } from './components/Sections.jsx'
 import Stats from './components/Charts.jsx'
+import { underwaterBanner } from './data/media.js'
 import { tabs, defaultBudget, defaultParams, defaultVoyages } from './data/dossier.js'
 
 export default function App() {
@@ -113,7 +114,7 @@ export default function App() {
 
   return (
     <>
-      <header className="top">
+      <header className="top" style={{ backgroundImage: `linear-gradient(180deg, rgba(9,42,49,.42), rgba(9,42,49,.72)), url(${underwaterBanner})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div className="wrap">
           <div className="kick">Reconversion · 2026 – 2027</div>
           <h1>Juriste Data, IA &amp; Cyber</h1>
