@@ -240,3 +240,15 @@ export function libelleJours(j) {
   const m = Math.round(j / 30)
   return `dans ~${m} mois`
 }
+
+/* Relevés réels des livrets (saisis par mois), stockés en params : reel_<index>. */
+export function serieReel(params, horizon = MOIS.length) {
+  return Array.from({ length: horizon }, (_, i) => {
+    const p = (params || []).find((x) => x.param_key === 'reel_' + i)
+    return p && p.montant !== '' && p.montant != null ? Number(p.montant) : null
+  })
+}
+export const reelParam = (params, i) => {
+  const p = (params || []).find((x) => x.param_key === 'reel_' + i)
+  return p && p.montant != null ? p.montant : ''
+}
