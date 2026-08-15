@@ -1,8 +1,9 @@
 import {
   chronologie, semaine, semaineNotes, suivi, budgetEcheancier, budgetRecap, sportSlots, pieces,
   paramLabels, defaultParams, MOIS, getParam, sumKind, marge, vacancesMensuel, projVacances,
-  projLivrets, jalons, planParam, prochainesEcheances, libelleJours,
+  projLivrets, jalons, planParam, prochainesEcheances, libelleJours, serieReel, reelParam,
 } from '../data/dossier.js'
+import { annecyBanner } from '../data/media.js'
 
 const eur = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' €'
 const defP = (k) => { const d = defaultParams.find((p) => p.param_key === k); return d ? d.montant : 0 }
@@ -20,11 +21,9 @@ export function Apercu({ progress = {}, budget, params }) {
 
   return (
     <section className="sec">
-      <div className="card" style={{ background: 'linear-gradient(120deg,#c15a3d,#dd9038)', color: '#fff', border: 0 }}>
-        <div style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', opacity: .92 }}>Cap sur la mer 🌊</div>
-        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.25rem', marginTop: 4 }}>Chaque jalon te rapproche du bord de mer.</div>
-        <div style={{ fontSize: 13, opacity: .92, marginTop: 6 }}>Reconversion → matelas → PEA → la mer.</div>
-      </div>
+      <div className="card" style={{ padding: 0, border: 0, overflow: 'hidden', height: 148,
+        backgroundImage: `linear-gradient(180deg, rgba(14,58,66,.05), rgba(14,58,66,.30)), url(${annecyBanner})`,
+        backgroundSize: 'cover', backgroundPosition: 'center 62%' }} />
 
       {next && (
         <>
@@ -48,7 +47,7 @@ export function Apercu({ progress = {}, budget, params }) {
       <div className="h3">Où j'en suis</div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span>Matelas de sécurité <span style={{ color: 'var(--slate)' }}>· à la clé : le PEA, puis la mer</span></span>
+          <span>Matelas de sécurité</span>
           <b>{matelasPct} %</b>
         </div>
         <div className="prog" style={{ margin: '6px 0 14px' }}><i style={{ width: matelasPct + '%' }} /></div>
@@ -196,30 +195,36 @@ export function Tresorerie(props) {
         ))}
       </div>
 
-      <div className="h3">Projection de l'épargne (livrets)</div>
+      <div className="h3">Épargne — prévu vs réalisé</div>
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="tbl">
-          <thead><tr><th>Mois</th><th>Événement</th><th className="num">Solde livrets</th></tr></thead>
+          <thead><tr><th>Mois</th><th className="num">Prévu</th><th className="num">Réel</th><th className="num">Écart</th></tr></thead>
           <tbody>
             {(() => {
               const pts = projLivrets(budget, params)
-              const cible = getParam(params, 'cible', defP('cible'))
-              const { troughIdx, recIdx } = jalons(pts, cible)
-              const ev = {
-                0: '\u2212 ' + eur(getParam(params, 'sport', defP('sport'))) + ' (sport)',
-                1: '\u2212 ' + eur(getParam(params, 'scap_s1', defP('scap_s1'))) + ' (SCAP)',
-                4: '\u2212 ' + eur(getParam(params, 'du_paiement', defP('du_paiement'))) + ' (DU)',
-              }
-              return pts.map((v, i) => (
-                <tr key={i}>
-                  <td>{MOIS[i]}</td>
-                  <td className={i === troughIdx ? 'low' : ''}>{i === recIdx ? 'objectif repassé' : (ev[i] || '\u2014')}</td>
-                  <td className={'num' + (i === troughIdx ? ' low' : i === recIdx ? ' ok' : '')}>{eur(v)}</td>
-                </tr>
-              ))
+              const { troughIdx, recIdx } = jalons(pts, planParam(params, 'cible'))
+              return pts.slice(0, 13).map((v, i) => {
+                const rv = reelParam(params, i)
+                const has = rv !== '' && rv != null
+                const ecart = has ? Number(rv) - v : null
+                return (
+                  <tr key={i}>
+                    <td className={i === troughIdx ? 'low' : i === recIdx ? 'ok' : ''}>{MOIS[i]}</td>
+                    <td className="num">{eur(v)}</td>
+                    <td className="num" style={{ padding: '3px 6px' }}>
+                      <input className="bedit bnum" style={{ width: 82 }} type="number" inputMode="numeric" placeholder="—"
+                        value={rv}
+                        onChange={(e) => editParam('reel_' + i, e.target.value)}
+                        onBlur={(e) => saveParam('reel_' + i, e.target.value)} />
+                    </td>
+                    <td className={'num' + (has ? (ecart >= 0 ? ' ok' : ' low') : '')}>{has ? (ecart >= 0 ? '+' : '') + eur(ecart) : '—'}</td>
+                  </tr>
+                )
+              })
             })()}
           </tbody>
         </table>
+        <div className="note">Saisis ton solde livrets réel chaque mois : l'écart et la courbe « réalisé » (Graphiques) se mettent à jour.</div>
       </div>
 
       <div className="h3">Voyages — provision {eur(vacMens)}/mois</div>
