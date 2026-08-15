@@ -15,7 +15,7 @@ export default function App() {
   const [voyages, setVoyages] = useState([])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true) })
+    supabase.auth.getSession().then(({ data }) => setSession(data?.session ?? null)).catch(() => {}).finally(() => setReady(true))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -122,7 +122,7 @@ export default function App() {
         </div>
       </header>
       <main className="wrap">
-        {tab === 'apercu' && <Apercu />}
+        {tab === 'apercu' && <Apercu progress={progress} budget={budget} params={params} />}
         {tab === 'planning' && <Planning />}
         {tab === 'suivi' && <Suivi progress={progress} toggle={toggle} />}
         {tab === 'budget' && <Budget />}
