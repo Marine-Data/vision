@@ -166,6 +166,9 @@ export const getParam = (params, key, def = 0) => {
   const p = (params || []).find((x) => x.param_key === key)
   return p ? num(p.montant) : def
 }
+// valeur par défaut d'un paramètre du plan (utilisée quand la clé n'est pas encore en base)
+export const paramDefault = (key) => { const d = defaultParams.find((p) => p.param_key === key); return d ? d.montant : 0 }
+export const planParam = (params, key) => getParam(params, key, paramDefault(key))
 
 export const sumKind = (budget, kind) => (budget || []).filter((b) => b.kind === kind).reduce((s, b) => s + num(b.montant), 0)
 const isVacances = (b) => b.line_key === 'e_vacances' || /vacances/i.test(b.poste || '')
@@ -178,10 +181,10 @@ export function marge(budget) {
 
 // Projection livrets (matelas), coûts de reconversion déduits
 export function projLivrets(budget, params, horizon = MOIS.length) {
-  const start = getParam(params, 'start_livrets', 13321.59)
+  const start = planParam(params, 'start_livrets')
   const mens = livretsMensuel(budget)
   const sorties = {}
-  for (const [key, i] of Object.entries(SORTIE_MOIS)) sorties[i] = (sorties[i] || 0) + getParam(params, key, 0)
+  for (const [key, i] of Object.entries(SORTIE_MOIS)) sorties[i] = (sorties[i] || 0) + planParam(params, key)
   const pts = [start - (sorties[0] || 0)]
   for (let i = 1; i < horizon; i++) pts.push(pts[i - 1] + mens - (sorties[i] || 0))
   return pts
@@ -202,4 +205,38 @@ export function jalons(pts, cible) {
   let recIdx = -1
   for (let i = troughIdx; i < pts.length; i++) { if (pts[i] >= cible) { recIdx = i; break } }
   return { troughIdx, recIdx }
+}
+
+/* ============================================================
+   Échéances datées — alimentent les comptes à rebours (Aperçu).
+   ============================================================ */
+export const echeances = [
+  { date: '2026-08-17', titre: 'Inscriptions SCAP S1', detail: 'Ouverture — jusqu\u2019au 7 sept.' },
+  { date: '2026-08-24', titre: 'Inscription sport — En Avant!', detail: 'Chèque 600 € + certificat médical' },
+  { date: '2026-09-01', titre: 'Candidature DU sur eCandidat', detail: 'Dépôt jusqu\u2019au 1er déc.' },
+  { date: '2026-09-28', titre: 'Rentrée SCAP S1', detail: 'Début des cours' },
+  { date: '2026-12-01', titre: 'Date limite dossier DU', detail: 'Dernier jour eCandidat' },
+  { date: '2027-01-15', titre: 'Rentrée du DU', detail: 'Panthéon-Sorbonne' },
+  { date: '2027-07-04', titre: 'Fin du DU', detail: '\u2192 recherche de poste' },
+  { date: '2027-09-01', titre: 'Bascule PEA \ud83c\udf0a', detail: 'Matelas reconstitué — cap sur la mer' },
+]
+
+export function joursRestants(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  return Math.round((d - now) / 86400000)
+}
+export function prochainesEcheances(n = 3) {
+  return echeances
+    .map((e) => ({ ...e, j: joursRestants(e.date) }))
+    .filter((e) => e.j >= 0)
+    .sort((a, b) => a.j - b.j)
+    .slice(0, n)
+}
+export function libelleJours(j) {
+  if (j === 0) return "aujourd'hui"
+  if (j === 1) return 'demain'
+  if (j < 30) return `dans ${j} jours`
+  const m = Math.round(j / 30)
+  return `dans ~${m} mois`
 }
