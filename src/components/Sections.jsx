@@ -1,18 +1,64 @@
 import {
   chronologie, semaine, semaineNotes, suivi, budgetEcheancier, budgetRecap, sportSlots, pieces,
   paramLabels, defaultParams, MOIS, getParam, sumKind, marge, vacancesMensuel, projVacances,
-  projLivrets, jalons,
+  projLivrets, jalons, planParam, prochainesEcheances, libelleJours,
 } from '../data/dossier.js'
 
 const eur = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' €'
 const defP = (k) => { const d = defaultParams.find((p) => p.param_key === k); return d ? d.montant : 0 }
 
 /* ---------- Aperçu ---------- */
-export function Apercu() {
+export function Apercu({ progress = {}, budget, params }) {
+  const prochaines = prochainesEcheances(3)
+  const next = prochaines[0]
+  const suiviDone = suivi.filter((s) => progress[s.key]).length
+  const piecesAll = pieces.flatMap((g) => g.items)
+  const piecesDone = piecesAll.filter((it) => progress[it.key]).length
+  const start = planParam(params, 'start_livrets')
+  const cible = planParam(params, 'cible')
+  const matelasPct = cible ? Math.min(100, Math.round((start / cible) * 100)) : 0
+
   return (
     <section className="sec">
-      <h2>Chronologie de l'année</h2>
-      <p className="sub">Août 2026 → juillet 2027, tous dispositifs confondus.</p>
+      <div className="card" style={{ background: 'linear-gradient(120deg,#c15a3d,#dd9038)', color: '#fff', border: 0 }}>
+        <div style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', opacity: .92 }}>Cap sur la mer 🌊</div>
+        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.25rem', marginTop: 4 }}>Chaque jalon te rapproche du bord de mer.</div>
+        <div style={{ fontSize: 13, opacity: .92, marginTop: 6 }}>Reconversion → matelas → PEA → la mer.</div>
+      </div>
+
+      {next && (
+        <>
+          <div className="h3">À faire ensuite</div>
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+              <b>{next.titre}</b>
+              <span style={{ color: 'var(--oxblood)', fontWeight: 700, whiteSpace: 'nowrap' }}>{libelleJours(next.j)}</span>
+            </div>
+            {next.detail && <div className="detail" style={{ marginTop: 3 }}>{next.detail}</div>}
+          </div>
+          {prochaines.slice(1).map((e, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '5px 4px', fontSize: 13.5 }}>
+              <span>{e.titre}</span>
+              <span style={{ color: 'var(--slate)', whiteSpace: 'nowrap' }}>{libelleJours(e.j)}</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      <div className="h3">Où j'en suis</div>
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span>Matelas de sécurité <span style={{ color: 'var(--slate)' }}>· à la clé : le PEA, puis la mer</span></span>
+          <b>{matelasPct} %</b>
+        </div>
+        <div className="prog" style={{ margin: '6px 0 14px' }}><i style={{ width: matelasPct + '%' }} /></div>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <div style={{ flex: 1 }}><div className="detail">Étapes de suivi</div><b>{suiviDone} / {suivi.length}</b></div>
+          <div style={{ flex: 1 }}><div className="detail">Pièces prêtes</div><b>{piecesDone} / {piecesAll.length}</b></div>
+        </div>
+      </div>
+
+      <div className="h3">Chronologie de l'année</div>
       <div className="card">
         {chronologie.map((t, i) => (
           <div className="tl" key={i}><div className="when">{t.when}</div><div className="what">{t.what}</div><div className="det">{t.det}</div></div>
@@ -50,13 +96,14 @@ export function Planning() {
 export function Suivi({ progress, toggle }) {
   const done = suivi.filter((s) => progress[s.key]).length
   const pct = Math.round((done / suivi.length) * 100)
+  const ordonne = [...suivi].sort((a, b) => (progress[a.key] ? 1 : 0) - (progress[b.key] ? 1 : 0))
   return (
     <section className="sec">
       <h2>Tableau de suivi</h2>
       <p className="sub">{done} / {suivi.length} étapes faites · coché = sauvegardé.</p>
       <div className="prog"><i style={{ width: pct + '%' }} /></div>
       <div className="card" style={{ padding: '4px 12px' }}>
-        {suivi.map((s) => (
+        {ordonne.map((s) => (
           <label className={'check' + (progress[s.key] ? ' done' : '')} key={s.key}>
             <input type="checkbox" checked={!!progress[s.key]} onChange={() => toggle(s.key)} />
             <span className="lbl"><b>{s.etape}</b><span className="meta">{s.echeance}{s.action !== '—' ? ' · ' + s.action : ''}</span></span>
@@ -247,7 +294,7 @@ export function Pieces({ progress, toggle }) {
         <div key={i}>
           <div className="h3">{g.titre}</div>
           <div className="card" style={{ padding: '4px 12px' }}>
-            {g.items.map((it) => (
+            {[...g.items].sort((a, b) => (progress[a.key] ? 1 : 0) - (progress[b.key] ? 1 : 0)).map((it) => (
               <label className={'check' + (progress[it.key] ? ' done' : '')} key={it.key}>
                 <input type="checkbox" checked={!!progress[it.key]} onChange={() => toggle(it.key)} />
                 <span className="lbl"><b>{it.label}</b></span>

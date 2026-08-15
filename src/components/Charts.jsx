@@ -1,19 +1,19 @@
 import {
-  MOIS, getParam, sumKind, livretsMensuel, projLivrets, projVacances, jalons,
+  MOIS, getParam, planParam, sumKind, livretsMensuel, projLivrets, projVacances, jalons,
 } from '../data/dossier.js'
 
 const eur = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' €'
 const eurShort = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n))
 
-const DONUT_COLORS = ['#8a2f2c', '#2e6b4f', '#946517', '#b5654d', '#5b8c6e', '#4a7a8c', '#a88b3f', '#c08a5e', '#7d5a86', '#6f665c', '#9c5a3c', '#3f7d6a']
+const DONUT_COLORS = ['#c15a3d', '#148a7a', '#dd9038', '#3f9fb0', '#e0a15a', '#5b8c9c', '#b5654d', '#2f9e8a', '#c9873f', '#5f7279', '#7fbfc4', '#a8543a']
 
 /* ---------- Courbe de projection de l'épargne (livrets) ---------- */
 export function EpargneChart({ budget, params }) {
   const pts = projLivrets(budget, params)
-  const cible = getParam(params, 'cible', 12900)
+  const cible = planParam(params, 'cible')
   const { troughIdx, recIdx } = jalons(pts, cible)
   const duMois = 4
-  const duMontant = getParam(params, 'du_paiement', 5660)
+  const duMontant = planParam(params, 'du_paiement')
   const W = 680, H = 300, pad = { l: 54, r: 16, t: 18, b: 34 }
   const ix = W - pad.l - pad.r, iy = H - pad.t - pad.b
   const vals = [...pts, cible]
@@ -30,22 +30,29 @@ export function EpargneChart({ budget, params }) {
       <svg viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', width: '100%', height: 'auto' }} role="img" aria-label="Projection de l'épargne">
         {grid.map((v, k) => (
           <g key={k}>
-            <line x1={pad.l} y1={Y(v)} x2={W - pad.r} y2={Y(v)} stroke="#e4dccd" strokeWidth="1" />
-            <text x={pad.l - 8} y={Y(v) + 4} textAnchor="end" fontSize="11" fill="#6f665c">{eurShort(v)}</text>
+            <line x1={pad.l} y1={Y(v)} x2={W - pad.r} y2={Y(v)} stroke="#dfe5e3" strokeWidth="1" />
+            <text x={pad.l - 8} y={Y(v) + 4} textAnchor="end" fontSize="11" fill="#5f7279">{eurShort(v)}</text>
           </g>
         ))}
-        <line x1={pad.l} y1={Y(cible)} x2={W - pad.r} y2={Y(cible)} stroke="#2e6b4f" strokeWidth="1.5" strokeDasharray="5 4" />
-        <text x={W - pad.r} y={Y(cible) - 6} textAnchor="end" fontSize="11" fill="#2e6b4f">Matelas {eur(cible)}</text>
-        <path d={area} fill="#8a2f2c" opacity="0.07" />
-        <path d={line} fill="none" stroke="#8a2f2c" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <line x1={pad.l} y1={Y(cible)} x2={W - pad.r} y2={Y(cible)} stroke="#148a7a" strokeWidth="1.5" strokeDasharray="5 4" />
+        <text x={W - pad.r} y={Y(cible) - 6} textAnchor="end" fontSize="11" fill="#148a7a">Matelas {eur(cible)}</text>
+        <path d={area} fill="#c15a3d" opacity="0.07" />
+        <path d={line} fill="none" stroke="#c15a3d" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {MOIS.map((m, i) => (i % 2 === 0 || i === MOIS.length - 1) && (
-          <text key={i} x={X(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="#6f665c">{m}</text>
+          <text key={i} x={X(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="#5f7279">{m}</text>
         ))}
         {pts.map((v, i) => {
           const hot = i === 0 || i === 1 || i === duMois
-          return <circle key={i} cx={X(i)} cy={Y(v)} r={hot ? 4 : 2.5} fill={hot ? '#946517' : '#8a2f2c'} />
+          return <circle key={i} cx={X(i)} cy={Y(v)} r={hot ? 4 : 2.5} fill={hot ? '#dd9038' : '#c15a3d'} />
         })}
-        <text x={X(duMois)} y={Y(pts[duMois]) + 18} textAnchor="middle" fontSize="11" fill="#946517">{'\u2212 '}{eurShort(duMontant)} DU</text>
+        <text x={X(duMois)} y={Y(pts[duMois]) + 18} textAnchor="middle" fontSize="11" fill="#dd9038">{'\u2212 '}{eurShort(duMontant)} DU</text>
+        {recIdx >= 0 && (
+          <g>
+            <line x1={X(recIdx)} y1={pad.t} x2={X(recIdx)} y2={H - pad.b} stroke="#148a7a" strokeWidth="1.5" strokeDasharray="4 4" />
+            <circle cx={X(recIdx)} cy={Y(pts[recIdx])} r="4.5" fill="#148a7a" />
+            <text x={X(recIdx)} y={pad.t + 10} textAnchor={recIdx > MOIS.length - 3 ? 'end' : 'middle'} fontSize="11" fontWeight="700" fill="#148a7a">Bascule PEA 🌊</text>
+          </g>
+        )}
       </svg>
       <div className="note">
         Sport, SCAP et DU déduits des livrets : creux à {eur(pts[troughIdx])} en {MOIS[troughIdx]}, puis retour au-dessus du matelas de {eur(cible)} vers {recIdx >= 0 ? MOIS[recIdx] : 'plus tard'}.
@@ -57,8 +64,8 @@ export function EpargneChart({ budget, params }) {
 /* ---------- Jauge du matelas de sécurité ---------- */
 export function MatelasGauge({ budget, params }) {
   const pts = projLivrets(budget, params)
-  const cible = getParam(params, 'cible', 12900)
-  const start = getParam(params, 'start_livrets', 13321.59)
+  const cible = planParam(params, 'cible')
+  const start = planParam(params, 'start_livrets')
   const { troughIdx, recIdx } = jalons(pts, cible)
   const pct = cible > 0 ? Math.round(start / cible * 100) : 0
   const barW = Math.max(0, Math.min(100, pct))
@@ -87,6 +94,36 @@ export function MatelasGauge({ budget, params }) {
   )
 }
 
+/* ---------- Courbe de la poche vacances ---------- */
+export function VacancesChart({ budget, voyages }) {
+  const pts = projVacances(budget, voyages, 12)
+  const labels = MOIS.slice(0, 12)
+  const W = 680, H = 240, pad = { l: 48, r: 16, t: 16, b: 34 }
+  const ix = W - pad.l - pad.r, iy = H - pad.t - pad.b
+  let min = Math.min(0, ...pts), max = Math.max(...pts, 1)
+  const span = (max - min) || 1; min -= span * 0.08; max += span * 0.10
+  const X = (i) => pad.l + i * (ix / (labels.length - 1))
+  const Y = (v) => pad.t + (1 - (v - min) / (max - min)) * iy
+  const line = pts.map((v, i) => `${i === 0 ? 'M' : 'L'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')
+  const floor = Math.min(...pts), floorIdx = pts.indexOf(floor)
+  return (
+    <div className="card">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', width: '100%', height: 'auto' }} role="img" aria-label="Projection de la poche vacances">
+        {[0, 1, 2].map((k) => { const v = min + (max - min) * k / 2; return (
+          <g key={k}><line x1={pad.l} y1={Y(v)} x2={W - pad.r} y2={Y(v)} stroke="#dfe5e3" strokeWidth="1" />
+          <text x={pad.l - 8} y={Y(v) + 4} textAnchor="end" fontSize="11" fill="#5f7279">{eurShort(v)}</text></g>) })}
+        {min < 0 && <line x1={pad.l} y1={Y(0)} x2={W - pad.r} y2={Y(0)} stroke="#c15a3d" strokeWidth="1" strokeDasharray="3 3" />}
+        <path d={line} fill="none" stroke="#148a7a" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {labels.map((m, i) => (i % 2 === 0 || i === labels.length - 1) && (
+          <text key={i} x={X(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="#5f7279">{m}</text>
+        ))}
+        {pts.map((v, i) => <circle key={i} cx={X(i)} cy={Y(v)} r={i === floorIdx ? 4 : 2.5} fill={i === floorIdx ? '#c15a3d' : '#148a7a'} />)}
+      </svg>
+      <div className="note">Plancher à {eur(floor)} en {labels[floorIdx]} (après le grand voyage). En dessous de 0, ça déborderait sur les livrets.</div>
+    </div>
+  )
+}
+
 /* ---------- Donut de répartition des charges ---------- */
 export function ChargesDonut({ budget }) {
   const charges = (budget || []).filter((b) => b.kind === 'charge').map((b, i) => ({ nom: b.poste, montant: Number(b.montant) || 0, couleur: DONUT_COLORS[i % DONUT_COLORS.length] }))
@@ -108,8 +145,8 @@ export function ChargesDonut({ budget }) {
             off += len
             return el
           })}
-          <text x={C} y={C - 4} textAnchor="middle" style={{ fontFamily: 'Georgia,serif', fontSize: 22, fontWeight: 600, fill: '#26201b' }}>{eurShort(total)} €</text>
-          <text x={C} y={C + 16} textAnchor="middle" fontSize="11" fill="#6f665c">par mois</text>
+          <text x={C} y={C - 4} textAnchor="middle" style={{ fontFamily: 'Georgia,serif', fontSize: 22, fontWeight: 600, fill: '#23323a' }}>{eurShort(total)} €</text>
+          <text x={C} y={C + 16} textAnchor="middle" fontSize="11" fill="#5f7279">par mois</text>
         </svg>
       </div>
       <div style={{ marginTop: 10 }}>
@@ -138,6 +175,8 @@ export default function Stats({ budget, params, voyages }) {
       <EpargneChart budget={budget} params={params} />
       <div className="h3">Matelas de sécurité</div>
       <MatelasGauge budget={budget} params={params} />
+      <div className="h3">Poche vacances</div>
+      <VacancesChart budget={budget} voyages={voyages} />
       <div className="h3">{`Répartition des charges — ${eurShort(totalCharges)} €/mois`}</div>
       <ChargesDonut budget={budget} />
     </section>
