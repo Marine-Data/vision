@@ -92,7 +92,7 @@ export function Planning() {
 }
 
 /* ---------- Suivi ---------- */
-export function Suivi({ progress, toggle }) {
+export function Suivi({ progress, toggle, readOnly }) {
   const done = suivi.filter((s) => progress[s.key]).length
   const pct = Math.round((done / suivi.length) * 100)
   const ordonne = [...suivi].sort((a, b) => (progress[a.key] ? 1 : 0) - (progress[b.key] ? 1 : 0))
@@ -104,7 +104,7 @@ export function Suivi({ progress, toggle }) {
       <div className="card" style={{ padding: '4px 12px' }}>
         {ordonne.map((s) => (
           <label className={'check' + (progress[s.key] ? ' done' : '')} key={s.key}>
-            <input type="checkbox" checked={!!progress[s.key]} onChange={() => toggle(s.key)} />
+            <input type="checkbox" checked={!!progress[s.key]} disabled={readOnly} onChange={() => toggle(s.key)} />
             <span className="lbl"><b>{s.etape}</b><span className="meta">{s.echeance}{s.action !== '—' ? ' · ' + s.action : ''}</span></span>
           </label>
         ))}
@@ -135,7 +135,7 @@ export function Budget() {
 }
 
 /* ---------- Groupe de budget éditable ---------- */
-function BudgetGroup({ titre, kind, budget, editLine, saveLine, addLine, removeLine }) {
+function BudgetGroup({ titre, kind, budget, editLine, saveLine, addLine, removeLine, readOnly }) {
   const rows = budget.filter((b) => b.kind === kind)
   return (
     <>
@@ -143,22 +143,22 @@ function BudgetGroup({ titre, kind, budget, editLine, saveLine, addLine, removeL
       {rows.map((b) => (
         <div className="brow" key={b.id}>
           <div className="bcol">
-            <input className="bedit lbl" value={b.poste} onChange={(e) => editLine(b.id, { poste: e.target.value })} onBlur={() => saveLine(b.id)} />
+            <input className="bedit lbl" disabled={readOnly} value={b.poste} onChange={(e) => editLine(b.id, { poste: e.target.value })} onBlur={() => saveLine(b.id)} />
             {b.detail ? <div className="bdet">{b.detail}</div> : null}
           </div>
-          <input className="bedit bnum" type="number" inputMode="numeric" value={b.montant}
+          <input className="bedit bnum" type="number" inputMode="numeric" disabled={readOnly} value={b.montant}
             onChange={(e) => editLine(b.id, { montant: e.target.value })} onBlur={() => saveLine(b.id)} />
-          <button className="bdel" onClick={() => removeLine(b.id)} aria-label="Supprimer">×</button>
+          {!readOnly && <button className="bdel" onClick={() => removeLine(b.id)} aria-label="Supprimer">×</button>}
         </div>
       ))}
-      <button className="badd" onClick={() => addLine(kind)}>+ Ajouter une ligne</button>
+      {!readOnly && <button className="badd" onClick={() => addLine(kind)}>+ Ajouter une ligne</button>}
     </>
   )
 }
 
 /* ---------- Trésorerie (éditable) ---------- */
 export function Tresorerie(props) {
-  const { budget, params, voyages, editLine, saveLine, addLine, removeLine, editParam, saveParam, editVoyage, saveVoyage, addVoyage, removeVoyage } = props
+  const { budget, params, voyages, editLine, saveLine, addLine, removeLine, editParam, saveParam, editVoyage, saveVoyage, addVoyage, removeVoyage, readOnly } = props
   if (!budget) return <section className="sec"><h2>Trésorerie</h2><p className="sub">Chargement du budget…</p></section>
   const totCharges = sumKind(budget, 'charge')
   const totEpargne = sumKind(budget, 'epargne')
@@ -174,10 +174,10 @@ export function Tresorerie(props) {
       <p className="sub">Édite tes montants : tout se sauvegarde, et les Graphiques suivent.</p>
 
       <div className="card">
-        <BudgetGroup titre="Revenus" kind="revenu" budget={budget} editLine={editLine} saveLine={saveLine} addLine={addLine} removeLine={removeLine} />
-        <BudgetGroup titre="Charges de vie" kind="charge" budget={budget} editLine={editLine} saveLine={saveLine} addLine={addLine} removeLine={removeLine} />
+        <BudgetGroup titre="Revenus" kind="revenu" budget={budget} editLine={editLine} saveLine={saveLine} addLine={addLine} removeLine={removeLine} readOnly={readOnly} />
+        <BudgetGroup titre="Charges de vie" kind="charge" budget={budget} editLine={editLine} saveLine={saveLine} addLine={addLine} removeLine={removeLine} readOnly={readOnly} />
         <div className="btot"><span>Total charges de vie</span><span>{eur(totCharges)}</span></div>
-        <BudgetGroup titre="Épargne" kind="epargne" budget={budget} editLine={editLine} saveLine={saveLine} addLine={addLine} removeLine={removeLine} />
+        <BudgetGroup titre="Épargne" kind="epargne" budget={budget} editLine={editLine} saveLine={saveLine} addLine={addLine} removeLine={removeLine} readOnly={readOnly} />
         <div className="btot"><span>Total épargne</span><span>{eur(totEpargne)}</span></div>
         {m < 0
           ? <div className="bwarn"><b>Budget en déséquilibre de {eur(-m)}/mois.</b> Baisse un poste souple, réduis la provision vacances, ou ajuste la beauté.</div>
@@ -189,7 +189,7 @@ export function Tresorerie(props) {
         {paramKeys.map((key) => (
           <div className="hyp" key={key}>
             <span className="lbl">{paramLabels[key]}</span>
-            <input className="bedit bnum" type="number" inputMode="numeric" value={getParam(params, key, defP(key))}
+            <input className="bedit bnum" type="number" inputMode="numeric" disabled={readOnly} value={getParam(params, key, defP(key))}
               onChange={(e) => editParam(key, e.target.value)} onBlur={(e) => saveParam(key, e.target.value)} />
           </div>
         ))}
@@ -212,7 +212,7 @@ export function Tresorerie(props) {
                     <td className={i === troughIdx ? 'low' : i === recIdx ? 'ok' : ''}>{MOIS[i]}</td>
                     <td className="num">{eur(v)}</td>
                     <td className="num" style={{ padding: '3px 6px' }}>
-                      <input className="bedit bnum" style={{ width: 82 }} type="number" inputMode="numeric" placeholder="—"
+                      <input className="bedit bnum" style={{ width: 82 }} type="number" inputMode="numeric" disabled={readOnly} placeholder="—"
                         value={rv}
                         onChange={(e) => editParam('reel_' + i, e.target.value)}
                         onBlur={(e) => saveParam('reel_' + i, e.target.value)} />
@@ -231,15 +231,15 @@ export function Tresorerie(props) {
       <div className="card">
         {(voyages || []).map((v) => (
           <div className="brow" key={v.id}>
-            <input className="bedit lbl" style={{ flex: 1 }} value={v.label} onChange={(e) => editVoyage(v.id, { label: e.target.value })} onBlur={() => saveVoyage(v.id)} />
-            <select className="bsel" value={v.mois_index} onChange={(e) => { editVoyage(v.id, { mois_index: e.target.value }); saveVoyage(v.id, { mois_index: e.target.value }) }}>
+            <input className="bedit lbl" style={{ flex: 1 }} disabled={readOnly} value={v.label} onChange={(e) => editVoyage(v.id, { label: e.target.value })} onBlur={() => saveVoyage(v.id)} />
+            <select className="bsel" disabled={readOnly} value={v.mois_index} onChange={(e) => { editVoyage(v.id, { mois_index: e.target.value }); saveVoyage(v.id, { mois_index: e.target.value }) }}>
               {MOIS.slice(0, 12).map((mo, i) => <option key={i} value={i}>{mo}</option>)}
             </select>
-            <input className="bedit bnum" type="number" inputMode="numeric" value={v.montant} onChange={(e) => editVoyage(v.id, { montant: e.target.value })} onBlur={() => saveVoyage(v.id)} />
-            <button className="bdel" onClick={() => removeVoyage(v.id)} aria-label="Supprimer">×</button>
+            <input className="bedit bnum" type="number" inputMode="numeric" disabled={readOnly} value={v.montant} onChange={(e) => editVoyage(v.id, { montant: e.target.value })} onBlur={() => saveVoyage(v.id)} />
+            {!readOnly && <button className="bdel" onClick={() => removeVoyage(v.id)} aria-label="Supprimer">×</button>}
           </div>
         ))}
-        <button className="badd" onClick={addVoyage}>+ Ajouter un voyage</button>
+        {!readOnly && <button className="badd" onClick={addVoyage}>+ Ajouter un voyage</button>}
         <div className="note">Plancher de la poche vacances : <b>{eur(vacFloor)}</b>. En dessous de 0, ça déborderait sur les livrets.</div>
       </div>
 
@@ -286,7 +286,7 @@ export function Sport() {
 }
 
 /* ---------- Pièces ---------- */
-export function Pieces({ progress, toggle }) {
+export function Pieces({ progress, toggle, readOnly }) {
   const all = pieces.flatMap((g) => g.items)
   const done = all.filter((it) => progress[it.key]).length
   const pct = Math.round((done / all.length) * 100)
@@ -301,7 +301,7 @@ export function Pieces({ progress, toggle }) {
           <div className="card" style={{ padding: '4px 12px' }}>
             {[...g.items].sort((a, b) => (progress[a.key] ? 1 : 0) - (progress[b.key] ? 1 : 0)).map((it) => (
               <label className={'check' + (progress[it.key] ? ' done' : '')} key={it.key}>
-                <input type="checkbox" checked={!!progress[it.key]} onChange={() => toggle(it.key)} />
+                <input type="checkbox" checked={!!progress[it.key]} disabled={readOnly} onChange={() => toggle(it.key)} />
                 <span className="lbl"><b>{it.label}</b></span>
               </label>
             ))}
