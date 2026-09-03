@@ -17099,10 +17099,11 @@ const Av = [{
         sort: 2
     }],
     Kv = {
-        start_livrets: "Épargne de départ (livrets, mi-août 2026)",
+        start_livrets: "Épargne de départ (livrets, mi-août 2026, hors provisions)",
         du_paiement: "Coût du DU (payé en déc. 2026)",
-        sport: "Sport — En Avant! (août 2026)",
-        scap_s1: "SCAP semestre 1 (sept. 2026)",
+        sport: "Sport — En Avant! (600 €, SEPA 3×200)",
+        scap_s1: "SCAP semestre 1 (prévu, sept. 2026)",
+        scap_s1_reel: "SCAP S1 — réellement payé à ce jour",
         cible: "Matelas cible (6 mois de salaire)"
     },
     ve = ["Août 26", "Sep", "Oct", "Nov", "Déc", "Jan 27", "Fév", "Mars", "Avr", "Mai", "Juin", "Juil", "Août 27", "Sep 27", "Oct 27", "Nov 27", "Déc 27"],
@@ -17132,30 +17133,48 @@ function qv(t) {
     return en(t, "revenu") - en(t, "charge") - en(t, "epargne")
 }
 
-function zl(t, e, r = ve.length) {
-    const n = mt(e, "start_livrets"),
-        s = Nv(t),
-        i = {};
-    for (const [l, u] of Object.entries(Vv)) i[u] = (i[u] || 0) + mt(e, l);
-    const o = mt(e, "sport") / 3;
-    [0, 1, 2].forEach(l => {
-        i[l] = (i[l] || 0) + o
-    });
-    const a = [n - (i[0] || 0)];
-    for (let l = 1; l < r; l++) a.push(a[l - 1] + s - (i[l] || 0));
+function pocketCalc(items, pocket, monthlyRate, r = ve.length) {
+    const list = (items || []).filter(x => x.pocket === pocket);
+    const prevu = [],
+        reel = [],
+        solde = [];
+    let pc = 0,
+        rc = 0;
+    for (let i = 0; i < r; i++) {
+        for (const it of list)
+            if (gr(it.mois_index) === i) {
+                pc += gr(it.montant_prevu);
+                if (it.paid) rc += it.montant_reel != null ? gr(it.montant_reel) : gr(it.montant_prevu)
+            }
+        pc += monthlyRate;
+        prevu.push(pc), reel.push(rc), solde.push(pc - rc)
+    }
+    return {
+        prevu,
+        reel,
+        solde
+    }
+}
+
+function planEpargne(items, e, r = ve.length) {
+    const base = mt(e, "plan_baseline"),
+        s = mt(e, "epargne_mensuelle"),
+        du = (items || []).filter(x => x.pocket === "epargne");
+    const a = [];
+    let cur = base,
+        cost = 0;
+    for (let i = 0; i < r; i++) {
+        if (i > 0) cur += s;
+        for (const it of du)
+            if (gr(it.mois_index) === i) cost += gr(it.montant_prevu);
+        a.push(cur - cost)
+    }
     return a
 }
 
-function qf(t, e, r = ve.length) {
-    const n = Nf(t),
-        s = {};
-    (e || []).forEach(a => {
-        s[gr(a.mois_index)] = (s[gr(a.mois_index)] || 0) + gr(a.montant)
-    });
-    const i = [];
-    let o = 0;
-    for (let a = 0; a < r; a++) o += n - (s[a] || 0), i.push(o);
-    return i
+function reelEpargnePure(rawReel, vac, form, epg, i) {
+    if (rawReel[i] == null) return null;
+    return rawReel[i] - vac.reel[i] - form.reel[i] - epg.reel[i]
 }
 
 function moisNow() {
@@ -17281,19 +17300,27 @@ function Mv({
     progress: t = {},
     budget: e,
     params: r,
-    voyages: vg
+    items: im
 }) {
     const n = Iv(3),
         s = n[0],
         i = Br.filter(d => t[d.key]).length,
         o = Ba.flatMap(d => d.items),
         a = o.filter(d => t[d.key]).length,
-        l = mt(r, "start_livrets"),
         u = mt(r, "cible"),
-        c = u ? Math.min(100, Math.round(l / u * 100)) : 0,
         Mm = moisNow(),
-        Mg = qf(e, vg),
-        MpocheM = Mg[Mm],
+        MvacArr = pocketCalc(im, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
+        MformArr = pocketCalc(im, "formation", 0, ve.length),
+        MepgArr = pocketCalc(im, "epargne", 0, ve.length),
+        MrawReel = Cv(r, ve.length),
+        MplanArr = planEpargne(im, r),
+        l = (() => {
+            for (let w = ve.length - 1; w >= 0; w--)
+                if (MrawReel[w] != null) return reelEpargnePure(MrawReel, MvacArr, MformArr, MepgArr, w);
+            return MplanArr[Mm]
+        })(),
+        c = u ? Math.min(100, Math.round(l / u * 100)) : 0,
+        MpocheM = MvacArr.solde[Mm],
         Mdernier = (() => {
             for (let w = ve.length - 1; w >= 0; w--) {
                 const q = Wv(r, w);
@@ -17716,16 +17743,13 @@ function Jv(t) {
         budget: e,
         params: r,
         voyages: n,
-        editLine: s,
-        saveLine: i,
-        addLine: o,
-        removeLine: a,
+        items: itemsAll,
         editParam: l,
         saveParam: u,
-        editVoyage: c,
-        saveVoyage: d,
-        addVoyage: p,
-        removeVoyage: m,
+        editItem: ei,
+        saveItem: si,
+        addItem: ai,
+        removeItem: ri,
         readOnly: v
     } = t;
     if (!e) return h.jsxs("section", {
@@ -17737,24 +17761,21 @@ function Jv(t) {
             children: "Chargement du budget…"
         })]
     });
-    const k = en(e, "charge"),
-        x = en(e, "epargne"),
-        y = qv(e),
-        f = Nf(e),
-        g = qf(e, n),
-        S = Math.min(...g),
-        b = ["start_livrets", "du_paiement", "sport", "scap_s1", "cible"],
+    const items = itemsAll || [],
+        k = en(e, "charge"),
         M = moisNow(),
-        planArr = zl(e, r),
-        curPlan = planArr[M],
+        rawReel = Cv(r, ve.length),
+        vac = pocketCalc(items, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
+        form = pocketCalc(items, "formation", 0, ve.length),
+        epg = pocketCalc(items, "epargne", 0, ve.length),
+        plan = planEpargne(items, r, ve.length),
+        curPlan = plan[M],
         curReelRaw = Wv(r, M),
         curHasReel = curReelRaw !== "" && curReelRaw != null,
-        curHV = curHasReel ? Number(curReelRaw) - g[M] : null,
+        curHV = reelEpargnePure(rawReel, vac, form, epg, M),
         curEcart = curHV != null ? curHV - curPlan : null,
-        curPoche = g[M],
-        spendRaw = Vf(r, "spend_" + M, ""),
-        curHasSpend = spendRaw !== "" && spendRaw != null,
-        curSpendEcart = curHasSpend ? k - Number(spendRaw) : null,
+        curPoche = vac.solde[M],
+        curForm = form.solde[M],
         lastSaved = Vf(r, "last_saved_at", 0),
         lastSavedLabel = lastSaved ? new Intl.DateTimeFormat("fr-FR", {
             day: "numeric",
@@ -17763,19 +17784,234 @@ function Jv(t) {
             minute: "2-digit"
         }).format(new Date(lastSaved)) : null,
         dernierMoisMaj = (() => {
-            for (let w = ve.length - 1; w >= 0; w--) {
-                const q = Wv(r, w);
-                if (q !== "" && q != null) return w
-            }
+            for (let w = ve.length - 1; w >= 0; w--)
+                if (rawReel[w] != null) return w;
             return -1
-        })();
+        })(),
+        [moisSel, setMoisSel] = re.useState(M),
+        [reelInput, setReelInput] = re.useState(curReelRaw === "" ? "" : String(curReelRaw)),
+        [saving, setSaving] = re.useState(!1),
+        [msg, setMsg] = re.useState(""),
+        enAttente = items.filter(x => !x.paid && gr(x.mois_index) <= moisSel).sort((a, b) => gr(a.mois_index) - gr(b.mois_index));
+    re.useEffect(() => {
+        const rr = Wv(r, moisSel);
+        setReelInput(rr === "" ? "" : String(rr))
+    }, [moisSel]);
+
+    async function enregistrer() {
+        const val = parseFloat(String(reelInput).replace(",", "."));
+        if (Number.isNaN(val)) {
+            setMsg("Entre un montant valide.");
+            return
+        }
+        setSaving(!0), setMsg("");
+        await u("reel_" + moisSel, val), await u("last_saved_at", Date.now());
+        setSaving(!1), setMsg("ok")
+    }
+
+    async function togglePaid(it) {
+        const patch = {
+            paid: !it.paid,
+            montant_reel: !it.paid ? (it.montant_reel != null ? it.montant_reel : it.montant_prevu) : it.montant_reel
+        };
+        ei(it.id, patch), await si(it.id, patch)
+    }
+
+    function Pocket({
+        title,
+        pocket,
+        calc,
+        note,
+        showMonthly
+    }) {
+        const list = items.filter(x => x.pocket === pocket).sort((a, b) => gr(a.mois_index) - gr(b.mois_index) || (a.sort || 0) - (b.sort || 0));
+        return h.jsxs("details", {
+            className: "collapsible",
+            children: [h.jsx("summary", {
+                children: title
+            }), h.jsxs("div", {
+                className: "inner",
+                children: [note && h.jsx("p", {
+                    className: "sub",
+                    style: {
+                        marginTop: 0
+                    },
+                    children: note
+                }), h.jsxs("table", {
+                    className: "tbl",
+                    children: [h.jsx("thead", {
+                        children: h.jsxs("tr", {
+                            children: [h.jsx("th", {
+                                children: "Mois"
+                            }), h.jsx("th", {
+                                className: "num",
+                                children: "Prévu"
+                            }), h.jsx("th", {
+                                className: "num",
+                                children: pocket === "epargne" ? "Écart" : "Réel"
+                            }), pocket !== "epargne" && h.jsx("th", {
+                                className: "num",
+                                children: "Solde"
+                            })]
+                        })
+                    }), h.jsx("tbody", {
+                        children: ve.slice(0, 8).map((label, i) => pocket === "epargne" ? h.jsxs("tr", {
+                            className: i === moisSel ? "total" : "",
+                            children: [h.jsx("td", {
+                                children: label
+                            }), h.jsx("td", {
+                                className: "num",
+                                children: ot(plan[i])
+                            }), h.jsx("td", {
+                                className: "num" + (rawReel[i] == null ? "" : (reelEpargnePure(rawReel, vac, form, epg, i) - plan[i]) >= 0 ? " ok" : " low"),
+                                children: rawReel[i] == null ? "—" : (((reelEpargnePure(rawReel, vac, form, epg, i) - plan[i]) >= 0 ? "+" : "") + ot(reelEpargnePure(rawReel, vac, form, epg, i) - plan[i]))
+                            })]
+                        }, i) : h.jsxs("tr", {
+                            className: i === moisSel ? "total" : "",
+                            children: [h.jsx("td", {
+                                children: label
+                            }), h.jsx("td", {
+                                className: "num",
+                                children: ot(calc.prevu[i])
+                            }), h.jsx("td", {
+                                className: "num",
+                                children: ot(calc.reel[i])
+                            }), h.jsx("td", {
+                                className: "num" + (calc.solde[i] < 0 ? " low" : ""),
+                                children: ot(calc.solde[i])
+                            })]
+                        }, i))
+                    })]
+                }), !v && h.jsxs("div", {
+                    style: {
+                        marginTop: 12
+                    },
+                    children: [h.jsx("div", {
+                        style: {
+                            fontSize: 12.5,
+                            color: "var(--slate)",
+                            fontWeight: 600,
+                            marginBottom: 6
+                        },
+                        children: "Postes"
+                    }), list.map(it => h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            gap: 6,
+                            alignItems: "center",
+                            marginBottom: 6,
+                            flexWrap: "wrap"
+                        },
+                        children: [h.jsx("input", {
+                            "aria-label": "Libellé",
+                            value: it.label,
+                            onChange: g => ei(it.id, {
+                                label: g.target.value
+                            }),
+                            onBlur: g => si(it.id, {
+                                label: g.target.value
+                            }),
+                            style: {
+                                flex: "1 1 140px",
+                                padding: 8,
+                                borderRadius: 8,
+                                border: "1px solid var(--line)",
+                                fontSize: 13
+                            }
+                        }), h.jsx("select", {
+                            "aria-label": "Mois",
+                            value: it.mois_index,
+                            onChange: g => {
+                                const val = Number(g.target.value);
+                                ei(it.id, {
+                                    mois_index: val
+                                }), si(it.id, {
+                                    mois_index: val
+                                })
+                            },
+                            style: {
+                                padding: 8,
+                                borderRadius: 8,
+                                border: "1px solid var(--line)",
+                                fontSize: 13
+                            },
+                            children: ve.map((m, mi) => h.jsx("option", {
+                                value: mi,
+                                children: m
+                            }, mi))
+                        }), h.jsx("input", {
+                            "aria-label": "Montant prévu",
+                            inputMode: "decimal",
+                            value: it.montant_prevu,
+                            onChange: g => ei(it.id, {
+                                montant_prevu: g.target.value
+                            }),
+                            onBlur: g => si(it.id, {
+                                montant_prevu: Number(g.target.value) || 0
+                            }),
+                            style: {
+                                width: 70,
+                                padding: 8,
+                                borderRadius: 8,
+                                border: "1px solid var(--line)",
+                                fontSize: 13,
+                                textAlign: "right"
+                            }
+                        }), h.jsxs("label", {
+                            style: {
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: 12.5
+                            },
+                            children: [h.jsx("input", {
+                                type: "checkbox",
+                                checked: !!it.paid,
+                                onChange: () => togglePaid(it)
+                            }), "payé"]
+                        }), it.paid && h.jsx("input", {
+                            "aria-label": "Montant réel",
+                            inputMode: "decimal",
+                            value: it.montant_reel ?? "",
+                            onChange: g => ei(it.id, {
+                                montant_reel: g.target.value
+                            }),
+                            onBlur: g => si(it.id, {
+                                montant_reel: Number(g.target.value) || 0
+                            }),
+                            style: {
+                                width: 70,
+                                padding: 8,
+                                borderRadius: 8,
+                                border: "1px solid var(--line)",
+                                fontSize: 13,
+                                textAlign: "right"
+                            }
+                        }), h.jsx("button", {
+                            className: "btn-outline btn-sm",
+                            onClick: () => ri(it.id),
+                            "aria-label": "Supprimer",
+                            children: "✕"
+                        })]
+                    }, it.id)), h.jsx("button", {
+                        className: "btn-outline btn-sm",
+                        style: {
+                            marginTop: 4
+                        },
+                        onClick: () => ai(pocket),
+                        children: "+ Ajouter un poste"
+                    })]
+                })]
+            })]
+        })
+    }
     return h.jsxs("section", {
         className: "sec",
         children: [h.jsx("h2", {
             children: "Trésorerie"
         }), h.jsx("p", {
             className: "sub",
-            children: "Édite tes montants : tout se sauvegarde, et les Graphiques suivent."
+            children: "Un seul geste chaque mois : ton relevé livrets + cocher ce qui a été payé. Le reste se calcule tout seul, à partir de tes vraies données — plus aucun chiffre caché à recalibrer."
         }), (dernierMoisMaj >= 0 && dernierMoisMaj < M) && h.jsxs("div", {
             className: "bwarn",
             role: "alert",
@@ -17791,7 +18027,7 @@ function Jv(t) {
                 marginBottom: 12
             },
             role: "group",
-            "aria-label": "Résumé de " + ve[M],
+            "aria-label": "Résumé de " + ve[moisSel],
             children: [h.jsxs("div", {
                 className: "card",
                 style: {
@@ -17859,52 +18095,107 @@ function Jv(t) {
                     style: {
                         fontSize: 18
                     },
-                    children: curSpendEcart == null ? "·" : curSpendEcart >= 0 ? "✓" : "⚠"
+                    children: curForm < 0 ? "⚠" : "✓"
                 }), h.jsx("div", {
                     style: {
                         fontFamily: "Georgia,serif",
                         fontWeight: 700,
                         fontSize: "1.05rem",
-                        color: curSpendEcart == null ? "var(--ink)" : curSpendEcart >= 0 ? "var(--green)" : "var(--oxblood)"
+                        color: curForm < 0 ? "var(--oxblood)" : "var(--green)"
                     },
-                    children: curSpendEcart == null ? "—" : ot(Math.abs(curSpendEcart))
+                    children: ot(curForm)
                 }), h.jsx("div", {
                     style: {
                         fontSize: 10.5,
                         color: "var(--slate)",
                         textTransform: "uppercase"
                     },
-                    children: curSpendEcart != null && curSpendEcart < 0 ? "Dépassement" : "Marge charges"
+                    children: "Provision formation"
                 })]
             })]
+        }), h.jsx("div", {
+            className: "h3",
+            children: "📌 Mise à jour du mois"
         }), h.jsxs("div", {
             className: "card",
-            children: [h.jsx("div", {
-                className: "h3",
-                style: {
-                    marginTop: 0
-                },
-                children: "Charges de vie dépensées ce mois (" + ve[M] + ")"
-            }), h.jsx("input", {
-                className: "bedit bnum",
-                type: "number",
-                inputMode: "numeric",
-                disabled: v,
-                placeholder: "ex. 1180 (budget prévu " + ot(k) + ")",
-                value: spendRaw,
-                "aria-label": "Charges de vie dépensées ce mois",
-                onChange: gt => l("spend_" + M, gt.target.value),
-                onBlur: gt => {
-                    u("spend_" + M, gt.target.value);
-                    u("last_saved_at", "" + Date.now())
-                }
+            style: {
+                borderColor: "var(--oxblood)",
+                borderWidth: 2
+            },
+            children: [h.jsxs("div", {
+                className: "field",
+                children: [h.jsx("label", {
+                    htmlFor: "mois-select",
+                    children: "Mois"
+                }), h.jsx("select", {
+                    id: "mois-select",
+                    value: moisSel,
+                    disabled: v,
+                    onChange: g => setMoisSel(Number(g.target.value)),
+                    children: ve.map((m, i) => h.jsx("option", {
+                        value: i,
+                        children: m
+                    }, i))
+                })]
+            }), h.jsxs("div", {
+                className: "field",
+                children: [h.jsx("label", {
+                    htmlFor: "reel-input",
+                    children: "Solde total livrets (Livret A + LDD) à ce jour"
+                }), h.jsx("input", {
+                    id: "reel-input",
+                    inputMode: "decimal",
+                    disabled: v,
+                    placeholder: "ex. 13725,59",
+                    value: reelInput,
+                    onChange: g => setReelInput(g.target.value)
+                })]
+            }), enAttente.length > 0 && h.jsxs("div", {
+                className: "field",
+                children: [h.jsx("span", {
+                    style: {
+                        display: "block",
+                        fontSize: 12.5,
+                        color: "var(--slate)",
+                        marginBottom: 6,
+                        fontWeight: 600
+                    },
+                    children: "Ces dépenses sont-elles passées ?"
+                }), enAttente.map(it => h.jsxs("div", {
+                    style: {
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        marginBottom: 6
+                    },
+                    children: [h.jsxs("label", {
+                        style: {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flex: 1,
+                            fontSize: 13.5
+                        },
+                        children: [h.jsx("input", {
+                            type: "checkbox",
+                            disabled: v,
+                            checked: !1,
+                            onChange: () => togglePaid(it)
+                        }), it.label + " — " + ot(it.montant_prevu) + " (" + ve[it.mois_index] + ")"]
+                    })]
+                }, it.id))]
+            }), h.jsx("button", {
+                className: "btn",
+                onClick: enregistrer,
+                disabled: saving || v,
+                children: saving ? "Enregistrement…" : "Enregistrer ce mois"
             }), h.jsxs("div", {
                 role: "status",
                 "aria-live": "polite",
                 style: {
                     marginTop: 10,
                     fontSize: 12.5,
-                    color: lastSavedLabel ? "var(--green)" : "var(--slate)",
+                    color: msg === "ok" ? "var(--green)" : "var(--slate)",
                     display: "flex",
                     alignItems: "center",
                     gap: 6
@@ -17918,257 +18209,82 @@ function Jv(t) {
                         background: "currentColor",
                         display: "inline-block"
                     }
-                }), lastSavedLabel ? "Enregistré \u2014 " + lastSavedLabel : "Rien d\u2019enregistr\u00e9 pour l\u2019instant"]
+                }), msg === "ok" ? lastSavedLabel ? "Enregistré \u2014 " + lastSavedLabel : "Enregistré" : msg || (lastSavedLabel ? "Enregistré \u2014 " + lastSavedLabel : "Rien d\u2019enregistr\u00e9 pour l\u2019instant")]
             })]
-        }), h.jsxs("div", {
-            className: "card",
-            children: [h.jsx(zo, {
-                titre: "Revenus",
-                kind: "revenu",
-                budget: e,
-                editLine: s,
-                saveLine: i,
-                addLine: o,
-                removeLine: a,
-                readOnly: v
-            }), h.jsx(zo, {
-                titre: "Charges de vie",
-                kind: "charge",
-                budget: e,
-                editLine: s,
-                saveLine: i,
-                addLine: o,
-                removeLine: a,
-                readOnly: v
-            }), h.jsxs("div", {
-                className: "btot",
-                children: [h.jsx("span", {
-                    children: "Total charges de vie"
-                }), h.jsx("span", {
-                    children: ot(k)
-                })]
-            }), h.jsx(zo, {
-                titre: "Épargne",
-                kind: "epargne",
-                budget: e,
-                editLine: s,
-                saveLine: i,
-                addLine: o,
-                removeLine: a,
-                readOnly: v
-            }), h.jsxs("div", {
-                className: "btot",
-                children: [h.jsx("span", {
-                    children: "Total épargne"
-                }), h.jsx("span", {
-                    children: ot(x)
-                })]
-            }), y < 0 ? h.jsxs("div", {
-                className: "bwarn",
-                children: [h.jsxs("b", {
-                    children: ["Budget en déséquilibre de ", ot(-y), "/mois."]
-                }), " Baisse un poste souple, réduis la provision vacances, ou ajuste la beauté."]
-            }) : h.jsxs("div", {
-                className: "bok",
-                children: [h.jsx("b", {
-                    children: "Budget équilibré"
-                }), " — il te reste ", ot(y), "/mois de marge."]
-            })]
-        }), h.jsx("div", {
-            className: "h3",
-            children: "Paramètres du plan"
-        }), h.jsx("div", {
-            className: "card",
-            children: b.map(w => h.jsxs("div", {
-                className: "hyp",
-                children: [h.jsx("span", {
-                    className: "lbl",
-                    children: Kv[w]
-                }), h.jsx("input", {
-                    className: "bedit bnum",
-                    type: "number",
-                    inputMode: "numeric",
-                    disabled: v,
-                    value: Vf(r, w, zv(w)),
-                    onChange: j => l(w, j.target.value),
-                    onBlur: j => u(w, j.target.value)
-                })]
-            }, w))
-        }), h.jsx("div", {
-            className: "h3",
-            children: "Épargne — prévu vs réalisé"
-        }), h.jsxs("div", {
-            className: "card",
-            style: {
-                padding: 0,
-                overflowX: "auto"
-            },
-            children: [h.jsxs("table", {
-                className: "tbl",
-                children: [h.jsx("thead", {
-                    children: h.jsxs("tr", {
-                        children: [h.jsx("th", {
-                            children: "Mois"
-                        }), h.jsx("th", {
-                            className: "num",
-                            children: "Prévu"
-                        }), h.jsx("th", {
-                            className: "num",
-                            children: "Réel"
-                        }), h.jsx("th", {
-                            className: "num",
-                            children: "Écart"
-                        })]
-                    })
-                }), h.jsx("tbody", {
-                    children: (() => {
-                        const w = zl(e, r),
-                            {
-                                troughIdx: j,
-                                recIdx: P
-                            } = Ml(w, mt(r, "cible"));
-                        return w.slice(0, 13).map((q, V) => {
-                            const oe = Wv(r, V),
-                                st = oe !== "" && oe != null,
-                                hv = st ? Number(oe) - g[V] : null,
-                                Ge = st ? hv - q : null;
-                            return h.jsxs("tr", {
-                                children: [h.jsx("td", {
-                                    className: V === j ? "low" : V === P ? "ok" : "",
-                                    children: ve[V]
-                                }), h.jsx("td", {
-                                    className: "num",
-                                    children: ot(q)
-                                }), h.jsx("td", {
-                                    className: "num",
-                                    style: {
-                                        padding: "3px 6px"
-                                    },
-                                    children: h.jsx("input", {
-                                        className: "bedit bnum",
-                                        style: {
-                                            width: 82
-                                        },
-                                        type: "number",
-                                        inputMode: "numeric",
-                                        disabled: v,
-                                        placeholder: "—",
-                                        value: oe,
-                                        onChange: gt => l("reel_" + V, gt.target.value),
-                                        onBlur: gt => {
-                                            u("reel_" + V, gt.target.value);
-                                            u("last_saved_at", "" + Date.now())
-                                        }
-                                    })
-                                }), h.jsx("td", {
-                                    className: "num" + (st ? Ge >= 0 ? " ok" : " low" : ""),
-                                    title: st ? "Réel hors-vacances : " + ot(hv) : void 0,
-                                    children: st ? (Math.abs(Ge) > 300 ? "⚠ " : "") + (Ge >= 0 ? "+" : "") + ot(Ge) : "—"
-                                })]
-                            }, V)
-                        })
-                    })()
-                })]
+        }), h.jsxs("details", {
+            className: "collapsible",
+            children: [h.jsx("summary", {
+                children: "Budget mensuel"
             }), h.jsx("div", {
-                className: "note",
-                children: "Saisis ton solde TOTAL livrets réel (Livret A + LDD, poche vacances comprise) chaque mois : l'app soustrait automatiquement la poche vacances avant de comparer au plan. Survole l'écart pour voir le détail. ⚠ = écart de plus de 300 € vs le plan, à vérifier (faute de frappe ?)."
-            })]
-        }), h.jsxs("div", {
-            className: "h3",
-            children: ["Voyages — provision ", ot(f), "/mois"]
-        }), h.jsxs("div", {
-            className: "card",
-            children: [(n || []).map(w => h.jsxs("div", {
-                className: "brow",
-                children: [h.jsx("input", {
-                    className: "bedit lbl",
-                    style: {
-                        flex: 1
-                    },
-                    disabled: v,
-                    value: w.label,
-                    onChange: j => c(w.id, {
-                        label: j.target.value
-                    }),
-                    onBlur: () => d(w.id)
-                }), h.jsx("select", {
-                    className: "bsel",
-                    disabled: v,
-                    value: w.mois_index,
-                    onChange: j => {
-                        c(w.id, {
-                            mois_index: j.target.value
-                        }), d(w.id, {
-                            mois_index: j.target.value
+                className: "inner",
+                children: h.jsxs("table", {
+                    className: "tbl",
+                    children: [h.jsx("thead", {
+                        children: h.jsxs("tr", {
+                            children: [h.jsx("th", {
+                                children: "Poste"
+                            }), h.jsx("th", {
+                                className: "num",
+                                children: "/ mois"
+                            })]
                         })
-                    },
-                    children: ve.slice(0, 12).map((j, P) => h.jsx("option", {
-                        value: P,
-                        children: j
-                    }, P))
-                }), h.jsx("input", {
-                    className: "bedit bnum",
-                    type: "number",
-                    inputMode: "numeric",
-                    disabled: v,
-                    value: w.montant,
-                    onChange: j => c(w.id, {
-                        montant: j.target.value
-                    }),
-                    onBlur: () => d(w.id)
-                }), !v && h.jsx("button", {
-                    className: "bdel",
-                    onClick: () => m(w.id),
-                    "aria-label": "Supprimer",
-                    children: "×"
-                })]
-            }, w.id)), !v && h.jsx("button", {
-                className: "badd",
-                onClick: p,
-                children: "+ Ajouter un voyage"
-            }), h.jsxs("div", {
-                className: "note",
-                children: ["Plancher de la poche vacances : ", h.jsx("b", {
-                    children: ot(S)
-                }), ". En dessous de 0, ça déborderait sur les livrets."]
+                    }), h.jsx("tbody", {
+                        children: (e || []).map(w => h.jsxs("tr", {
+                            children: [h.jsx("td", {
+                                children: w.poste
+                            }), h.jsx("td", {
+                                className: "num",
+                                children: ot(gr(w.montant))
+                            })]
+                        }, w.id))
+                    })]
+                })
             })]
         }), h.jsx("div", {
-            className: "card",
-            style: {
-                padding: 0,
-                overflowX: "auto"
-            },
-            children: h.jsxs("table", {
-                className: "tbl",
-                children: [h.jsx("thead", {
-                    children: h.jsxs("tr", {
-                        children: [h.jsx("th", {
-                            children: "Mois"
-                        }), h.jsx("th", {
-                            children: "Dépense"
-                        }), h.jsx("th", {
-                            className: "num",
-                            children: "Solde vacances"
-                        })]
-                    })
-                }), h.jsx("tbody", {
-                    children: g.slice(0, 12).map((w, j) => {
-                        const P = (n || []).filter(V => Number(V.mois_index) === j),
-                            q = w === S;
-                        return h.jsxs("tr", {
-                            children: [h.jsx("td", {
-                                children: ve[j]
-                            }), h.jsx("td", {
-                                className: P.length ? "low" : "",
-                                children: P.length ? P.map(V => "− " + ot(V.montant) + " (" + V.label + ")").join(" · ") : "—"
-                            }), h.jsx("td", {
-                                className: "num" + (q ? " low" : ""),
-                                children: ot(w)
-                            })]
-                        }, j)
-                    })
-                })]
+            className: "note red",
+            children: h.jsx("b", {
+                children: "Objectif : " + ot(mt(r, "cible")) + " (6 mois de salaire) sur les livrets, hors provisions vacances et formation."
             })
+        }), h.jsx(Pocket, {
+            title: "Épargne — prévu vs réel",
+            pocket: "epargne",
+            calc: epg,
+            note: "Seul le DU est déduit de l'épargne pure, et seulement une fois réellement payé (coche « payé » ci-dessous)."
+        }), h.jsx(Pocket, {
+            title: "Provision vacances — prévu vs réel",
+            pocket: "vacances",
+            calc: vac,
+            note: ot(mt(r, "provision_vacances_mensuelle")) + "/mois de provision + les dépenses réelles de voyage."
+        }), h.jsx(Pocket, {
+            title: "Provision frais de formation — prévu vs réel",
+            pocket: "formation",
+            calc: form,
+            note: "Sport + SCAP. Rien n'est déduit tant qu'un poste n'est pas coché « payé »."
+        }), !v && h.jsxs("details", {
+            className: "collapsible",
+            children: [h.jsx("summary", {
+                children: "⚙ Paramètres du plan"
+            }), h.jsx("div", {
+                className: "inner",
+                children: [
+                    ["plan_baseline", "Base théorique du plan (fixe, jamais recalée automatiquement)"],
+                    ["epargne_mensuelle", "Épargne mensuelle vers les livrets"],
+                    ["provision_vacances_mensuelle", "Provision vacances mensuelle"],
+                    ["cible", "Objectif matelas"]
+                ].map(([key, label]) => h.jsxs("div", {
+                    className: "field",
+                    key,
+                    children: [h.jsx("label", {
+                        htmlFor: "plan-" + key,
+                        children: label
+                    }), h.jsx("input", {
+                        id: "plan-" + key,
+                        inputMode: "decimal",
+                        defaultValue: mt(r, key),
+                        onBlur: g => u(key, g.target.value)
+                    })]
+                }))
+            })]
         })]
     })
 }
@@ -18280,9 +18396,10 @@ const Pt = t => new Intl.NumberFormat("fr-FR", {
 function Xv({
     budget: t,
     params: e,
-    voyages: vg
+    voyages: vg,
+    items: im
 }) {
-    const r = zl(t, e),
+    const r = planEpargne(im, e),
         n = mt(e, "cible"),
         {
             troughIdx: s,
@@ -18409,9 +18526,11 @@ function Xv({
                     children: "Bascule PEA 🌊"
                 })]
             }), (() => {
-                const pv = qf(t, vg, ve.length),
-                    w0 = Cv(e, ve.length),
-                    w = w0.map((q, V) => q == null ? null : q - pv[V]),
+                const vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
+                    form = pocketCalc(im, "formation", 0, ve.length),
+                    epg = pocketCalc(im, "epargne", 0, ve.length),
+                    rawReel = Cv(e, ve.length),
+                    w = rawReel.map((q, V) => reelEpargnePure(rawReel, vac, form, epg, V)),
                     j = w.map((q, V) => q != null ? V : -1).filter(q => q >= 0);
                 if (!j.length) return null;
                 const P = j.map((q, V) => `${V===0?"M":"L"}${y(q).toFixed(1)},${f(w[q]).toFixed(1)}`).join(" ");
@@ -18468,11 +18587,22 @@ function Xv({
 
 function Qv({
     budget: t,
-    params: e
+    params: e,
+    items: im
 }) {
-    const r = zl(t, e),
+    const r = planEpargne(im, e),
         n = mt(e, "cible"),
-        s = mt(e, "start_livrets"),
+        vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
+        form = pocketCalc(im, "formation", 0, ve.length),
+        epg = pocketCalc(im, "epargne", 0, ve.length),
+        rawReel = Cv(e, ve.length),
+        M = moisNow(),
+        latestReel = (() => {
+            for (let w = ve.length - 1; w >= 0; w--)
+                if (rawReel[w] != null) return reelEpargnePure(rawReel, vac, form, epg, w);
+            return null
+        })(),
+        s = latestReel != null ? latestReel : r[M],
         {
             troughIdx: i,
             recIdx: o
@@ -18557,9 +18687,10 @@ function Qv({
 
 function _v({
     budget: t,
-    voyages: e
+    params: e,
+    items: im
 }) {
-    const r = qf(t, e, 12),
+    const r = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), 12).solde,
         n = ve.slice(0, 12),
         s = 680,
         i = 240,
@@ -18768,7 +18899,8 @@ function $v({
 function ek({
     budget: t,
     params: e,
-    voyages: r
+    voyages: r,
+    items: im
 }) {
     if (!t) return h.jsx("section", {
         className: "sec",
@@ -18791,19 +18923,22 @@ function ek({
         }), h.jsx(Xv, {
             budget: t,
             params: e,
-            voyages: r
+            voyages: r,
+            items: im
         }), h.jsx("div", {
             className: "h3",
             children: "Matelas de sécurité"
         }), h.jsx(Qv, {
             budget: t,
-            params: e
+            params: e,
+            items: im
         }), h.jsx("div", {
             className: "h3",
             children: "Poche vacances"
         }), h.jsx(_v, {
             budget: t,
-            voyages: r
+            params: e,
+            items: im
         }), h.jsx("div", {
             className: "h3",
             children: `Répartition des charges — ${hs(n)} €/mois`
@@ -18860,7 +18995,7 @@ function nk({
 }
 
 function sk() {
-    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1);
+    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]);
     re.useEffect(() => {
         if (at) {
             n(!0);
@@ -18925,6 +19060,11 @@ function sk() {
             })), {
                 onConflict: "user_id,line_key"
             }), K = (await J.from("vision_voyages").select("*").order("mois_index").order("sort")).data), m(K || [])
+        })(), (async () => {
+            const {
+                data: K
+            } = await J.from("vision_items").select("*").order("mois_index").order("sort");
+            mi(K || [])
         })()
     }, [t]);
     async function x(N) {
@@ -19028,6 +19168,32 @@ function sk() {
     async function V(N) {
         m(K => K.filter(H => H.id !== N)), await J.from("vision_voyages").delete().eq("id", N)
     }
+    const itemLocal = (N, K) => mi(H => H.map(A => A.id === N ? {
+        ...A,
+        ...K
+    } : A));
+    async function itemSave(N, K) {
+        await J.from("vision_items").update(K).eq("id", N)
+    }
+    async function itemAdd(N) {
+        const K = {
+                user_id: t.user.id,
+                pocket: N,
+                label: "",
+                montant_prevu: 0,
+                montant_reel: null,
+                mois_index: moisNow(),
+                paid: !1,
+                sort: Math.max(0, ...vi.filter(A => A.pocket === N).map(A => A.sort || 0)) + 1
+            },
+            {
+                data: H
+            } = await J.from("vision_items").insert(K).select().single();
+        H && mi(A => [...A, H])
+    }
+    async function itemDel(N) {
+        mi(K => K.filter(H => H.id !== N)), await J.from("vision_items").delete().eq("id", N)
+    }
 
     function oe() {
         const N = window.location.origin + window.location.pathname + "?partage";
@@ -19045,6 +19211,7 @@ function sk() {
             budget: l,
             params: c,
             voyages: p,
+            items: vi,
             ...at ? {
                 readOnly: !0,
                 editLine: lt,
@@ -19056,7 +19223,11 @@ function sk() {
                 editVoyage: lt,
                 saveVoyage: lt,
                 addVoyage: lt,
-                removeVoyage: lt
+                removeVoyage: lt,
+                editItem: lt,
+                saveItem: lt,
+                addItem: lt,
+                removeItem: lt
             } : {
                 readOnly: !1,
                 editLine: y,
@@ -19068,7 +19239,11 @@ function sk() {
                 editVoyage: j,
                 saveVoyage: P,
                 addVoyage: q,
-                removeVoyage: V
+                removeVoyage: V,
+                editItem: itemLocal,
+                saveItem: itemSave,
+                addItem: itemAdd,
+                removeItem: itemDel
             }
         },
         gt = N => at && !v ? h.jsx(nk, {
@@ -19116,7 +19291,7 @@ function sk() {
                 progress: o,
                 budget: l,
                 params: c,
-                voyages: p
+                items: vi
             }), s === "planning" && h.jsx(Dv, {}), s === "suivi" && h.jsx(Bv, {
                 progress: o,
                 toggle: x,
@@ -19126,7 +19301,8 @@ function sk() {
             })), s === "stats" && gt(h.jsx(ek, {
                 budget: l,
                 params: c,
-                voyages: p
+                voyages: p,
+                items: vi
             })), s === "sport" && h.jsx(Zv, {}), s === "pieces" && h.jsx(Yv, {
                 progress: o,
                 toggle: x,
