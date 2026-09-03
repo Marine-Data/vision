@@ -17158,6 +17158,12 @@ function qf(t, e, r = ve.length) {
     return i
 }
 
+function moisNow() {
+    const b = new Date(2026, 7, 1),
+        n = new Date;
+    return Math.max(0, (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth()))
+}
+
 function Ml(t, e) {
     const r = t.indexOf(Math.min(...t));
     let n = -1;
@@ -17274,7 +17280,8 @@ const Wv = (t, e) => {
 function Mv({
     progress: t = {},
     budget: e,
-    params: r
+    params: r,
+    voyages: vg
 }) {
     const n = Iv(3),
         s = n[0],
@@ -17283,10 +17290,29 @@ function Mv({
         a = o.filter(d => t[d.key]).length,
         l = mt(r, "start_livrets"),
         u = mt(r, "cible"),
-        c = u ? Math.min(100, Math.round(l / u * 100)) : 0;
+        c = u ? Math.min(100, Math.round(l / u * 100)) : 0,
+        Mm = moisNow(),
+        Mg = qf(e, vg),
+        MpocheM = Mg[Mm],
+        Mdernier = (() => {
+            for (let w = ve.length - 1; w >= 0; w--) {
+                const q = Wv(r, w);
+                if (q !== "" && q != null) return w
+            }
+            return -1
+        })(),
+        Mflag = (Mdernier >= 0 && Mdernier < Mm) || MpocheM < 200;
     return h.jsxs("section", {
         className: "sec",
-        children: [h.jsx("div", {
+        children: [Mflag && h.jsxs("div", {
+            className: "bwarn",
+            role: "alert",
+            children: [Mdernier >= 0 && Mdernier < Mm && h.jsxs("span", {
+                children: ["⚠ Dernier mois enregistré : ", ve[Mdernier], ". "]
+            }), MpocheM < 200 && h.jsxs("span", {
+                children: ["⚠ Poche vacances basse (", ot(MpocheM), "). "]
+            }), "Va dans Trésorerie."]
+        }), h.jsx("div", {
             className: "card",
             style: {
                 padding: 0,
@@ -17717,7 +17743,32 @@ function Jv(t) {
         f = Nf(e),
         g = qf(e, n),
         S = Math.min(...g),
-        b = ["start_livrets", "du_paiement", "sport", "scap_s1", "cible"];
+        b = ["start_livrets", "du_paiement", "sport", "scap_s1", "cible"],
+        M = moisNow(),
+        planArr = zl(e, r),
+        curPlan = planArr[M],
+        curReelRaw = Wv(r, M),
+        curHasReel = curReelRaw !== "" && curReelRaw != null,
+        curHV = curHasReel ? Number(curReelRaw) - g[M] : null,
+        curEcart = curHV != null ? curHV - curPlan : null,
+        curPoche = g[M],
+        spendRaw = Vf(r, "spend_" + M, ""),
+        curHasSpend = spendRaw !== "" && spendRaw != null,
+        curSpendEcart = curHasSpend ? k - Number(spendRaw) : null,
+        lastSaved = Vf(r, "last_saved_at", 0),
+        lastSavedLabel = lastSaved ? new Intl.DateTimeFormat("fr-FR", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit"
+        }).format(new Date(lastSaved)) : null,
+        dernierMoisMaj = (() => {
+            for (let w = ve.length - 1; w >= 0; w--) {
+                const q = Wv(r, w);
+                if (q !== "" && q != null) return w
+            }
+            return -1
+        })();
     return h.jsxs("section", {
         className: "sec",
         children: [h.jsx("h2", {
@@ -17725,6 +17776,150 @@ function Jv(t) {
         }), h.jsx("p", {
             className: "sub",
             children: "Édite tes montants : tout se sauvegarde, et les Graphiques suivent."
+        }), (dernierMoisMaj >= 0 && dernierMoisMaj < M) && h.jsxs("div", {
+            className: "bwarn",
+            role: "alert",
+            children: [h.jsx("b", {
+                children: "⚠ Pense à mettre " + ve[M] + " à jour."
+            }), " Dernier mois saisi : " + ve[dernierMoisMaj] + "."]
+        }), h.jsxs("div", {
+            className: "sumrow",
+            style: {
+                display: "grid",
+                gridTemplateColumns: "repeat(3,1fr)",
+                gap: 8,
+                marginBottom: 12
+            },
+            role: "group",
+            "aria-label": "Résumé de " + ve[M],
+            children: [h.jsxs("div", {
+                className: "card",
+                style: {
+                    textAlign: "center",
+                    padding: "10px 6px"
+                },
+                children: [h.jsx("div", {
+                    "aria-hidden": "true",
+                    style: {
+                        fontSize: 18
+                    },
+                    children: curEcart == null ? "·" : curEcart >= 0 ? "✓" : "⚠"
+                }), h.jsx("div", {
+                    style: {
+                        fontFamily: "Georgia,serif",
+                        fontWeight: 700,
+                        fontSize: "1.05rem",
+                        color: curEcart == null ? "var(--ink)" : curEcart >= 0 ? "var(--green)" : "var(--oxblood)"
+                    },
+                    children: curEcart == null ? "—" : (curEcart >= 0 ? "+" : "") + ot(curEcart)
+                }), h.jsx("div", {
+                    style: {
+                        fontSize: 10.5,
+                        color: "var(--slate)",
+                        textTransform: "uppercase"
+                    },
+                    children: "Écart épargne"
+                })]
+            }), h.jsxs("div", {
+                className: "card",
+                style: {
+                    textAlign: "center",
+                    padding: "10px 6px"
+                },
+                children: [h.jsx("div", {
+                    "aria-hidden": "true",
+                    style: {
+                        fontSize: 18
+                    },
+                    children: curPoche < 200 ? "⚠" : "✓"
+                }), h.jsx("div", {
+                    style: {
+                        fontFamily: "Georgia,serif",
+                        fontWeight: 700,
+                        fontSize: "1.05rem",
+                        color: curPoche < 200 ? "var(--oxblood)" : "var(--green)"
+                    },
+                    children: ot(curPoche)
+                }), h.jsx("div", {
+                    style: {
+                        fontSize: 10.5,
+                        color: "var(--slate)",
+                        textTransform: "uppercase"
+                    },
+                    children: "Poche vacances"
+                })]
+            }), h.jsxs("div", {
+                className: "card",
+                style: {
+                    textAlign: "center",
+                    padding: "10px 6px"
+                },
+                children: [h.jsx("div", {
+                    "aria-hidden": "true",
+                    style: {
+                        fontSize: 18
+                    },
+                    children: curSpendEcart == null ? "·" : curSpendEcart >= 0 ? "✓" : "⚠"
+                }), h.jsx("div", {
+                    style: {
+                        fontFamily: "Georgia,serif",
+                        fontWeight: 700,
+                        fontSize: "1.05rem",
+                        color: curSpendEcart == null ? "var(--ink)" : curSpendEcart >= 0 ? "var(--green)" : "var(--oxblood)"
+                    },
+                    children: curSpendEcart == null ? "—" : ot(Math.abs(curSpendEcart))
+                }), h.jsx("div", {
+                    style: {
+                        fontSize: 10.5,
+                        color: "var(--slate)",
+                        textTransform: "uppercase"
+                    },
+                    children: curSpendEcart != null && curSpendEcart < 0 ? "Dépassement" : "Marge charges"
+                })]
+            })]
+        }), h.jsxs("div", {
+            className: "card",
+            children: [h.jsx("div", {
+                className: "h3",
+                style: {
+                    marginTop: 0
+                },
+                children: "Charges de vie dépensées ce mois (" + ve[M] + ")"
+            }), h.jsx("input", {
+                className: "bedit bnum",
+                type: "number",
+                inputMode: "numeric",
+                disabled: v,
+                placeholder: "ex. 1180 (budget prévu " + ot(k) + ")",
+                value: spendRaw,
+                "aria-label": "Charges de vie dépensées ce mois",
+                onChange: gt => l("spend_" + M, gt.target.value),
+                onBlur: gt => {
+                    u("spend_" + M, gt.target.value);
+                    u("last_saved_at", "" + Date.now())
+                }
+            }), h.jsxs("div", {
+                role: "status",
+                "aria-live": "polite",
+                style: {
+                    marginTop: 10,
+                    fontSize: 12.5,
+                    color: lastSavedLabel ? "var(--green)" : "var(--slate)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6
+                },
+                children: [h.jsx("span", {
+                    "aria-hidden": "true",
+                    style: {
+                        width: 8,
+                        height: 8,
+                        borderRadius: 99,
+                        background: "currentColor",
+                        display: "inline-block"
+                    }
+                }), lastSavedLabel ? "Enregistré \u2014 " + lastSavedLabel : "Rien d\u2019enregistr\u00e9 pour l\u2019instant"]
+            })]
         }), h.jsxs("div", {
             className: "card",
             children: [h.jsx(zo, {
@@ -17860,7 +18055,10 @@ function Jv(t) {
                                         placeholder: "—",
                                         value: oe,
                                         onChange: gt => l("reel_" + V, gt.target.value),
-                                        onBlur: gt => u("reel_" + V, gt.target.value)
+                                        onBlur: gt => {
+                                            u("reel_" + V, gt.target.value);
+                                            u("last_saved_at", "" + Date.now())
+                                        }
                                     })
                                 }), h.jsx("td", {
                                     className: "num" + (st ? Ge >= 0 ? " ok" : " low" : ""),
@@ -18917,7 +19115,8 @@ function sk() {
             children: [s === "apercu" && h.jsx(Mv, {
                 progress: o,
                 budget: l,
-                params: c
+                params: c,
+                voyages: p
             }), s === "planning" && h.jsx(Dv, {}), s === "suivi" && h.jsx(Bv, {
                 progress: o,
                 toggle: x,
