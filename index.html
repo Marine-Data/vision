@@ -17143,7 +17143,7 @@ function pocketCalc(items, pocket, monthlyRate, r = ve.length) {
     for (let i = 0; i < r; i++) {
         for (const it of list)
             if (gr(it.mois_index) === i) {
-                pc += gr(it.montant_prevu);
+                if (monthlyRate === 0) pc += gr(it.montant_prevu);
                 if (it.paid) rc += it.montant_reel != null ? gr(it.montant_reel) : gr(it.montant_prevu)
             }
         pc += monthlyRate;
@@ -17925,7 +17925,7 @@ function Jv(t) {
                             })]
                         })
                     }), h.jsx("tbody", {
-                        children: ve.slice(0, 8).map((label, i) => {
+                        children: ve.map((label, i) => {
                             const snap = cloture(i);
                             if (pocket === "epargne") {
                                 const ec = snap ? snap.snapshot.ecart : (rawReel[i] == null ? null : reelEpargnePure(rawReel, vac, form, epg, i) - plan[i]),
@@ -17964,126 +17964,183 @@ function Jv(t) {
                             }, i)
                         })
                     })]
-                }), !v && h.jsxs("div", {
-                    style: {
-                        marginTop: 12
-                    },
-                    children: [h.jsx("div", {
+                }), !v && (() => {
+                    const byMonth = {};
+                    list.forEach(it => {
+                        (byMonth[it.mois_index] = byMonth[it.mois_index] || []).push(it)
+                    });
+                    const months = Object.keys(byMonth).map(Number).sort((a, b) => a - b);
+                    return h.jsxs("div", {
                         style: {
-                            fontSize: 12.5,
-                            color: "var(--slate)",
-                            fontWeight: 600,
-                            marginBottom: 6
+                            marginTop: 12
                         },
-                        children: "Postes"
-                    }), list.map(it => h.jsxs("div", {
-                        style: {
-                            display: "flex",
-                            gap: 6,
-                            alignItems: "center",
-                            marginBottom: 6,
-                            flexWrap: "wrap"
-                        },
-                        children: [h.jsx("input", {
-                            "aria-label": "Libellé",
-                            value: it.label,
-                            onChange: g => ei(it.id, {
-                                label: g.target.value
-                            }),
-                            onBlur: g => si(it.id, {
-                                label: g.target.value
-                            }),
+                        children: [h.jsx("div", {
                             style: {
-                                flex: "1 1 140px",
-                                padding: 8,
-                                borderRadius: 8,
-                                border: "1px solid var(--line)",
-                                fontSize: 13
-                            }
-                        }), h.jsx("select", {
-                            "aria-label": "Mois",
-                            value: it.mois_index,
-                            onChange: g => {
-                                const val = Number(g.target.value);
-                                ei(it.id, {
-                                    mois_index: val
-                                }), si(it.id, {
-                                    mois_index: val
-                                })
+                                fontSize: 12.5,
+                                color: "var(--slate)",
+                                fontWeight: 600,
+                                marginBottom: 6
                             },
-                            style: {
-                                padding: 8,
-                                borderRadius: 8,
-                                border: "1px solid var(--line)",
-                                fontSize: 13
-                            },
-                            children: ve.map((m, mi) => h.jsx("option", {
-                                value: mi,
-                                children: m
-                            }, mi))
-                        }), h.jsx("input", {
-                            "aria-label": "Montant prévu",
-                            inputMode: "decimal",
-                            value: it.montant_prevu,
-                            onChange: g => ei(it.id, {
-                                montant_prevu: g.target.value
-                            }),
-                            onBlur: g => si(it.id, {
-                                montant_prevu: Number(g.target.value) || 0
-                            }),
-                            style: {
-                                width: 70,
-                                padding: 8,
-                                borderRadius: 8,
-                                border: "1px solid var(--line)",
-                                fontSize: 13,
-                                textAlign: "right"
-                            }
-                        }), h.jsxs("label", {
-                            style: {
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
-                                fontSize: 12.5
-                            },
-                            children: [h.jsx("input", {
-                                type: "checkbox",
-                                checked: !!it.paid,
-                                onChange: () => togglePaid(it)
-                            }), "payé"]
-                        }), it.paid && h.jsx("input", {
-                            "aria-label": "Montant réel",
-                            inputMode: "decimal",
-                            value: it.montant_reel ?? "",
-                            onChange: g => ei(it.id, {
-                                montant_reel: g.target.value
-                            }),
-                            onBlur: g => si(it.id, {
-                                montant_reel: Number(g.target.value) || 0
-                            }),
-                            style: {
-                                width: 70,
-                                padding: 8,
-                                borderRadius: 8,
-                                border: "1px solid var(--line)",
-                                fontSize: 13,
-                                textAlign: "right"
-                            }
+                            children: "Détail par mois"
+                        }), months.map(mi => {
+                            const its = byMonth[mi],
+                                total = its.reduce((s, x) => s + (x.paid ? (x.montant_reel ?? x.montant_prevu) : x.montant_prevu), 0);
+                            return h.jsxs("details", {
+                                className: "collapsible",
+                                style: {
+                                    marginBottom: 8
+                                },
+                                children: [h.jsxs("summary", {
+                                    children: [ve[mi] + " — " + its.length + " poste" + (its.length > 1 ? "s" : ""), h.jsx("span", {
+                                        style: {
+                                            color: "var(--slate)",
+                                            fontWeight: 400,
+                                            marginLeft: 8
+                                        },
+                                        children: ot(total)
+                                    })]
+                                }), h.jsx("div", {
+                                    className: "inner",
+                                    children: its.map(it => h.jsxs("div", {
+                                        style: {
+                                            display: "flex",
+                                            gap: 6,
+                                            alignItems: "center",
+                                            marginBottom: 8,
+                                            flexWrap: "wrap",
+                                            paddingBottom: 8,
+                                            borderBottom: "1px solid var(--line)"
+                                        },
+                                        children: [h.jsx("input", {
+                                            "aria-label": "Libellé",
+                                            value: it.label,
+                                            onChange: g => ei(it.id, {
+                                                label: g.target.value
+                                            }),
+                                            onBlur: g => si(it.id, {
+                                                label: g.target.value
+                                            }),
+                                            style: {
+                                                flex: "1 1 140px",
+                                                padding: 8,
+                                                borderRadius: 8,
+                                                border: "1px solid var(--line)",
+                                                fontSize: 13
+                                            }
+                                        }), h.jsx("select", {
+                                            "aria-label": "Mois",
+                                            value: it.mois_index,
+                                            onChange: g => {
+                                                const val = Number(g.target.value);
+                                                ei(it.id, {
+                                                    mois_index: val
+                                                }), si(it.id, {
+                                                    mois_index: val
+                                                })
+                                            },
+                                            style: {
+                                                padding: 8,
+                                                borderRadius: 8,
+                                                border: "1px solid var(--line)",
+                                                fontSize: 13
+                                            },
+                                            children: ve.map((m, mj) => h.jsx("option", {
+                                                value: mj,
+                                                children: m
+                                            }, mj))
+                                        }), h.jsxs("div", {
+                                            style: {
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: 2
+                                            },
+                                            children: [h.jsx("label", {
+                                                style: {
+                                                    fontSize: 10.5,
+                                                    color: "var(--slate)"
+                                                },
+                                                children: "Prévu"
+                                            }), h.jsx("input", {
+                                                "aria-label": "Montant prévu",
+                                                inputMode: "decimal",
+                                                value: it.montant_prevu,
+                                                onChange: g => ei(it.id, {
+                                                    montant_prevu: g.target.value
+                                                }),
+                                                onBlur: g => si(it.id, {
+                                                    montant_prevu: Number(g.target.value) || 0
+                                                }),
+                                                style: {
+                                                    width: 70,
+                                                    padding: 8,
+                                                    borderRadius: 8,
+                                                    border: "1px solid var(--line)",
+                                                    fontSize: 13,
+                                                    textAlign: "right"
+                                                }
+                                            })]
+                                        }), h.jsxs("label", {
+                                            style: {
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 4,
+                                                fontSize: 12.5
+                                            },
+                                            children: [h.jsx("input", {
+                                                type: "checkbox",
+                                                checked: !!it.paid,
+                                                onChange: () => togglePaid(it)
+                                            }), "payé"]
+                                        }), it.paid && h.jsxs("div", {
+                                            style: {
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: 2
+                                            },
+                                            children: [h.jsx("label", {
+                                                style: {
+                                                    fontSize: 10.5,
+                                                    color: "var(--slate)"
+                                                },
+                                                children: "Réel"
+                                            }), h.jsx("input", {
+                                                "aria-label": "Montant réel",
+                                                inputMode: "decimal",
+                                                value: it.montant_reel ?? "",
+                                                onChange: g => ei(it.id, {
+                                                    montant_reel: g.target.value
+                                                }),
+                                                onBlur: g => si(it.id, {
+                                                    montant_reel: Number(g.target.value) || 0
+                                                }),
+                                                style: {
+                                                    width: 70,
+                                                    padding: 8,
+                                                    borderRadius: 8,
+                                                    border: "1px solid var(--line)",
+                                                    fontSize: 13,
+                                                    textAlign: "right"
+                                                }
+                                            })]
+                                        }), h.jsx("button", {
+                                            className: "btn-outline btn-sm",
+                                            onClick: () => ri(it.id),
+                                            "aria-label": "Supprimer",
+                                            children: "✕"
+                                        })]
+                                    }, it.id))
+                                })]
+                            }, mi)
                         }), h.jsx("button", {
                             className: "btn-outline btn-sm",
-                            onClick: () => ri(it.id),
-                            "aria-label": "Supprimer",
-                            children: "✕"
+                            style: {
+                                marginTop: 4
+                            },
+                            onClick: () => ai(pocket),
+                            children: "+ Ajouter un poste"
                         })]
-                    }, it.id)), h.jsx("button", {
-                        className: "btn-outline btn-sm",
-                        style: {
-                            marginTop: 4
-                        },
-                        onClick: () => ai(pocket),
-                        children: "+ Ajouter un poste"
-                    })]
-                })]
+                    })
+                })()]
             })]
         })
     }
@@ -18966,8 +19023,8 @@ function _v({
     params: e,
     items: im
 }) {
-    const r = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), 12).solde,
-        n = ve.slice(0, 12),
+    const r = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length).solde,
+        n = ve,
         s = 680,
         i = 240,
         o = {
@@ -19655,7 +19712,7 @@ class ik extends ai.Component {
     }
 }
 tf(document.getElementById("root")).render(ai.createElement(ik, null, ai.createElement(sk)));</script>
-    <style rel="stylesheet" crossorigin>:root{--paper:#eaf5f6;--surface:#ffffff;--ink:#0e3a42;--slate:#5a787e;--oxblood:#0e9fb2;--green:#12a07a;--amber:#e0794a;--line:#d7e7e8;--alert:#dd5f43}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0}body{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,system-ui,sans-serif;font-size:15px;line-height:1.5;padding-bottom:calc(70px + env(safe-area-inset-bottom))}a{color:var(--oxblood)}h1,h2,h3{font-family:Georgia,Times New Roman,serif;font-weight:600;line-height:1.2}.wrap{max-width:720px;margin:0 auto;padding:0 16px}.top{background:var(--ink);color:#fff;padding:22px 0 18px}.top .kick{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.85}.top h1{margin:6px 0 0;font-size:1.5rem;color:#fff}.top .who{font-size:12px;opacity:.85;margin-top:4px}.logout{position:absolute;top:16px;right:16px;background:#ffffff26;color:#fff;border:0;border-radius:8px;padding:7px 11px;font-size:12px}.top .wrap{position:relative}.sec{padding:20px 0 8px}.sec h2{font-size:1.28rem;margin:0 0 4px;color:var(--oxblood)}.sub{color:var(--slate);font-size:13.5px;margin:0 0 14px}.h3{font-family:Georgia,serif;font-weight:600;font-size:1.05rem;margin:22px 0 8px}.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}.tl{border-left:2px solid var(--oxblood);padding:2px 0 10px 14px;margin-left:4px;position:relative}.tl .when{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--oxblood);font-weight:700}.tl .what{font-weight:600;margin-top:2px}.tl .det{color:var(--slate);font-size:13px;margin-top:2px}.tbl{width:100%;border-collapse:collapse;font-size:13.5px}.tbl th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--slate);font-weight:700;padding:8px;border-bottom:1px solid var(--line)}.tbl td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}.tbl tr:last-child td{border-bottom:0}.tbl .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}.tbl .total td{font-weight:700;background:#0e9fb20d}.pos{color:var(--green)}.low{color:var(--alert);font-weight:700}.ok{color:var(--green);font-weight:700}.note{font-size:12.5px;color:var(--slate);background:#00000005;border-left:3px solid var(--line);padding:9px 11px;border-radius:0 8px 8px 0;margin:10px 0}.note.red{border-left-color:var(--alert)}.detail{color:var(--slate);font-size:12px}.check{display:flex;gap:11px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--line)}.check:last-child{border-bottom:0}.check input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--oxblood);flex:0 0 auto}.check .lbl{flex:1}.check .lbl b{display:block}.check .meta{color:var(--slate);font-size:12px;margin-top:2px}.check.done .lbl b{text-decoration:line-through;color:var(--slate)}.chip{display:inline-block;font-size:11px;padding:3px 8px;border-radius:6px;margin:3px 6px 0 0;background:#0e9fb21a;color:var(--oxblood);font-weight:600}.chip.free{background:#12a07a1f;color:var(--green)}.di{display:inline-flex;width:38px;height:38px;border-radius:9px;background:var(--oxblood);color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;flex:0 0 auto}.prog{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:2px 0 14px}.prog>i{display:block;height:100%;background:var(--green);transition:width .3s}.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;overflow-x:auto;padding-bottom:env(safe-area-inset-bottom);z-index:20}.nav button{flex:1 0 auto;background:none;border:0;padding:10px 12px 12px;font-size:11px;color:var(--slate);white-space:nowrap;font-weight:600}.nav button.on{color:var(--oxblood);border-top:2px solid var(--oxblood);margin-top:-1px}.auth{text-align:center}.auth h1{color:var(--oxblood);font-size:1.6rem}.auth p{color:var(--slate);font-size:14px}.auth input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin:14px 0;background:#fff}.btn{width:100%;padding:13px;border:0;border-radius:10px;background:var(--oxblood);color:#fff;font-size:15px;font-weight:600}.btn:disabled{opacity:.5}.warn{background:#fff3cd;border:1px solid #ffe08a;color:#7a5b00;padding:12px 14px;border-radius:12px;font-size:13px;margin:16px}.brow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.brow:last-of-type{border-bottom:0}.bcol{flex:1;min-width:0}.bedit{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px;background:#fff;color:var(--ink)}.bedit.lbl{font-weight:600;border-color:transparent;background:transparent;padding:6px 2px}.bedit.lbl:focus{border-color:var(--line);background:#fff}.bnum{width:96px;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}.bdet{font-size:11.5px;color:var(--slate);margin:2px 2px 0}.bdel{flex:0 0 auto;background:none;border:0;color:#b98;font-size:20px;line-height:1;padding:4px 6px}.badd{width:100%;background:none;border:1px dashed var(--line);border-radius:9px;padding:9px;color:var(--oxblood);font-weight:600;font-size:13px;margin-top:8px}.btot{display:flex;justify-content:space-between;align-items:baseline;padding:9px 2px;font-weight:700;border-top:2px solid var(--line);margin-top:4px}.btot.big{font-size:1.05rem}.bgrouplab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:16px 0 4px}.bwarn{background:#dd5f4314;border:1px solid rgba(221,95,67,.28);color:var(--alert);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bok{background:#12a07a1a;border:1px solid rgba(18,160,122,.25);color:var(--green);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bsel{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px;background:#fff;color:var(--ink);max-width:130px}.hyp{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}.hyp:last-child{border-bottom:0}.hyp .lbl{flex:1;font-size:13.5px}</style>
+    <style rel="stylesheet" crossorigin>:root{--paper:#eaf5f6;--surface:#ffffff;--ink:#0e3a42;--slate:#5a787e;--oxblood:#0e9fb2;--green:#12a07a;--amber:#e0794a;--line:#d7e7e8;--alert:#dd5f43}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0}body{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,system-ui,sans-serif;font-size:15px;line-height:1.5;padding-bottom:calc(70px + env(safe-area-inset-bottom))}a{color:var(--oxblood)}h1,h2,h3{font-family:Georgia,Times New Roman,serif;font-weight:600;line-height:1.2}.wrap{max-width:720px;margin:0 auto;padding:0 16px}.top{background:var(--ink);color:#fff;padding:22px 0 18px}.top .kick{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.85}.top h1{margin:6px 0 0;font-size:1.5rem;color:#fff}.top .who{font-size:12px;opacity:.85;margin-top:4px}.logout{position:absolute;top:16px;right:16px;background:#ffffff26;color:#fff;border:0;border-radius:8px;padding:7px 11px;font-size:12px}.top .wrap{position:relative}.sec{padding:20px 0 8px}.sec h2{font-size:1.28rem;margin:0 0 4px;color:var(--oxblood)}.sub{color:var(--slate);font-size:13.5px;margin:0 0 14px}.h3{font-family:Georgia,serif;font-weight:600;font-size:1.05rem;margin:22px 0 8px}.btn-outline{width:auto;padding:9px 14px;border-radius:12px;border:1.5px solid var(--oxblood);background:#fff;color:var(--oxblood);font-size:13px;font-weight:600;transition:background .12s ease}.btn-outline:active{background:var(--paper)}.btn-sm{padding:8px 12px;font-size:12.5px;border-radius:10px}.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(14,58,66,.07),0 1px 2px rgba(14,58,66,.05)}.tl{border-left:2px solid var(--oxblood);padding:2px 0 10px 14px;margin-left:4px;position:relative}.tl .when{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--oxblood);font-weight:700}.tl .what{font-weight:600;margin-top:2px}.tl .det{color:var(--slate);font-size:13px;margin-top:2px}.tbl{width:100%;border-collapse:collapse;font-size:13.5px}.tbl th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--slate);font-weight:700;padding:8px;border-bottom:1px solid var(--line)}.tbl td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}.tbl tr:last-child td{border-bottom:0}.tbl .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}.tbl .total td{font-weight:700;background:#0e9fb20d}.pos{color:var(--green)}.low{color:var(--alert);font-weight:700}.ok{color:var(--green);font-weight:700}.note{font-size:12.5px;color:var(--slate);background:#00000005;border-left:3px solid var(--line);padding:9px 11px;border-radius:0 8px 8px 0;margin:10px 0}.note.red{border-left-color:var(--alert)}.detail{color:var(--slate);font-size:12px}.check{display:flex;gap:11px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--line)}.check:last-child{border-bottom:0}.check input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--oxblood);flex:0 0 auto}.check .lbl{flex:1}.check .lbl b{display:block}.check .meta{color:var(--slate);font-size:12px;margin-top:2px}.check.done .lbl b{text-decoration:line-through;color:var(--slate)}.chip{display:inline-block;font-size:11px;padding:3px 8px;border-radius:6px;margin:3px 6px 0 0;background:#0e9fb21a;color:var(--oxblood);font-weight:600}.chip.free{background:#12a07a1f;color:var(--green)}.di{display:inline-flex;width:38px;height:38px;border-radius:9px;background:var(--oxblood);color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;flex:0 0 auto}.prog{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:2px 0 14px}.prog>i{display:block;height:100%;background:var(--green);transition:width .3s}.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;overflow-x:auto;padding-bottom:env(safe-area-inset-bottom);z-index:20}.nav button{flex:1 0 auto;background:none;border:0;padding:10px 12px 12px;font-size:11px;color:var(--slate);white-space:nowrap;font-weight:600}.nav button.on{color:var(--oxblood);border-top:2px solid var(--oxblood);margin-top:-1px}.auth{text-align:center}.auth h1{color:var(--oxblood);font-size:1.6rem}.auth p{color:var(--slate);font-size:14px}.auth input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin:14px 0;background:#fff}.btn{width:100%;padding:13px;border:0;border-radius:14px;background:var(--oxblood);color:#fff;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(14,159,178,.35);transition:transform .12s ease,box-shadow .12s ease}.btn:active{transform:scale(0.98);box-shadow:0 1px 4px rgba(14,159,178,.3)}.btn:disabled{opacity:.5}.warn{background:#fff3cd;border:1px solid #ffe08a;color:#7a5b00;padding:12px 14px;border-radius:12px;font-size:13px;margin:16px}.brow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.brow:last-of-type{border-bottom:0}.bcol{flex:1;min-width:0}.bedit{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px;background:#fff;color:var(--ink)}.bedit.lbl{font-weight:600;border-color:transparent;background:transparent;padding:6px 2px}.bedit.lbl:focus{border-color:var(--line);background:#fff}.bnum{width:96px;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}.bdet{font-size:11.5px;color:var(--slate);margin:2px 2px 0}.bdel{flex:0 0 auto;background:none;border:0;color:#b98;font-size:20px;line-height:1;padding:4px 6px}.badd{width:100%;background:none;border:1px dashed var(--line);border-radius:9px;padding:9px;color:var(--oxblood);font-weight:600;font-size:13px;margin-top:8px}.btot{display:flex;justify-content:space-between;align-items:baseline;padding:9px 2px;font-weight:700;border-top:2px solid var(--line);margin-top:4px}.btot.big{font-size:1.05rem}.bgrouplab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:16px 0 4px}.bwarn{background:#dd5f4314;border:1px solid rgba(221,95,67,.28);color:var(--alert);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bok{background:#12a07a1a;border:1px solid rgba(18,160,122,.25);color:var(--green);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bsel{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px;background:#fff;color:var(--ink);max-width:130px}.hyp{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}.hyp:last-child{border-bottom:0}.hyp .lbl{flex:1;font-size:13.5px}</style>
   </head>
   <body>
     <div id="root"></div>
