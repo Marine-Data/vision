@@ -18459,89 +18459,139 @@ function Jv(t) {
             }), (() => {
                 const rr = parseFloat(String(reelInput).replace(",", "."));
                 if (Number.isNaN(rr)) return null;
-                const vacR = vac.reel[moisSel],
-                    formR = form.reel[moisSel],
-                    epgR = epg.reel[moisSel],
-                    sportR = sport.reel[moisSel],
-                    pure = rr - vacR - formR - epgR - sportR;
+                const pockets = [
+                        ["vacances", "Vacances", vac],
+                        ["sport", "Sport", sport],
+                        ["formation", "Formation", form]
+                    ],
+                    totalReserve = pockets.reduce((s, [, , p]) => s + p.prevu[moisSel], 0),
+                    disponible = rr - totalReserve;
                 return h.jsxs("div", {
                     className: "note",
                     style: {
                         background: "#f4fafb"
                     },
-                    children: [h.jsx("div", {
+                    children: [h.jsxs("div", {
                         style: {
-                            fontWeight: 600,
-                            marginBottom: 6
+                            fontWeight: 700,
+                            marginBottom: 4
                         },
-                        children: "Détail du calcul — " + ve[moisSel]
+                        children: ["1. Montant sur les livrets d'épargne — ", ve[moisSel]]
                     }), h.jsxs("div", {
                         style: {
                             display: "flex",
-                            justifyContent: "space-between"
+                            justifyContent: "space-between",
+                            marginBottom: 10
                         },
                         children: [h.jsx("span", {
-                            children: "Solde total livrets"
-                        }), h.jsx("span", {
+                            children: "Solde total (Livret A + LDD)"
+                        }), h.jsx("b", {
                             children: ot(rr)
                         })]
-                    }), vacR > 0 && h.jsxs("div", {
+                    }), h.jsx("div", {
+                        style: {
+                            fontWeight: 700,
+                            marginBottom: 4
+                        },
+                        children: "2. Montants soustraits des provisions"
+                    }), pockets.map(([key, label, p]) => h.jsxs("div", {
                         style: {
                             display: "flex",
                             justifyContent: "space-between",
                             color: "var(--slate)"
                         },
-                        children: [h.jsx("span", {
-                            children: "− Provision vacances dépensée"
+                        children: [h.jsxs("span", {
+                            children: ["− Provision ", label]
                         }), h.jsxs("span", {
-                            children: ["− ", ot(vacR)]
+                            children: ["− ", ot(p.prevu[moisSel])]
                         })]
-                    }), formR > 0 && h.jsxs("div", {
-                        style: {
-                            display: "flex",
-                            justifyContent: "space-between",
-                            color: "var(--slate)"
-                        },
-                        children: [h.jsx("span", {
-                            children: "− Provision formation payée"
-                        }), h.jsxs("span", {
-                            children: ["− ", ot(formR)]
-                        })]
-                    }), sportR > 0 && h.jsxs("div", {
-                        style: {
-                            display: "flex",
-                            justifyContent: "space-between",
-                            color: "var(--slate)"
-                        },
-                        children: [h.jsx("span", {
-                            children: "− Provision sport payée"
-                        }), h.jsxs("span", {
-                            children: ["− ", ot(sportR)]
-                        })]
-                    }), epgR > 0 && h.jsxs("div", {
-                        style: {
-                            display: "flex",
-                            justifyContent: "space-between",
-                            color: "var(--slate)"
-                        },
-                        children: [h.jsx("span", {
-                            children: "− DU payé"
-                        }), h.jsxs("span", {
-                            children: ["− ", ot(epgR)]
-                        })]
-                    }), h.jsxs("div", {
+                    }, key)), h.jsxs("div", {
                         style: {
                             display: "flex",
                             justifyContent: "space-between",
                             fontWeight: 700,
                             marginTop: 6,
                             paddingTop: 6,
+                            marginBottom: 14,
                             borderTop: "1px solid var(--line)"
                         },
                         children: [h.jsx("span", {
-                            children: "= Épargne réelle (matelas pur)"
+                            children: "= Épargne réellement disponible"
                         }), h.jsx("span", {
-                            children: ot(pure)
+                            children: ot(disponible)
+                        })]
+                    }), h.jsx("div", {
+                        style: {
+                            fontWeight: 700,
+                            marginBottom: 6
+                        },
+                        children: "3. Détail par enveloppe"
+                    }), h.jsxs("table", {
+                        style: {
+                            width: "100%",
+                            borderCollapse: "collapse",
+                            fontSize: 12.5
+                        },
+                        children: [h.jsx("thead", {
+                            children: h.jsxs("tr", {
+                                children: [h.jsx("th", {
+                                    style: {
+                                        textAlign: "left",
+                                        paddingBottom: 4
+                                    },
+                                    children: "Enveloppe"
+                                }), h.jsx("th", {
+                                    style: {
+                                        textAlign: "right",
+                                        paddingBottom: 4
+                                    },
+                                    children: "À provisionner"
+                                }), h.jsx("th", {
+                                    style: {
+                                        textAlign: "right",
+                                        paddingBottom: 4
+                                    },
+                                    children: "Viré / dépensé"
+                                }), h.jsx("th", {
+                                    style: {
+                                        textAlign: "right",
+                                        paddingBottom: 4
+                                    },
+                                    children: "Reste"
+                                })]
+                            })
+                        }), h.jsx("tbody", {
+                            children: pockets.map(([key, label, p]) => h.jsxs("tr", {
+                                children: [h.jsx("td", {
+                                    style: {
+                                        padding: "5px 0",
+                                        borderTop: "1px solid var(--line)"
+                                    },
+                                    children: label
+                                }), h.jsx("td", {
+                                    style: {
+                                        textAlign: "right",
+                                        padding: "5px 0",
+                                        borderTop: "1px solid var(--line)"
+                                    },
+                                    children: ot(p.prevu[moisSel])
+                                }), h.jsx("td", {
+                                    style: {
+                                        textAlign: "right",
+                                        padding: "5px 0",
+                                        borderTop: "1px solid var(--line)"
+                                    },
+                                    children: ot(p.reel[moisSel])
+                                }), h.jsx("td", {
+                                    style: {
+                                        textAlign: "right",
+                                        padding: "5px 0",
+                                        borderTop: "1px solid var(--line)",
+                                        fontWeight: 600
+                                    },
+                                    children: ot(p.solde[moisSel])
+                                })]
+                            }, key))
                         })]
                     })]
                 })
