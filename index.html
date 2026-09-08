@@ -17178,6 +17178,19 @@ function reelEpargnePure(rawReel, vac, form, epg, i, sport) {
     return rawReel[i] - vac.reel[i] - form.reel[i] - epg.reel[i] - (sport ? sport.reel[i] : 0)
 }
 
+function totalReserve(vac, form, sport, i) {
+    return vac.prevu[i] + form.prevu[i] + (sport ? sport.prevu[i] : 0)
+}
+
+function reelDisponible(rawReel, vac, form, sport, i) {
+    if (rawReel[i] == null) return null;
+    return rawReel[i] - totalReserve(vac, form, sport, i)
+}
+
+function planDisponible(planArr, vac, form, sport, i) {
+    return planArr[i] - totalReserve(vac, form, sport, i)
+}
+
 function moisNow() {
     const b = new Date(2026, 7, 1),
         n = new Date;
@@ -17351,7 +17364,7 @@ function Mv({
         MplanArr = planEpargne(im, r),
         l = (() => {
             for (let w = ve.length - 1; w >= 0; w--)
-                if (MrawReel[w] != null) return reelEpargnePure(MrawReel, MvacArr, MformArr, MepgArr, w, MsportArr);
+                if (MrawReel[w] != null) return reelDisponible(MrawReel, MvacArr, MformArr, MsportArr, w);
             return MplanArr[Mm]
         })(),
         c = u ? Math.min(100, Math.round(l / u * 100)) : 0,
@@ -17832,10 +17845,10 @@ function Jv(t) {
         sport = pocketCalc(items, "sport", 0, ve.length, !0),
         epg = pocketCalc(items, "epargne", 0, ve.length),
         plan = planEpargne(items, r, ve.length),
-        curPlan = plan[M],
+        curPlan = planDisponible(plan, vac, form, sport, M),
         curReelRaw = Wv(r, M),
         curHasReel = curReelRaw !== "" && curReelRaw != null,
-        curHV = reelEpargnePure(rawReel, vac, form, epg, M, sport),
+        curHV = reelDisponible(rawReel, vac, form, sport, M),
         curEcart = curHV != null ? curHV - curPlan : null,
         curPoche = vac.solde[M],
         curForm = form.solde[M],
@@ -17879,11 +17892,12 @@ function Jv(t) {
     async function cloturer() {
         if (!curHasReelSel()) return;
         setClosing(!0);
-        const hv = reelEpargnePure(rawReel, vac, form, epg, moisSel, sport);
+        const hv = reelDisponible(rawReel, vac, form, sport, moisSel),
+            planD = planDisponible(plan, vac, form, sport, moisSel);
         await acl(moisSel, {
-            plan: plan[moisSel],
+            plan: planD,
             reel: hv,
-            ecart: hv - plan[moisSel],
+            ecart: hv - planD,
             vacPrevu: vac.prevu[moisSel],
             vacReel: vac.reel[moisSel],
             vacSolde: vac.solde[moisSel],
@@ -17952,8 +17966,8 @@ function Jv(t) {
                         children: ve.map((label, i) => {
                             const snap = cloture(i);
                             if (pocket === "epargne") {
-                                const ec = snap ? snap.snapshot.ecart : (rawReel[i] == null ? null : reelEpargnePure(rawReel, vac, form, epg, i, sport) - plan[i]),
-                                    pl = snap ? snap.snapshot.plan : plan[i];
+                                const ec = snap ? snap.snapshot.ecart : (rawReel[i] == null ? null : reelDisponible(rawReel, vac, form, sport, i) - planDisponible(plan, vac, form, sport, i)),
+                                    pl = snap ? snap.snapshot.plan : planDisponible(plan, vac, form, sport, i);
                                 return h.jsxs("tr", {
                                     className: i === moisSel ? "total" : "",
                                     children: [h.jsx("td", {
@@ -19201,7 +19215,11 @@ function Xv({
     voyages: vg,
     items: im
 }) {
-    const r = planEpargne(im, e),
+    const rawPlan = planEpargne(im, e),
+        vacX = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
+        formX = pocketCalc(im, "formation", 0, ve.length, !0),
+        sportX = pocketCalc(im, "sport", 0, ve.length, !0),
+        r = rawPlan.map((q, V) => planDisponible(rawPlan, vacX, formX, sportX, V)),
         n = getCible(e, t),
         {
             troughIdx: s,
@@ -19328,12 +19346,11 @@ function Xv({
                     children: "Bascule PEA 🌊"
                 })]
             }), (() => {
-                const vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
-                    form = pocketCalc(im, "formation", 0, ve.length, !0),
-                    sport = pocketCalc(im, "sport", 0, ve.length, !0),
-                    epg = pocketCalc(im, "epargne", 0, ve.length),
+                const vac = vacX,
+                    form = formX,
+                    sport = sportX,
                     rawReel = Cv(e, ve.length),
-                    w = rawReel.map((q, V) => reelEpargnePure(rawReel, vac, form, epg, V, sport)),
+                    w = rawReel.map((q, V) => reelDisponible(rawReel, vac, form, sport, V)),
                     j = w.map((q, V) => q != null ? V : -1).filter(q => q >= 0);
                 if (!j.length) return null;
                 const P = j.map((q, V) => `${V===0?"M":"L"}${y(q).toFixed(1)},${f(w[q]).toFixed(1)}`).join(" ");
@@ -19383,7 +19400,7 @@ function Xv({
             })]
         }), h.jsxs("div", {
             className: "note",
-            children: ["Sport, SCAP et DU déduits des livrets : creux à ", Pt(r[s]), " en ", ve[s], ", puis retour au-dessus du matelas de ", Pt(n), " vers ", i >= 0 ? ve[i] : "plus tard", "."]
+            children: ["Vacances, sport et formation (SCAP + DU) déduits en totalité dès qu'ils sont provisionnés — la courbe représente l'épargne réellement disponible, hors tout engagement. Objectif de ", Pt(n), " atteint ", i >= 0 ? ve[i] : "plus tard", "."]
         })]
     })
 }
@@ -19393,17 +19410,17 @@ function Qv({
     params: e,
     items: im
 }) {
-    const r = planEpargne(im, e),
+    const rawPlan = planEpargne(im, e),
         n = getCible(e, t),
         vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
         form = pocketCalc(im, "formation", 0, ve.length, !0),
-                    sport = pocketCalc(im, "sport", 0, ve.length, !0),
-        epg = pocketCalc(im, "epargne", 0, ve.length),
+        sport = pocketCalc(im, "sport", 0, ve.length, !0),
+        r = rawPlan.map((q, V) => planDisponible(rawPlan, vac, form, sport, V)),
         rawReel = Cv(e, ve.length),
         M = moisNow(),
         latestReel = (() => {
             for (let w = ve.length - 1; w >= 0; w--)
-                if (rawReel[w] != null) return reelEpargnePure(rawReel, vac, form, epg, w, sport);
+                if (rawReel[w] != null) return reelDisponible(rawReel, vac, form, sport, w);
             return null
         })(),
         s = latestReel != null ? latestReel : r[M],
