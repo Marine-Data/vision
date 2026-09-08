@@ -17183,10 +17183,14 @@ function moisNow() {
     return Math.max(0, (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth()))
 }
 
-function getCible(e) {
+function salaireMensuel(budget) {
+    return (budget || []).filter(x => x.kind === "revenu").reduce((s, x) => s + (Number(x.montant) || 0), 0)
+}
+
+function getCible(e, budget) {
     const ov = Vf(e, "cible_override", 0);
     if (ov > 0) return ov;
-    const sal = mt(e, "salaire_mensuel");
+    const sal = salaireMensuel(budget);
     return sal > 0 ? sal * 6 : 12900
 }
 
@@ -17196,6 +17200,10 @@ function seuilEpargne(e) {
 
 function seuilPoche(e) {
     return mt(e, "seuil_poche_min") || 200
+}
+
+function depasseCategorie(reel, budget) {
+    return reel > budget + Math.max(20, budget * 0.1)
 }
 
 function Ml(t, e) {
@@ -17332,7 +17340,7 @@ function Mv({
         i = Br.filter(d => t[d.key]).length,
         o = Ba.flatMap(d => d.items),
         a = o.filter(d => t[d.key]).length,
-        u = getCible(r),
+        u = getCible(r, e),
         Mm = moisNow(),
         MvacArr = pocketCalc(im, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
         MformArr = pocketCalc(im, "formation", 0, ve.length),
@@ -17783,6 +17791,14 @@ function Jv(t) {
         items: itemsAll,
         clotures: clAll,
         audit: auditAll,
+        spend: spendAll,
+        savings: savingsAll,
+        saveSpend: saveSpendFn,
+        addSaving: addSavingFn,
+        saveSaving: saveSavingFn,
+        delSaving: delSavingFn,
+        saveLine: saveLineFn,
+        editLine: editLineFn,
         editParam: l,
         saveParam: u,
         editItem: ei,
@@ -17806,6 +17822,7 @@ function Jv(t) {
         cloture = m => clotures.find(x => x.mois_index === m),
         isClosed = m => !!cloture(m),
         k = en(e, "charge"),
+        margeSecu = salaireMensuel(e) - k - en(e, "epargne"),
         M = moisNow(),
         rawReel = Cv(r, ve.length),
         vac = pocketCalc(items, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
@@ -18168,7 +18185,7 @@ function Jv(t) {
                     }
                     return s
                 })(),
-                objectifAtteint = curHV != null && curHV >= getCible(r);
+                objectifAtteint = curHV != null && curHV >= getCible(r, e);
             return h.jsxs("div", {
                 className: "card",
                 style: {
@@ -18249,7 +18266,7 @@ function Jv(t) {
             className: "sumrow",
             style: {
                 display: "grid",
-                gridTemplateColumns: "repeat(3,1fr)",
+                gridTemplateColumns: "repeat(2,1fr)",
                 gap: 8,
                 marginBottom: 12
             },
@@ -18339,6 +18356,34 @@ function Jv(t) {
                     },
                     children: "Provision formation"
                 })]
+            }), h.jsxs("div", {
+                className: "card",
+                style: {
+                    textAlign: "center",
+                    padding: "10px 6px"
+                },
+                children: [h.jsx("div", {
+                    "aria-hidden": "true",
+                    style: {
+                        fontSize: 18
+                    },
+                    children: margeSecu < 0 ? "⚠" : "✓"
+                }), h.jsx("div", {
+                    style: {
+                        fontFamily: "Georgia,serif",
+                        fontWeight: 700,
+                        fontSize: "1.05rem",
+                        color: margeSecu < 0 ? "var(--oxblood)" : "var(--green)"
+                    },
+                    children: (margeSecu >= 0 ? "+" : "") + ot(margeSecu)
+                }), h.jsx("div", {
+                    style: {
+                        fontSize: 10.5,
+                        color: "var(--slate)",
+                        textTransform: "uppercase"
+                    },
+                    children: "Marge de sécurité"
+                })]
             })]
         }), h.jsx("div", {
             className: "h3",
@@ -18377,7 +18422,84 @@ function Jv(t) {
                     value: reelInput,
                     onChange: g => setReelInput(g.target.value)
                 })]
-            }), selClosed && h.jsxs("div", {
+            }), (() => {
+                const rr = parseFloat(String(reelInput).replace(",", "."));
+                if (Number.isNaN(rr)) return null;
+                const vacR = vac.reel[moisSel],
+                    formR = form.reel[moisSel],
+                    epgR = epg.reel[moisSel],
+                    pure = rr - vacR - formR - epgR;
+                return h.jsxs("div", {
+                    className: "note",
+                    style: {
+                        background: "#f4fafb"
+                    },
+                    children: [h.jsx("div", {
+                        style: {
+                            fontWeight: 600,
+                            marginBottom: 6
+                        },
+                        children: "Détail du calcul — " + ve[moisSel]
+                    }), h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between"
+                        },
+                        children: [h.jsx("span", {
+                            children: "Solde total livrets"
+                        }), h.jsx("span", {
+                            children: ot(rr)
+                        })]
+                    }), vacR > 0 && h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between",
+                            color: "var(--slate)"
+                        },
+                        children: [h.jsx("span", {
+                            children: "− Provision vacances dépensée"
+                        }), h.jsxs("span", {
+                            children: ["− ", ot(vacR)]
+                        })]
+                    }), formR > 0 && h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between",
+                            color: "var(--slate)"
+                        },
+                        children: [h.jsx("span", {
+                            children: "− Provision formation/sport payée"
+                        }), h.jsxs("span", {
+                            children: ["− ", ot(formR)]
+                        })]
+                    }), epgR > 0 && h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between",
+                            color: "var(--slate)"
+                        },
+                        children: [h.jsx("span", {
+                            children: "− DU payé"
+                        }), h.jsxs("span", {
+                            children: ["− ", ot(epgR)]
+                        })]
+                    }), h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontWeight: 700,
+                            marginTop: 6,
+                            paddingTop: 6,
+                            borderTop: "1px solid var(--line)"
+                        },
+                        children: [h.jsx("span", {
+                            children: "= Épargne réelle (matelas pur)"
+                        }), h.jsx("span", {
+                            children: ot(pure)
+                        })]
+                    })]
+                })
+            })(), selClosed && h.jsxs("div", {
                 className: "note",
                 style: {
                     background: "#eef7f4",
@@ -18518,10 +18640,256 @@ function Jv(t) {
                     })]
                 })
             })]
-        }), h.jsx("div", {
+        }), (() => {
+            const chargeLines = (e || []).filter(w => w.kind === "charge"),
+                spendFor = w => {
+                    const rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel);
+                    return rec ? gr(rec.montant) : null
+                },
+                totalBudget = chargeLines.reduce((s, w) => s + gr(w.montant), 0),
+                totalSpent = chargeLines.reduce((s, w) => {
+                    const val2 = spendFor(w);
+                    return s + (val2 != null ? val2 : 0)
+                }, 0),
+                anySpent = chargeLines.some(w => spendFor(w) != null);
+            return h.jsxs("details", {
+                className: "collapsible",
+                open: !0,
+                children: [h.jsx("summary", {
+                    children: "📊 Dépenses réelles par catégorie — " + ve[moisSel]
+                }), h.jsxs("div", {
+                    className: "inner",
+                    children: [h.jsx("p", {
+                        className: "sub",
+                        style: {
+                            marginTop: 0
+                        },
+                        children: "Renseigne ce que tu as vraiment dépensé ce mois-ci dans chaque catégorie, pour voir où tu en es par rapport au budget. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets."
+                    }), chargeLines.map(w => {
+                        const val = spendFor(w),
+                            over = val != null && depasseCategorie(val, gr(w.montant));
+                        return h.jsxs("div", {
+                            style: {
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                                marginBottom: 8
+                            },
+                            children: [h.jsxs("span", {
+                                style: {
+                                    flex: 1,
+                                    fontSize: 13.5
+                                },
+                                children: [w.poste, " ", h.jsx("span", {
+                                    style: {
+                                        color: "var(--slate)",
+                                        fontSize: 11.5
+                                    },
+                                    children: "(budget " + ot(gr(w.montant)) + ")"
+                                })]
+                            }), h.jsx("input", {
+                                "aria-label": "Dépensé pour " + w.poste,
+                                inputMode: "decimal",
+                                disabled: v,
+                                placeholder: "€",
+                                defaultValue: val != null ? val : "",
+                                onBlur: g => {
+                                    const nv = parseFloat(String(g.target.value).replace(",", "."));
+                                    if (!Number.isNaN(nv)) saveSpendFn(w.id, moisSel, nv)
+                                },
+                                style: {
+                                    width: 90,
+                                    padding: 9,
+                                    borderRadius: 10,
+                                    border: "1.5px solid " + (over ? "var(--oxblood)" : "var(--line)"),
+                                    fontSize: 14,
+                                    textAlign: "right"
+                                }
+                            })]
+                        }, w.id)
+                    }), anySpent && h.jsxs("div", {
+                        className: "note",
+                        style: {
+                            marginTop: 8,
+                            background: depasseCategorie(totalSpent, totalBudget) ? "#fbe9e4" : "#eef7f4"
+                        },
+                        children: ["Total dépensé : ", h.jsx("b", {
+                            children: ot(totalSpent)
+                        }), " sur ", ot(totalBudget), " prévu — ", h.jsx("span", {
+                            className: depasseCategorie(totalSpent, totalBudget) ? "low" : "ok",
+                            children: depasseCategorie(totalSpent, totalBudget) ? "dépassement de " + ot(totalSpent - totalBudget) : "marge de " + ot(totalBudget - totalSpent)
+                        })]
+                    })]
+                })]
+            })
+        })(), (() => {
+            const list = savingsAll || [];
+            return h.jsxs("details", {
+                className: "collapsible",
+                children: [h.jsx("summary", {
+                    children: "💚 Avant / Après — économies réalisées"
+                }), h.jsxs("div", {
+                    className: "inner",
+                    children: [h.jsx("p", {
+                        className: "sub",
+                        style: {
+                            marginTop: 0
+                        },
+                        children: "Ce que tu as résilié ou renégocié depuis le début de la reconversion."
+                    }), list.map(sItem => {
+                        const eco = gr(sItem.ancien_montant) - gr(sItem.nouveau_montant);
+                        return h.jsxs("div", {
+                            style: {
+                                display: "flex",
+                                gap: 6,
+                                alignItems: "center",
+                                marginBottom: 8,
+                                flexWrap: "wrap"
+                            },
+                            children: [h.jsx("input", {
+                                "aria-label": "Poste",
+                                defaultValue: sItem.poste,
+                                placeholder: "Poste (ex. Shiva)",
+                                disabled: v,
+                                onBlur: g => saveSavingFn(sItem.id, {
+                                    poste: g.target.value
+                                }),
+                                style: {
+                                    flex: "1 1 120px",
+                                    padding: 8,
+                                    borderRadius: 8,
+                                    border: "1px solid var(--line)",
+                                    fontSize: 13
+                                }
+                            }), h.jsx("input", {
+                                "aria-label": "Ancien montant",
+                                inputMode: "decimal",
+                                defaultValue: sItem.ancien_montant,
+                                disabled: v,
+                                onBlur: g => saveSavingFn(sItem.id, {
+                                    ancien_montant: Number(g.target.value) || 0
+                                }),
+                                style: {
+                                    width: 65,
+                                    padding: 8,
+                                    borderRadius: 8,
+                                    border: "1px solid var(--line)",
+                                    fontSize: 13,
+                                    textAlign: "right"
+                                }
+                            }), h.jsx("span", {
+                                "aria-hidden": "true",
+                                children: "→"
+                            }), h.jsx("input", {
+                                "aria-label": "Nouveau montant",
+                                inputMode: "decimal",
+                                defaultValue: sItem.nouveau_montant,
+                                disabled: v,
+                                onBlur: g => saveSavingFn(sItem.id, {
+                                    nouveau_montant: Number(g.target.value) || 0
+                                }),
+                                style: {
+                                    width: 65,
+                                    padding: 8,
+                                    borderRadius: 8,
+                                    border: "1px solid var(--line)",
+                                    fontSize: 13,
+                                    textAlign: "right"
+                                }
+                            }), h.jsx("span", {
+                                style: {
+                                    fontSize: 12.5,
+                                    fontWeight: 700,
+                                    color: "var(--green)",
+                                    minWidth: 55
+                                },
+                                children: "-" + ot(eco)
+                            }), !v && h.jsx("button", {
+                                className: "btn-outline btn-sm",
+                                onClick: () => delSavingFn(sItem.id),
+                                "aria-label": "Supprimer",
+                                children: "✕"
+                            })]
+                        }, sItem.id)
+                    }), list.length > 0 && !v && h.jsxs("div", {
+                        style: {
+                            marginTop: 4
+                        },
+                        children: [h.jsx("p", {
+                            className: "sub",
+                            style: {
+                                marginBottom: 6
+                            },
+                            children: "Relier une économie à une ligne du Budget mensuel pour la répercuter réellement :"
+                        }), list.map(sItem => h.jsxs("div", {
+                            style: {
+                                display: "flex",
+                                gap: 6,
+                                alignItems: "center",
+                                marginBottom: 6,
+                                flexWrap: "wrap"
+                            },
+                            children: [h.jsxs("span", {
+                                style: {
+                                    fontSize: 12.5,
+                                    minWidth: 90
+                                },
+                                children: [sItem.poste || "(sans nom)", " →"]
+                            }), h.jsxs("select", {
+                                "aria-label": "Ligne du budget correspondante",
+                                value: sItem.budget_line_id || "",
+                                onChange: g => saveSavingFn(sItem.id, {
+                                    budget_line_id: g.target.value || null
+                                }),
+                                style: {
+                                    flex: "1 1 140px",
+                                    padding: 7,
+                                    borderRadius: 8,
+                                    border: "1px solid var(--line)",
+                                    fontSize: 12.5
+                                },
+                                children: [h.jsx("option", {
+                                    value: "",
+                                    children: "— aucune —"
+                                }), (e || []).filter(w => w.kind === "charge").map(w => h.jsx("option", {
+                                    value: w.id,
+                                    children: w.poste + " (" + ot(gr(w.montant)) + ")"
+                                }, w.id))]
+                            }), sItem.budget_line_id && h.jsx("button", {
+                                className: "btn-outline btn-sm",
+                                onClick: () => {
+                                    editLineFn(sItem.budget_line_id, {
+                                        montant: sItem.nouveau_montant
+                                    }), saveLineFn(sItem.budget_line_id)
+                                },
+                                children: "Appliquer"
+                            })]
+                        }, sItem.id))]
+                    }), !v && h.jsx("button", {
+                        className: "btn-outline btn-sm",
+                        style: {
+                            marginTop: 4
+                        },
+                        onClick: addSavingFn,
+                        children: "+ Ajouter une économie"
+                    }), list.length > 0 && h.jsxs("p", {
+                        className: "sub",
+                        style: {
+                            marginTop: 10
+                        },
+                        children: ["Total économisé : ", h.jsx("b", {
+                            style: {
+                                color: "var(--green)"
+                            },
+                            children: ot(list.reduce((s, x) => s + (gr(x.ancien_montant) - gr(x.nouveau_montant)), 0))
+                        }), "/mois"]
+                    })]
+                })]
+            })
+        })(), h.jsx("div", {
             className: "note red",
             children: h.jsx("b", {
-                children: "Objectif : " + ot(getCible(r)) + " (6 mois de salaire) sur les livrets, hors provisions vacances et formation."
+                children: "Objectif : " + ot(getCible(r, e)) + " (6 mois de salaire) sur les livrets, hors provisions vacances et formation."
             })
         }), h.jsx(Pocket, {
             title: "Épargne — prévu vs réel",
@@ -18549,8 +18917,7 @@ function Jv(t) {
                         ["plan_baseline", "Base théorique du plan (fixe, jamais recalée automatiquement)"],
                         ["epargne_mensuelle", "Épargne mensuelle vers les livrets"],
                         ["provision_vacances_mensuelle", "Provision vacances mensuelle"],
-                        ["salaire_mensuel", "Salaire mensuel net (objectif matelas = ×6 automatiquement)"],
-                        ["cible_override", "Forcer l'objectif matelas (0 = auto, laisse vide sinon)"],
+                        ["cible_override", "Forcer l'objectif matelas (0 = auto, calculé depuis ton salaire du Budget mensuel ×6)"],
                         ["seuil_ecart_epargne", "Seuil d'alerte écart épargne (€), défaut 300"],
                         ["seuil_poche_min", "Seuil d'alerte poche basse (€), défaut 200"]
                     ].map(([key, label]) => h.jsxs("div", {
@@ -18568,7 +18935,7 @@ function Jv(t) {
                     })), h.jsxs("p", {
                         className: "sub",
                         children: ["Objectif matelas actuel : ", h.jsx("b", {
-                            children: ot(getCible(r))
+                            children: ot(getCible(r, e))
                         }), " (", mt(r, "cible_override") > 0 ? "forcé manuellement" : "6 × salaire mensuel", ")."]
                     })
                 ]
@@ -18733,7 +19100,7 @@ function Xv({
     items: im
 }) {
     const r = planEpargne(im, e),
-        n = getCible(e),
+        n = getCible(e, t),
         {
             troughIdx: s,
             recIdx: i
@@ -18924,7 +19291,7 @@ function Qv({
     items: im
 }) {
     const r = planEpargne(im, e),
-        n = getCible(e),
+        n = getCible(e, t),
         vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
         form = pocketCalc(im, "formation", 0, ve.length),
         epg = pocketCalc(im, "epargne", 0, ve.length),
@@ -19112,9 +19479,12 @@ function _v({
 }
 
 function $v({
-    budget: t
+    budget: t,
+    spend: spAll
 }) {
     const e = (t || []).filter(a => a.kind === "charge").map((a, l) => ({
+            id: a.id,
+            type: a.type,
             nom: a.poste,
             montant: Number(a.montant) || 0,
             couleur: Dc[l % Dc.length]
@@ -19225,7 +19595,112 @@ function $v({
                     children: [Math.round(a.montant / r * 100), " %"]
                 })]
             }, l))
-        })]
+        }), (() => {
+            const fixe = e.filter(a => a.type === "fixe").reduce((s, a) => s + a.montant, 0),
+                variable = e.filter(a => a.type === "variable").reduce((s, a) => s + a.montant, 0),
+                autre = r - fixe - variable,
+                M = moisNow(),
+                spentByLine = a => {
+                    const rec = (spAll || []).find(x => x.budget_line_id === a.id && x.mois_index === M);
+                    return rec ? Number(rec.montant) : null
+                },
+                totalSpent = e.reduce((s, a) => {
+                    const val = spentByLine(a);
+                    return s + (val != null ? val : 0)
+                }, 0),
+                anySpent = e.some(a => spentByLine(a) != null);
+            return h.jsxs(h.Fragment, {
+                children: [(fixe > 0 || variable > 0) && h.jsxs("div", {
+                    style: {
+                        marginTop: 16,
+                        paddingTop: 12,
+                        borderTop: "1px solid var(--line)"
+                    },
+                    children: [h.jsx("div", {
+                        style: {
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            marginBottom: 8
+                        },
+                        children: "Fixe vs variable"
+                    }), h.jsx("div", {
+                        style: {
+                            display: "flex",
+                            height: 22,
+                            borderRadius: 8,
+                            overflow: "hidden"
+                        },
+                        children: [
+                            ["Fixe", fixe, "var(--oxblood)"],
+                            ["Variable", variable, "var(--green)"],
+                            ["Autre", autre, "var(--line)"]
+                        ].filter(([, v]) => v > 0).map(([lbl, v, col], idx) => h.jsx("div", {
+                            style: {
+                                width: (v / r * 100) + "%",
+                                background: col
+                            },
+                            title: lbl + " : " + ot(v)
+                        }, idx))
+                    }), h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            gap: 12,
+                            marginTop: 6,
+                            fontSize: 11.5,
+                            color: "var(--slate)"
+                        },
+                        children: [fixe > 0 && h.jsxs("span", {
+                            children: ["● Fixe ", ot(fixe)]
+                        }), variable > 0 && h.jsxs("span", {
+                            children: ["● Variable ", ot(variable)]
+                        })]
+                    })]
+                }), anySpent && h.jsxs("div", {
+                    style: {
+                        marginTop: 16,
+                        paddingTop: 12,
+                        borderTop: "1px solid var(--line)"
+                    },
+                    children: [h.jsxs("div", {
+                        style: {
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            marginBottom: 8
+                        },
+                        children: ["Budget vs réel — ", ve[M]]
+                    }), e.filter(a => spentByLine(a) != null).map(a => {
+                        const val = spentByLine(a),
+                            over = depasseCategorie(val, a.montant);
+                        return h.jsxs("div", {
+                            style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: 13,
+                                padding: "5px 0",
+                                borderBottom: "1px solid var(--line)"
+                            },
+                            children: [h.jsx("span", {
+                                children: a.nom
+                            }), h.jsxs("span", {
+                                className: over ? "low" : "ok",
+                                style: {
+                                    fontVariantNumeric: "tabular-nums"
+                                },
+                                children: [ot(val), " / ", ot(a.montant)]
+                            })]
+                        }, a.id)
+                    }), h.jsxs("div", {
+                        className: "note",
+                        style: {
+                            marginTop: 8
+                        },
+                        children: ["Total réel : ", h.jsx("b", {
+                            children: ot(totalSpent)
+                        })]
+                    })]
+                })]
+            })
+        })()]
     })
 }
 
@@ -19233,7 +19708,8 @@ function ek({
     budget: t,
     params: e,
     voyages: r,
-    items: im
+    items: im,
+    spend: spAll
 }) {
     if (!t) return h.jsx("section", {
         className: "sec",
@@ -19276,7 +19752,8 @@ function ek({
             className: "h3",
             children: `Répartition des charges — ${hs(n)} €/mois`
         }), h.jsx($v, {
-            budget: t
+            budget: t,
+            spend: spAll
         })]
     })
 }
@@ -19328,7 +19805,7 @@ function nk({
 }
 
 function sk() {
-    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]);
+    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]);
     re.useEffect(() => {
         if (at) {
             n(!0);
@@ -19410,6 +19887,16 @@ function sk() {
                 ascending: !1
             }).limit(30);
             saud(K || [])
+        })(), (async () => {
+            const {
+                data: K
+            } = await J.from("vision_spend").select("*");
+            ssp(K || [])
+        })(), (async () => {
+            const {
+                data: K
+            } = await J.from("vision_savings").select("*").order("sort");
+            ssv(K || [])
         })()
     }, [t]);
     async function x(N) {
@@ -19551,6 +20038,42 @@ function sk() {
         }).select().single();
         K && scl(H => [...H.filter(A => A.mois_index !== moisIdx), K])
     }
+    async function saveSpend(lineId, moisIdx, montant) {
+        const {
+            data: K
+        } = await J.from("vision_spend").upsert({
+            user_id: t.user.id,
+            budget_line_id: lineId,
+            mois_index: moisIdx,
+            montant
+        }, {
+            onConflict: "user_id,budget_line_id,mois_index"
+        }).select().single();
+        K && ssp(H => [...H.filter(A => !(A.budget_line_id === lineId && A.mois_index === moisIdx)), K])
+    }
+    async function addSaving() {
+        const K = {
+                user_id: t.user.id,
+                poste: "",
+                ancien_montant: 0,
+                nouveau_montant: 0,
+                note: "",
+                sort: Math.max(0, ...sv.map(A => A.sort || 0)) + 1
+            },
+            {
+                data: H
+            } = await J.from("vision_savings").insert(K).select().single();
+        H && ssv(A => [...A, H])
+    }
+    async function saveSaving(id, patch) {
+        await J.from("vision_savings").update(patch).eq("id", id), ssv(K => K.map(H => H.id === id ? {
+            ...H,
+            ...patch
+        } : H))
+    }
+    async function delSaving(id) {
+        ssv(K => K.filter(H => H.id !== id)), await J.from("vision_savings").delete().eq("id", id)
+    }
 
     function oe() {
         const N = window.location.origin + window.location.pathname + "?partage";
@@ -19571,6 +20094,8 @@ function sk() {
             items: vi,
             clotures: cl,
             audit: aud,
+            spend: sp,
+            savings: sv,
             ...at ? {
                 readOnly: !0,
                 editLine: lt,
@@ -19587,7 +20112,11 @@ function sk() {
                 saveItem: lt,
                 addItem: lt,
                 removeItem: lt,
-                addCloture: lt
+                addCloture: lt,
+                saveSpend: lt,
+                addSaving: lt,
+                saveSaving: lt,
+                delSaving: lt
             } : {
                 readOnly: !1,
                 editLine: y,
@@ -19604,7 +20133,11 @@ function sk() {
                 saveItem: itemSave,
                 addItem: itemAdd,
                 removeItem: itemDel,
-                addCloture: clore
+                addCloture: clore,
+                saveSpend: saveSpend,
+                addSaving: addSaving,
+                saveSaving: saveSaving,
+                delSaving: delSaving
             }
         },
         gt = N => at && !v ? h.jsx(nk, {
@@ -19663,7 +20196,8 @@ function sk() {
                 budget: l,
                 params: c,
                 voyages: p,
-                items: vi
+                items: vi,
+                spend: sp
             })), s === "sport" && h.jsx(Zv, {}), s === "pieces" && h.jsx(Yv, {
                 progress: o,
                 toggle: x,
