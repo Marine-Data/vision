@@ -17133,21 +17133,22 @@ function qv(t) {
     return en(t, "revenu") - en(t, "charge") - en(t, "epargne")
 }
 
-function pocketCalc(items, pocket, monthlyRate, r = ve.length) {
+function pocketCalc(items, pocket, monthlyRate, r = ve.length, totalMode) {
     const list = (items || []).filter(x => x.pocket === pocket);
     const prevu = [],
         reel = [],
         solde = [];
+    const totalPrevu = totalMode ? list.reduce((s, it) => s + gr(it.montant_prevu), 0) : 0;
     let pc = 0,
         rc = 0;
     for (let i = 0; i < r; i++) {
         for (const it of list)
             if (gr(it.mois_index) === i) {
-                if (monthlyRate === 0) pc += gr(it.montant_prevu);
+                if (monthlyRate === 0 && !totalMode) pc += gr(it.montant_prevu);
                 if (it.paid) rc += it.montant_reel != null ? gr(it.montant_reel) : gr(it.montant_prevu)
             }
         pc += monthlyRate;
-        prevu.push(pc), reel.push(rc), solde.push(pc - rc)
+        prevu.push(totalMode ? totalPrevu : pc), reel.push(rc), solde.push((totalMode ? totalPrevu : pc) - rc)
     }
     return {
         prevu,
@@ -17343,8 +17344,8 @@ function Mv({
         u = getCible(r, e),
         Mm = moisNow(),
         MvacArr = pocketCalc(im, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
-        MformArr = pocketCalc(im, "formation", 0, ve.length),
-        MsportArr = pocketCalc(im, "sport", 0, ve.length),
+        MformArr = pocketCalc(im, "formation", 0, ve.length, !0),
+        MsportArr = pocketCalc(im, "sport", 0, ve.length, !0),
         MepgArr = pocketCalc(im, "epargne", 0, ve.length),
         MrawReel = Cv(r, ve.length),
         MplanArr = planEpargne(im, r),
@@ -17827,8 +17828,8 @@ function Jv(t) {
         M = moisNow(),
         rawReel = Cv(r, ve.length),
         vac = pocketCalc(items, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
-        form = pocketCalc(items, "formation", 0, ve.length),
-        sport = pocketCalc(items, "sport", 0, ve.length),
+        form = pocketCalc(items, "formation", 0, ve.length, !0),
+        sport = pocketCalc(items, "sport", 0, ve.length, !0),
         epg = pocketCalc(items, "epargne", 0, ve.length),
         plan = planEpargne(items, r, ve.length),
         curPlan = plan[M],
@@ -18461,8 +18462,8 @@ function Jv(t) {
                 if (Number.isNaN(rr)) return null;
                 const pockets = [
                         ["vacances", "Vacances", vac],
-                        ["sport", "Sport", sport],
-                        ["formation", "Formation", form]
+                        ["formation", "Formation", form],
+                        ["sport", "Sport", sport]
                     ],
                     totalReserve = pockets.reduce((s, [, , p]) => s + p.prevu[moisSel], 0),
                     disponible = rr - totalReserve;
@@ -18991,22 +18992,22 @@ function Jv(t) {
             title: "Épargne — prévu vs réel",
             pocket: "epargne",
             calc: epg,
-            note: "Seul le DU est déduit de l'épargne pure, et seulement une fois réellement payé (coche « payé » ci-dessous)."
+            note: "Rien n'est déduit de l'épargne pure ici — tout (vacances, formation, sport, DU) passe par ses propres provisions ci-dessous."
         }), h.jsx(Pocket, {
             title: "Provision vacances — prévu vs réel",
             pocket: "vacances",
             calc: vac,
             note: ot(mt(r, "provision_vacances_mensuelle")) + "/mois de provision + les dépenses réelles de voyage."
         }), h.jsx(Pocket, {
+            title: "Provision formation — prévu vs réel",
+            pocket: "formation",
+            calc: form,
+            note: "SCAP + DU. Rien n'est déduit tant qu'un poste n'est pas coché « payé »."
+        }), h.jsx(Pocket, {
             title: "Provision sport — prévu vs réel",
             pocket: "sport",
             calc: sport,
             note: "Les 3 échéances SEPA de 200 €. Rien n'est déduit tant que le prélèvement n'est pas coché « payé »."
-        }), h.jsx(Pocket, {
-            title: "Provision formation — prévu vs réel",
-            pocket: "formation",
-            calc: form,
-            note: "SCAP. Rien n'est déduit tant qu'un poste n'est pas coché « payé »."
         }), !v && h.jsxs("details", {
             className: "collapsible",
             children: [h.jsx("summary", {
@@ -19328,8 +19329,8 @@ function Xv({
                 })]
             }), (() => {
                 const vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
-                    form = pocketCalc(im, "formation", 0, ve.length),
-                    sport = pocketCalc(im, "sport", 0, ve.length),
+                    form = pocketCalc(im, "formation", 0, ve.length, !0),
+                    sport = pocketCalc(im, "sport", 0, ve.length, !0),
                     epg = pocketCalc(im, "epargne", 0, ve.length),
                     rawReel = Cv(e, ve.length),
                     w = rawReel.map((q, V) => reelEpargnePure(rawReel, vac, form, epg, V, sport)),
@@ -19395,8 +19396,8 @@ function Qv({
     const r = planEpargne(im, e),
         n = getCible(e, t),
         vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
-        form = pocketCalc(im, "formation", 0, ve.length),
-                    sport = pocketCalc(im, "sport", 0, ve.length),
+        form = pocketCalc(im, "formation", 0, ve.length, !0),
+                    sport = pocketCalc(im, "sport", 0, ve.length, !0),
         epg = pocketCalc(im, "epargne", 0, ve.length),
         rawReel = Cv(e, ve.length),
         M = moisNow(),
