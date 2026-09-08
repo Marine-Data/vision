@@ -18778,43 +18778,65 @@ function Jv(t) {
                         children: "Renseigne ce que tu as vraiment dépensé ce mois-ci dans chaque catégorie, pour voir où tu en es par rapport au budget. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets."
                     }), chargeLines.map(w => {
                         const val = spendFor(w),
-                            over = val != null && depasseCategorie(val, gr(w.montant));
+                            over = val != null && depasseCategorie(val, gr(w.montant)),
+                            rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel),
+                            noteVal = rec ? rec.note : "";
                         return h.jsxs("div", {
                             style: {
-                                display: "flex",
-                                gap: 8,
-                                alignItems: "center",
                                 marginBottom: 8
                             },
-                            children: [h.jsxs("span", {
+                            children: [h.jsxs("div", {
                                 style: {
-                                    flex: 1,
-                                    fontSize: 13.5
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center"
                                 },
-                                children: [w.poste, " ", h.jsx("span", {
+                                children: [h.jsxs("span", {
                                     style: {
-                                        color: "var(--slate)",
-                                        fontSize: 11.5
+                                        flex: 1,
+                                        fontSize: 13.5
                                     },
-                                    children: "(budget " + ot(gr(w.montant)) + ")"
+                                    children: [w.poste, " ", h.jsx("span", {
+                                        style: {
+                                            color: "var(--slate)",
+                                            fontSize: 11.5
+                                        },
+                                        children: "(budget " + ot(gr(w.montant)) + ")"
+                                    })]
+                                }), h.jsx("input", {
+                                    "aria-label": "Dépensé pour " + w.poste,
+                                    inputMode: "decimal",
+                                    disabled: v,
+                                    placeholder: "€",
+                                    defaultValue: val != null ? val : "",
+                                    onBlur: g => {
+                                        const nv = parseFloat(String(g.target.value).replace(",", "."));
+                                        if (!Number.isNaN(nv)) saveSpendFn(w.id, moisSel, nv, noteVal || "")
+                                    },
+                                    style: {
+                                        width: 90,
+                                        padding: 9,
+                                        borderRadius: 10,
+                                        border: "1.5px solid " + (over ? "var(--oxblood)" : "var(--line)"),
+                                        fontSize: 14,
+                                        textAlign: "right"
+                                    }
                                 })]
-                            }), h.jsx("input", {
-                                "aria-label": "Dépensé pour " + w.poste,
-                                inputMode: "decimal",
+                            }), val != null && h.jsx("input", {
+                                "aria-label": "Détail des dépenses pour " + w.poste,
                                 disabled: v,
-                                placeholder: "€",
-                                defaultValue: val != null ? val : "",
-                                onBlur: g => {
-                                    const nv = parseFloat(String(g.target.value).replace(",", "."));
-                                    if (!Number.isNaN(nv)) saveSpendFn(w.id, moisSel, nv)
-                                },
+                                placeholder: "détail (ex. EDF + ENGIE)",
+                                defaultValue: noteVal || "",
+                                onBlur: g => saveSpendFn(w.id, moisSel, val, g.target.value),
                                 style: {
-                                    width: 90,
-                                    padding: 9,
-                                    borderRadius: 10,
-                                    border: "1.5px solid " + (over ? "var(--oxblood)" : "var(--line)"),
-                                    fontSize: 14,
-                                    textAlign: "right"
+                                    width: "100%",
+                                    marginTop: 4,
+                                    padding: "6px 9px",
+                                    borderRadius: 8,
+                                    border: "1px solid var(--line)",
+                                    fontSize: 12,
+                                    color: "var(--slate)",
+                                    fontStyle: "italic"
                                 }
                             })]
                         }, w.id)
@@ -19725,6 +19747,10 @@ function $v({
                     const rec = (spAll || []).find(x => x.budget_line_id === a.id && x.mois_index === M);
                     return rec ? Number(rec.montant) : null
                 },
+                noteByLine = a => {
+                    const rec = (spAll || []).find(x => x.budget_line_id === a.id && x.mois_index === M);
+                    return rec ? rec.note : ""
+                },
                 totalSpent = e.reduce((s, a) => {
                     const val = spentByLine(a);
                     return s + (val != null ? val : 0)
@@ -19800,8 +19826,15 @@ function $v({
                                 padding: "5px 0",
                                 borderBottom: "1px solid var(--line)"
                             },
-                            children: [h.jsx("span", {
-                                children: a.nom
+                            children: [h.jsxs("span", {
+                                children: [a.nom, noteByLine(a) && h.jsxs("span", {
+                                    style: {
+                                        color: "var(--slate)",
+                                        fontSize: 11,
+                                        fontStyle: "italic"
+                                    },
+                                    children: [" (", noteByLine(a), ")"]
+                                })]
                             }), h.jsxs("span", {
                                 className: over ? "low" : "ok",
                                 style: {
@@ -20159,15 +20192,17 @@ function sk() {
         }).select().single();
         K && scl(H => [...H.filter(A => A.mois_index !== moisIdx), K])
     }
-    async function saveSpend(lineId, moisIdx, montant) {
-        const {
-            data: K
-        } = await J.from("vision_spend").upsert({
+    async function saveSpend(lineId, moisIdx, montant, note) {
+        const payload = {
             user_id: t.user.id,
             budget_line_id: lineId,
             mois_index: moisIdx,
             montant
-        }, {
+        };
+        if (note !== undefined) payload.note = note;
+        const {
+            data: K
+        } = await J.from("vision_spend").upsert(payload, {
             onConflict: "user_id,budget_line_id,mois_index"
         }).select().single();
         K && ssp(H => [...H.filter(A => !(A.budget_line_id === lineId && A.mois_index === moisIdx)), K])
