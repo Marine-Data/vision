@@ -17172,9 +17172,9 @@ function planEpargne(items, e, r = ve.length) {
     return a
 }
 
-function reelEpargnePure(rawReel, vac, form, epg, i) {
+function reelEpargnePure(rawReel, vac, form, epg, i, sport) {
     if (rawReel[i] == null) return null;
-    return rawReel[i] - vac.reel[i] - form.reel[i] - epg.reel[i]
+    return rawReel[i] - vac.reel[i] - form.reel[i] - epg.reel[i] - (sport ? sport.reel[i] : 0)
 }
 
 function moisNow() {
@@ -17344,12 +17344,13 @@ function Mv({
         Mm = moisNow(),
         MvacArr = pocketCalc(im, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
         MformArr = pocketCalc(im, "formation", 0, ve.length),
+        MsportArr = pocketCalc(im, "sport", 0, ve.length),
         MepgArr = pocketCalc(im, "epargne", 0, ve.length),
         MrawReel = Cv(r, ve.length),
         MplanArr = planEpargne(im, r),
         l = (() => {
             for (let w = ve.length - 1; w >= 0; w--)
-                if (MrawReel[w] != null) return reelEpargnePure(MrawReel, MvacArr, MformArr, MepgArr, w);
+                if (MrawReel[w] != null) return reelEpargnePure(MrawReel, MvacArr, MformArr, MepgArr, w, MsportArr);
             return MplanArr[Mm]
         })(),
         c = u ? Math.min(100, Math.round(l / u * 100)) : 0,
@@ -17827,15 +17828,17 @@ function Jv(t) {
         rawReel = Cv(r, ve.length),
         vac = pocketCalc(items, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
         form = pocketCalc(items, "formation", 0, ve.length),
+        sport = pocketCalc(items, "sport", 0, ve.length),
         epg = pocketCalc(items, "epargne", 0, ve.length),
         plan = planEpargne(items, r, ve.length),
         curPlan = plan[M],
         curReelRaw = Wv(r, M),
         curHasReel = curReelRaw !== "" && curReelRaw != null,
-        curHV = reelEpargnePure(rawReel, vac, form, epg, M),
+        curHV = reelEpargnePure(rawReel, vac, form, epg, M, sport),
         curEcart = curHV != null ? curHV - curPlan : null,
         curPoche = vac.solde[M],
         curForm = form.solde[M],
+        curSport = sport.solde[M],
         lastSaved = Vf(r, "last_saved_at", 0),
         lastSavedLabel = lastSaved ? new Intl.DateTimeFormat("fr-FR", {
             day: "numeric",
@@ -17875,7 +17878,7 @@ function Jv(t) {
     async function cloturer() {
         if (!curHasReelSel()) return;
         setClosing(!0);
-        const hv = reelEpargnePure(rawReel, vac, form, epg, moisSel);
+        const hv = reelEpargnePure(rawReel, vac, form, epg, moisSel, sport);
         await acl(moisSel, {
             plan: plan[moisSel],
             reel: hv,
@@ -17886,6 +17889,9 @@ function Jv(t) {
             formPrevu: form.prevu[moisSel],
             formReel: form.reel[moisSel],
             formSolde: form.solde[moisSel],
+            sportPrevu: sport.prevu[moisSel],
+            sportReel: sport.reel[moisSel],
+            sportSolde: sport.solde[moisSel],
             closedAtLabel: new Date().toISOString()
         });
         setClosing(!1), setJustClosed(!0), setTimeout(() => setJustClosed(!1), 6e3)
@@ -17945,7 +17951,7 @@ function Jv(t) {
                         children: ve.map((label, i) => {
                             const snap = cloture(i);
                             if (pocket === "epargne") {
-                                const ec = snap ? snap.snapshot.ecart : (rawReel[i] == null ? null : reelEpargnePure(rawReel, vac, form, epg, i) - plan[i]),
+                                const ec = snap ? snap.snapshot.ecart : (rawReel[i] == null ? null : reelEpargnePure(rawReel, vac, form, epg, i, sport) - plan[i]),
                                     pl = snap ? snap.snapshot.plan : plan[i];
                                 return h.jsxs("tr", {
                                     className: i === moisSel ? "total" : "",
@@ -17960,7 +17966,7 @@ function Jv(t) {
                                     })]
                                 }, i)
                             }
-                            const key = pocket === "vacances" ? "vac" : "form",
+                            const key = pocket === "vacances" ? "vac" : pocket === "sport" ? "sport" : "form",
                                 prevu = snap ? snap.snapshot[key + "Prevu"] : calc.prevu[i],
                                 reel = snap ? snap.snapshot[key + "Reel"] : calc.reel[i],
                                 solde = snap ? snap.snapshot[key + "Solde"] : calc.solde[i];
@@ -18367,6 +18373,34 @@ function Jv(t) {
                     style: {
                         fontSize: 18
                     },
+                    children: curSport < seuilPoche(r) ? "⚠" : "✓"
+                }), h.jsx("div", {
+                    style: {
+                        fontFamily: "Georgia,serif",
+                        fontWeight: 700,
+                        fontSize: "1.05rem",
+                        color: curSport < seuilPoche(r) ? "var(--oxblood)" : "var(--green)"
+                    },
+                    children: ot(curSport)
+                }), h.jsx("div", {
+                    style: {
+                        fontSize: 10.5,
+                        color: "var(--slate)",
+                        textTransform: "uppercase"
+                    },
+                    children: "Provision sport"
+                })]
+            }), h.jsxs("div", {
+                className: "card",
+                style: {
+                    textAlign: "center",
+                    padding: "10px 6px"
+                },
+                children: [h.jsx("div", {
+                    "aria-hidden": "true",
+                    style: {
+                        fontSize: 18
+                    },
                     children: margeSecu < 0 ? "⚠" : "✓"
                 }), h.jsx("div", {
                     style: {
@@ -18428,7 +18462,8 @@ function Jv(t) {
                 const vacR = vac.reel[moisSel],
                     formR = form.reel[moisSel],
                     epgR = epg.reel[moisSel],
-                    pure = rr - vacR - formR - epgR;
+                    sportR = sport.reel[moisSel],
+                    pure = rr - vacR - formR - epgR - sportR;
                 return h.jsxs("div", {
                     className: "note",
                     style: {
@@ -18468,9 +18503,20 @@ function Jv(t) {
                             color: "var(--slate)"
                         },
                         children: [h.jsx("span", {
-                            children: "− Provision formation/sport payée"
+                            children: "− Provision formation payée"
                         }), h.jsxs("span", {
                             children: ["− ", ot(formR)]
+                        })]
+                    }), sportR > 0 && h.jsxs("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between",
+                            color: "var(--slate)"
+                        },
+                        children: [h.jsx("span", {
+                            children: "− Provision sport payée"
+                        }), h.jsxs("span", {
+                            children: ["− ", ot(sportR)]
                         })]
                     }), epgR > 0 && h.jsxs("div", {
                         style: {
@@ -18889,7 +18935,7 @@ function Jv(t) {
         })(), h.jsx("div", {
             className: "note red",
             children: h.jsx("b", {
-                children: "Objectif : " + ot(getCible(r, e)) + " (6 mois de salaire) sur les livrets, hors provisions vacances et formation."
+                children: "Objectif : " + ot(getCible(r, e)) + " (6 mois de salaire) sur les livrets, hors provisions vacances, sport et formation."
             })
         }), h.jsx(Pocket, {
             title: "Épargne — prévu vs réel",
@@ -18902,10 +18948,15 @@ function Jv(t) {
             calc: vac,
             note: ot(mt(r, "provision_vacances_mensuelle")) + "/mois de provision + les dépenses réelles de voyage."
         }), h.jsx(Pocket, {
-            title: "Provision frais de formation — prévu vs réel",
+            title: "Provision sport — prévu vs réel",
+            pocket: "sport",
+            calc: sport,
+            note: "Les 3 échéances SEPA de 200 €. Rien n'est déduit tant que le prélèvement n'est pas coché « payé »."
+        }), h.jsx(Pocket, {
+            title: "Provision formation — prévu vs réel",
             pocket: "formation",
             calc: form,
-            note: "Sport + SCAP. Rien n'est déduit tant qu'un poste n'est pas coché « payé »."
+            note: "SCAP. Rien n'est déduit tant qu'un poste n'est pas coché « payé »."
         }), !v && h.jsxs("details", {
             className: "collapsible",
             children: [h.jsx("summary", {
@@ -19228,9 +19279,10 @@ function Xv({
             }), (() => {
                 const vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
                     form = pocketCalc(im, "formation", 0, ve.length),
+                    sport = pocketCalc(im, "sport", 0, ve.length),
                     epg = pocketCalc(im, "epargne", 0, ve.length),
                     rawReel = Cv(e, ve.length),
-                    w = rawReel.map((q, V) => reelEpargnePure(rawReel, vac, form, epg, V)),
+                    w = rawReel.map((q, V) => reelEpargnePure(rawReel, vac, form, epg, V, sport)),
                     j = w.map((q, V) => q != null ? V : -1).filter(q => q >= 0);
                 if (!j.length) return null;
                 const P = j.map((q, V) => `${V===0?"M":"L"}${y(q).toFixed(1)},${f(w[q]).toFixed(1)}`).join(" ");
@@ -19294,12 +19346,13 @@ function Qv({
         n = getCible(e, t),
         vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
         form = pocketCalc(im, "formation", 0, ve.length),
+                    sport = pocketCalc(im, "sport", 0, ve.length),
         epg = pocketCalc(im, "epargne", 0, ve.length),
         rawReel = Cv(e, ve.length),
         M = moisNow(),
         latestReel = (() => {
             for (let w = ve.length - 1; w >= 0; w--)
-                if (rawReel[w] != null) return reelEpargnePure(rawReel, vac, form, epg, w);
+                if (rawReel[w] != null) return reelEpargnePure(rawReel, vac, form, epg, w, sport);
             return null
         })(),
         s = latestReel != null ? latestReel : r[M],
