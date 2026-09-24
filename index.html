@@ -17820,7 +17820,8 @@ function MontantInput({ value, onSave, disabled, width = 76, label = "Montant", 
 function AjoutDepense({ onAdd, disabled }) {
     const [m, setM] = re.useState(""),
         [lib, setLib] = re.useState(""),
-        [st, setSt] = re.useState("idle");
+        [st, setSt] = re.useState("idle"),
+        [open, setOpen] = re.useState(!1);
     const num = parseMontant(m),
         can = num != null && !Number.isNaN(num) && num !== 0 && !disabled && st !== "saving";
     async function go() {
@@ -17829,9 +17830,22 @@ function AjoutDepense({ onAdd, disabled }) {
         let ok;
         try { ok = await onAdd(num, lib.trim()) } catch (e) { ok = !1 }
         if (ok === !1) { setSt("err"); return }
-        setM(""), setLib(""), setSt("idle")
+        setM(""), setLib(""), setSt("ok"), setOpen(!1), setTimeout(() => setSt("idle"), 2500)
     }
     const key = e => { if (e.key === "Enter") { e.preventDefault(); go() } };
+    if (!open) return h.jsxs("div", {
+        style: { marginTop: 4, display: "flex", gap: 8, alignItems: "center" },
+        children: [h.jsx("button", {
+            type: "button",
+            className: "btn-outline btn-sm",
+            disabled,
+            onClick: () => setOpen(!0),
+            children: "+ Ajouter une dépense"
+        }), st === "ok" && h.jsx("span", {
+            style: { fontSize: 12, color: "var(--green)", fontWeight: 600 },
+            children: "✓ ajoutée"
+        })]
+    });
     const inp = { padding: 8, borderRadius: 8, border: "1px solid var(--line)", fontSize: 13, boxSizing: "border-box" };
     return h.jsxs("div", {
         style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 6, paddingTop: 6, borderTop: "1px dashed var(--line)" },
@@ -17862,6 +17876,12 @@ function AjoutDepense({ onAdd, disabled }) {
                 background: can ? "var(--oxblood)" : "var(--line)"
             },
             children: st === "saving" ? "…" : "✓ Ajouter"
+        }), h.jsx("button", {
+            type: "button",
+            className: "btn-outline btn-sm",
+            onClick: () => { setOpen(!1), setM(""), setLib(""), setSt("idle") },
+            "aria-label": "Annuler",
+            children: "✕"
         }), st === "err" && h.jsx("span", {
             style: { fontSize: 12, color: "#dd5f43" },
             children: "Échec, réessaie"
@@ -18893,89 +18913,65 @@ function Jv(t) {
                         style: {
                             marginTop: 0
                         },
-                        children: "Ouvre une catégorie et ajoute chaque dépense au fil de l'eau (montant + ce que c'est, puis ✓) : le total de la catégorie, le suivi et les graphiques se mettent à jour tout de suite. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets."
+                        children: "Renseigne ce que tu as vraiment dépensé ce mois-ci dans chaque catégorie, pour voir où tu en es par rapport au budget. « + Ajouter une dépense » ajoute un achat au total de la catégorie et l'inscrit dans le détail. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets."
                     }), chargeLines.map(w => {
                         const val = spendFor(w),
-                            bud = gr(w.montant),
-                            over = val != null && depasseCategorie(val, bud),
-                            deps = (depAll || []).filter(x => x.budget_line_id === w.id && x.mois_index === moisSel).sort((x, y) => String(y.jour || "").localeCompare(String(x.jour || "")) || String(y.created_at || "").localeCompare(String(x.created_at || ""))),
-                            lock = v || selClosed;
-                        return h.jsxs("details", {
-                            className: "collapsible",
+                            over = val != null && depasseCategorie(val, gr(w.montant)),
+                            rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel),
+                            noteVal = rec ? rec.note : "";
+                        return h.jsxs("div", {
                             style: {
                                 marginBottom: 8
                             },
-                            children: [h.jsxs("summary", {
-                                children: [w.poste, h.jsxs("span", {
+                            children: [h.jsxs("div", {
+                                style: {
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center"
+                                },
+                                children: [h.jsxs("span", {
                                     style: {
-                                        fontWeight: 400,
-                                        marginLeft: 8,
-                                        fontSize: 12.5,
-                                        color: "var(--slate)"
+                                        flex: 1,
+                                        fontSize: 13.5
                                     },
-                                    children: [h.jsx("b", {
-                                        className: val == null ? "" : over ? "low" : "ok",
-                                        children: ot(val || 0)
-                                    }), " / " + ot(bud) + (deps.length ? " · " + deps.length + " dépense" + (deps.length > 1 ? "s" : "") : "")]
-                                })]
-                            }), h.jsxs("div", {
-                                className: "inner",
-                                children: [deps.length === 0 && h.jsx("p", {
-                                    className: "sub",
-                                    style: {
-                                        margin: "0 0 4px"
-                                    },
-                                    children: "Aucune dépense enregistrée ce mois-ci."
-                                }), deps.map(dp => h.jsxs("div", {
-                                    style: {
-                                        display: "flex",
-                                        gap: 6,
-                                        alignItems: "center",
-                                        marginBottom: 6,
-                                        flexWrap: "wrap"
-                                    },
-                                    children: [h.jsx("span", {
+                                    children: [w.poste, " ", h.jsx("span", {
                                         style: {
-                                            fontSize: 11.5,
                                             color: "var(--slate)",
-                                            minWidth: 36
+                                            fontSize: 11.5
                                         },
-                                        children: fmtJour(dp.jour)
-                                    }), h.jsx("input", {
-                                        "aria-label": "Ce que c'est",
-                                        defaultValue: dp.libelle || "",
-                                        placeholder: "ce que c'est",
-                                        disabled: lock,
-                                        onBlur: g => {
-                                            const nv = g.target.value.trim();
-                                            nv !== (dp.libelle || "") && saveDepFn(dp.id, {
-                                                libelle: nv
-                                            })
-                                        },
-                                        style: {
-                                            flex: "1 1 120px",
-                                            padding: 8,
-                                            borderRadius: 8,
-                                            border: "1px solid var(--line)",
-                                            fontSize: 13
-                                        }
-                                    }), h.jsx(MontantInput, {
-                                        label: "Montant",
-                                        value: dp.montant,
-                                        disabled: lock,
-                                        onSave: nv => saveDepFn(dp.id, {
-                                            montant: nv
-                                        })
-                                    }), !lock && h.jsx("button", {
-                                        className: "btn-outline btn-sm",
-                                        onClick: () => delDepFn(dp.id),
-                                        "aria-label": "Supprimer la dépense",
-                                        children: "✕"
+                                        children: "(budget " + ot(gr(w.montant)) + ")"
                                     })]
-                                }, dp.id)), !lock && h.jsx(AjoutDepense, {
-                                    onAdd: (m, lib) => addDepFn(w.id, moisSel, m, lib)
-                                }, w.id + "-" + moisSel)]
-                            })]
+                                }), h.jsx(MontantInput, {
+                                    label: "Dépensé pour " + w.poste,
+                                    value: val,
+                                    disabled: v || selClosed,
+                                    width: 90,
+                                    big: !0,
+                                    onSave: nv => saveSpendFn(w.id, moisSel, nv, noteVal || "")
+                                })]
+                            }), val != null && h.jsx("input", {
+                                "aria-label": "Détail des dépenses pour " + w.poste,
+                                disabled: v || selClosed,
+                                placeholder: "détail (ex. EDF + ENGIE)",
+                                defaultValue: noteVal || "",
+                                onBlur: g => saveSpendFn(w.id, moisSel, val, g.target.value),
+                                style: {
+                                    width: "100%",
+                                    marginTop: 4,
+                                    padding: "6px 9px",
+                                    borderRadius: 8,
+                                    border: "1px solid var(--line)",
+                                    fontSize: 12,
+                                    color: "var(--slate)",
+                                    fontStyle: "italic"
+                                }
+                            }, moisSel + "-" + (noteVal || "")), !v && !selClosed && h.jsx(AjoutDepense, {
+                                onAdd: (m, lib) => {
+                                    const tot = Math.round(((val || 0) + m) * 100) / 100,
+                                        ajout = (lib ? lib + " " : "") + ot(m);
+                                    return saveSpendFn(w.id, moisSel, tot, noteVal ? noteVal + ", " + ajout : ajout)
+                                }
+                            }, w.id + "-" + moisSel)]
                         }, w.id)
                     }), anySpent && h.jsxs("div", {
                         className: "note",
@@ -20169,8 +20165,8 @@ function sk() {
         })(), (async () => {
             const {
                 data: K
-            } = await J.from("vision_depenses").select("*").order("jour").order("created_at");
-            sdep(K || [])
+            } = await J.from("vision_spend").select("*");
+            ssp(K || [])
         })(), (async () => {
             const {
                 data: K
@@ -20347,7 +20343,8 @@ function sk() {
         } = await J.from("vision_spend").upsert(payload, {
             onConflict: "user_id,budget_line_id,mois_index"
         }).select().single();
-        K && ssp(H => [...H.filter(A => !(A.budget_line_id === lineId && A.mois_index === moisIdx)), K])
+        K && ssp(H => [...H.filter(A => !(A.budget_line_id === lineId && A.mois_index === moisIdx)), K]);
+        return !!K
     }
     async function addSaving() {
         const K = {
@@ -20443,8 +20440,7 @@ function sk() {
             items: vi,
             clotures: cl,
             audit: aud,
-            spend: spAgg,
-            depenses: dep,
+            spend: sp,
             savings: sv,
             ...at ? {
                 readOnly: !0,
@@ -20553,7 +20549,7 @@ function sk() {
                 params: c,
                 voyages: p,
                 items: vi,
-                spend: spAgg
+                spend: sp
             })), s === "sport" && h.jsx(Zv, {}), s === "pieces" && h.jsx(Yv, {
                 progress: o,
                 toggle: x,
