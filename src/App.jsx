@@ -143,9 +143,7 @@ export default function App() {
     setVoyages((vs) => vs.filter((v) => v.id !== id))
     await supabase.from('vision_voyages').delete().eq('id', id)
   }
-        {tab === 'pieces' && <Pieces progress={progress} toggle={toggle} readOnly={SHARE} />}
-        {tab === 'homework' && <Homework />}
-      </main>
+
   function partager() {
     const url = window.location.origin + window.location.pathname + '?partage'
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => alert('Lien de partage copié !\n\n' + url)).catch(() => window.prompt('Lien de partage :', url))
@@ -188,6 +186,7 @@ export default function App() {
         {tab === 'stats' && gate(<Stats budget={budget} params={params} voyages={voyages} />)}
         {tab === 'sport' && <Sport />}
         {tab === 'pieces' && <Pieces progress={progress} toggle={toggle} readOnly={SHARE} />}
+        {tab === 'homework' && <Homework />}
       </main>
       <nav className="nav">
         {tabs.map((t) => (
