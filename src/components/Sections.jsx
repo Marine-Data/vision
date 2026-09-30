@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react'
 import {
   chronologie, semaine, semaineNotes, suivi, budgetEcheancier, budgetRecap, sportSlots, pieces,
   paramLabels, defaultParams, MOIS, getParam, sumKind, marge, vacancesMensuel, projVacances,
   projLivrets, jalons, planParam, prochainesEcheances, libelleJours, serieReel, reelParam,
 } from '../data/dossier.js'
 import { annecyBanner } from '../data/media.js'
+import { supabase } from '../lib/supabase.js'
 
 const eur = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' €'
 const defP = (k) => { const d = defaultParams.find((p) => p.param_key === k); return d ? d.montant : 0 }
@@ -309,5 +311,521 @@ export function Pieces({ progress, toggle, readOnly }) {
         </div>
       ))}
     </section>
+  )
+}
+
+/* ---------- HOMEWORK — Tracker de devoirs ---------- */
+export function Homework() {
+  const [homeworks, setHomeworks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedHw, setSelectedHw] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [filterSubject, setFilterSubject] = useState('all')
+  const [filterDate, setFilterDate] = useState('all')
+  const [saving, setSaving] = useState(false)
+
+  const [formData, setFormData] = useState({
+    subject: 'Anglais pro',
+    title: '',
+    deadline: '',
+    description: '',
+    status: 'À faire',
+    notes: '',
+    file_url: ''
+  })
+
+  useEffect(() => {
+    loadHomeworks()
+  }, [])
+
+  async function loadHomeworks() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('vision_homework')
+      .select('*')
+      .order('deadline', { ascending: true })
+    
+    if (error) {
+      console.error('Erreur charge devoirs:', error)
+      setHomeworks([])
+    } else {
+      setHomeworks(data || [])
+    }
+    setLoading(false)
+  }
+
+  async function createHomework() {
+    if (!formData.title || !formData.deadline) {
+      alert('Titre et deadline obligatoires')
+      return
+    }
+
+    setSaving(true)
+    const { error } = await supabase
+      .from('vision_homework')
+      .insert([{
+        subject: formData.subject,
+        title: formData.title,
+        description: formData.description,
+        deadline: formData.deadline,
+        status: formData.status,
+        notes: formData.notes,
+        file_url: formData.file_url,
+        created_at: new Date().toISOString()
+      }])
+
+    if (error) {
+      console.error('Erreur création:', error)
+      alert('Erreur lors de la création')
+    } else {
+      setShowModal(false)
+      setFormData({
+        subject: 'Anglais pro',
+        title: '',
+        deadline: '',
+        description: '',
+        status: 'À faire',
+        notes: '',
+        file_url: ''
+      })
+      loadHomeworks()
+    }
+    setSaving(false)
+  }
+
+  async function updateHomework(id, updates) {
+    setSaving(true)
+    const { error } = await supabase
+      .from('vision_homework')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+
+    if (error) {
+      console.error('Erreur update:', error)
+    } else {
+      loadHomeworks()
+      setSelectedHw(null)
+    }
+    setSaving(false)
+  }
+
+  async function deleteHomework(id) {
+    if (!confirm('Supprimer ce devoir ?')) return
+    
+    const { error } = await supabase
+      .from('vision_homework')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Erreur suppression:', error)
+    } else {
+      loadHomeworks()
+    }
+  }
+
+  function getFilteredHomeworks() {
+    let filtered = homeworks
+
+    if (filterSubject !== 'all') {
+      filtered = filtered.filter(hw => hw.subject === filterSubject)
+    }
+
+    if (filterDate !== 'all') {
+      const today = new Date()
+      const mondayNext = new Date(today)
+      mondayNext.setDate(today.getDate() + (8 - today.getDay()) % 7)
+      const sundayNext = new Date(mondayNext)
+      sundayNext.setDate(mondayNext.getDate() + 6)
+
+      if (filterDate === 'next-week') {
+        filtered = filtered.filter(hw => {
+          const d = new Date(hw.deadline)
+          return d >= mondayNext && d <= sundayNext
+        })
+      } else if (filterDate === 'overdue') {
+        filtered = filtered.filter(hw => new Date(hw.deadline) < today)
+      }
+    }
+
+    return filtered
+  }
+
+  const filteredHws = getFilteredHomeworks()
+  const stats = {
+    total: homeworks.length,
+    done: homeworks.filter(h => h.status === 'Fait' || h.status === 'Corrigé').length
+  }
+
+  const styles = {
+    container: { padding: '1.5rem' },
+    progressBar: {
+      display: 'flex',
+      gap: '0.75rem',
+      alignItems: 'center',
+      marginBottom: '1.5rem'
+    },
+    progressFill: {
+      height: '8px',
+      background: '#199e70',
+      borderRadius: '4px',
+      flex: 1
+    },
+    controls: {
+      display: 'flex',
+      gap: '0.75rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap'
+    },
+    select: {
+      padding: '0.5rem 0.75rem',
+      border: '0.5px solid rgba(11,11,11,0.1)',
+      borderRadius: '6px',
+      fontSize: '13px',
+      fontFamily: 'inherit',
+      cursor: 'pointer'
+    },
+    addBtn: {
+      padding: '0.5rem 1rem',
+      background: '#3987e5',
+      color: 'white',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontWeight: 500,
+      fontSize: '13px'
+    },
+    table: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      fontSize: '13px'
+    },
+    tableHeader: {
+      borderBottom: '0.5px solid rgba(11,11,11,0.1)',
+      padding: '0.75rem',
+      textAlign: 'left',
+      fontWeight: 500,
+      color: '#52514e'
+    },
+    tableCell: {
+      borderBottom: '0.5px solid rgba(11,11,11,0.1)',
+      padding: '0.75rem',
+      cursor: 'pointer'
+    },
+    statusBadge: {
+      padding: '4px 12px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      fontWeight: 500,
+      display: 'inline-block'
+    },
+    statusBadgeTodo: {
+      background: '#fab219',
+      color: '#663d00'
+    },
+    statusBadgeDone: {
+      background: '#0ca30c',
+      color: 'white'
+    },
+    statusBadgeCorrected: {
+      background: '#3987e5',
+      color: 'white'
+    },
+    modal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    },
+    modalContent: {
+      background: 'white',
+      borderRadius: '12px',
+      padding: '2rem',
+      maxWidth: '500px',
+      width: '90%'
+    },
+    formGroup: {
+      marginBottom: '1rem'
+    },
+    label: {
+      display: 'block',
+      fontSize: '12px',
+      fontWeight: 500,
+      marginBottom: '0.5rem',
+      color: '#0b0b0b'
+    },
+    input: {
+      width: '100%',
+      padding: '0.75rem',
+      border: '0.5px solid rgba(11,11,11,0.1)',
+      borderRadius: '6px',
+      fontSize: '14px',
+      fontFamily: 'inherit',
+      boxSizing: 'border-box'
+    },
+    textarea: {
+      width: '100%',
+      padding: '0.75rem',
+      border: '0.5px solid rgba(11,11,11,0.1)',
+      borderRadius: '6px',
+      fontSize: '14px',
+      fontFamily: 'inherit',
+      minHeight: '80px',
+      resize: 'vertical',
+      boxSizing: 'border-box'
+    },
+    modalBtns: {
+      display: 'flex',
+      gap: '0.75rem',
+      justifyContent: 'flex-end',
+      marginTop: '1.5rem'
+    },
+    btnPrimary: {
+      padding: '0.75rem 1rem',
+      background: '#3987e5',
+      color: 'white',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontWeight: 500,
+      fontSize: '13px'
+    },
+    btnSecondary: {
+      padding: '0.75rem 1rem',
+      background: 'transparent',
+      color: '#0b0b0b',
+      border: '0.5px solid rgba(11,11,11,0.2)',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontWeight: 500,
+      fontSize: '13px'
+    }
+  }
+
+  function getStatusColor(status) {
+    if (status === 'À faire' || status === 'En cours') return styles.statusBadgeTodo
+    if (status === 'Fait') return styles.statusBadgeDone
+    if (status === 'Corrigé') return styles.statusBadgeCorrected
+    return {}
+  }
+
+  if (loading) return <div style={styles.container}>Chargement...</div>
+
+  return (
+    <div style={styles.container}>
+      <h2>📚 Devoirs</h2>
+
+      <div style={styles.progressBar}>
+        <span style={{ fontWeight: 500 }}>{stats.done}/{stats.total}</span>
+        <div style={{ ...styles.progressFill, width: `${stats.total > 0 ? (stats.done / stats.total) * 100 : 0}%` }} />
+      </div>
+
+      <div style={styles.controls}>
+        <select 
+          value={filterSubject} 
+          onChange={e => setFilterSubject(e.target.value)}
+          style={styles.select}
+        >
+          <option value="all">Toutes matières</option>
+          <option value="Anglais pro">Anglais pro</option>
+          <option value="Droit numérique">Droit numérique</option>
+        </select>
+
+        <select 
+          value={filterDate} 
+          onChange={e => setFilterDate(e.target.value)}
+          style={styles.select}
+        >
+          <option value="all">Toutes les dates</option>
+          <option value="next-week">Semaine prochaine</option>
+          <option value="overdue">En retard</option>
+        </select>
+
+        <button 
+          onClick={() => setShowModal(true)}
+          style={styles.addBtn}
+        >
+          + Ajouter
+        </button>
+      </div>
+
+      {filteredHws.length === 0 ? (
+        <p style={{ color: '#52514e', marginTop: '1rem' }}>Aucun devoir.</p>
+      ) : (
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.tableHeader}>Matière</th>
+              <th style={styles.tableHeader}>Titre</th>
+              <th style={styles.tableHeader}>Deadline</th>
+              <th style={styles.tableHeader}>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredHws.map(hw => (
+              <tr key={hw.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedHw(hw)}>
+                <td style={styles.tableCell}>{hw.subject}</td>
+                <td style={styles.tableCell}>{hw.title}</td>
+                <td style={styles.tableCell}>{new Date(hw.deadline).toLocaleDateString('fr-FR')}</td>
+                <td style={styles.tableCell}>
+                  <span style={{ ...styles.statusBadge, ...getStatusColor(hw.status) }}>
+                    {hw.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {showModal && (
+        <div style={styles.modal} onClick={() => setShowModal(false)}>
+          <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+            <h3>Ajouter un devoir</h3>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Matière</label>
+              <select
+                value={formData.subject}
+                onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                style={styles.input}
+              >
+                <option>Anglais pro</option>
+                <option>Droit numérique</option>
+              </select>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Titre du devoir *</label>
+              <input
+                type="text"
+                placeholder="ex. Present an app..."
+                value={formData.title}
+                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Description</label>
+              <textarea
+                placeholder="Instructions..."
+                value={formData.description}
+                onChange={e => setFormData({ ...formData, description: e.target.value })}
+                style={styles.textarea}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Deadline *</label>
+              <input
+                type="date"
+                value={formData.deadline}
+                onChange={e => setFormData({ ...formData, deadline: e.target.value })}
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.modalBtns}>
+              <button
+                onClick={() => setShowModal(false)}
+                style={styles.btnSecondary}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={createHomework}
+                disabled={saving}
+                style={styles.btnPrimary}
+              >
+                {saving ? '...' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedHw && (
+        <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#fcfcfb', borderRadius: '12px' }}>
+          <button
+            onClick={() => setSelectedHw(null)}
+            style={{ ...styles.btnSecondary, marginBottom: '1rem' }}
+          >
+            ← Retour
+          </button>
+
+          <h3>{selectedHw.title}</h3>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <strong style={{ fontSize: '12px', color: '#52514e', textTransform: 'uppercase' }}>Matière</strong>
+              <p>{selectedHw.subject}</p>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <strong style={{ fontSize: '12px', color: '#52514e', textTransform: 'uppercase' }}>Deadline</strong>
+              <p>{new Date(selectedHw.deadline).toLocaleDateString('fr-FR')}</p>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <strong style={{ fontSize: '12px', color: '#52514e', textTransform: 'uppercase' }}>Statut</strong>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                {['À faire', 'En cours', 'Fait', 'Corrigé'].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => updateHomework(selectedHw.id, { status: s })}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      border: selectedHw.status === s ? '1px solid #3987e5' : '0.5px solid rgba(11,11,11,0.1)',
+                      background: selectedHw.status === s ? 'rgba(57, 135, 229, 0.1)' : 'transparent',
+                      color: selectedHw.status === s ? '#3987e5' : '#0b0b0b',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 500
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <strong style={{ fontSize: '12px', color: '#52514e', textTransform: 'uppercase' }}>Notes</strong>
+              <textarea
+                value={selectedHw.notes || ''}
+                onChange={e => updateHomework(selectedHw.id, { notes: e.target.value })}
+                style={{
+                  ...styles.textarea,
+                  marginTop: '0.5rem'
+                }}
+              />
+            </div>
+
+            <button
+              onClick={() => deleteHomework(selectedHw.id)}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#e24b4a',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
