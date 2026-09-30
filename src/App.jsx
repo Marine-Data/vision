@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, supabaseConfigured } from './lib/supabase.js'
 import Auth from './components/Auth.jsx'
-import { Apercu, Planning, Suivi, Budget, Tresorerie, Sport, Pieces } from './components/Sections.jsx'
+import { Apercu, Planning, Suivi, Budget, Tresorerie, Sport, Pieces, Homework } from './components/Sections.jsx'
 import Stats from './components/Charts.jsx'
 import { underwaterBanner } from './data/media.js'
 import { tabs, defaultBudget, defaultParams, defaultVoyages } from './data/dossier.js'
@@ -143,7 +143,9 @@ export default function App() {
     setVoyages((vs) => vs.filter((v) => v.id !== id))
     await supabase.from('vision_voyages').delete().eq('id', id)
   }
-
+        {tab === 'pieces' && <Pieces progress={progress} toggle={toggle} readOnly={SHARE} />}
+        {tab === 'homework' && <Homework />}
+      </main>
   function partager() {
     const url = window.location.origin + window.location.pathname + '?partage'
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => alert('Lien de partage copié !\n\n' + url)).catch(() => window.prompt('Lien de partage :', url))
