@@ -102,6 +102,7 @@ export const tabs = [
   { id: 'stats', label: 'Graphiques' },
   { id: 'sport', label: 'Sport' },
   { id: 'pieces', label: 'Pièces' },
+  { id: 'homework', label: 'Devoirs' },
 ]
 
 /* ============================================================
