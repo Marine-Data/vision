@@ -18132,6 +18132,14 @@ function Jv(t) {
         addCloture: acl,
         readOnly: v
     } = t;
+    // Les blocs "Détail par mois" étaient des <details> non contrôlés : à chaque
+    // re-rendu (annulation, changement de mois) ils se refermaient tout seuls.
+    // On mémorise ici quels mois sont ouverts pour que ça ne bouge plus.
+    const [moisOuverts, setMoisOuverts] = re.useState({}),
+        [msgSave, setMsgSave] = re.useState("");
+    const flashSave = (txt = "Enregistré ✓") => {
+        setMsgSave(txt), setTimeout(() => setMsgSave(""), 2000)
+    };
     if (!e) return h.jsxs("section", {
         className: "sec",
         children: [h.jsx("h2", {
@@ -18243,6 +18251,9 @@ function Jv(t) {
         return CANCEL_RE.test(it.label || "")
     }
 
+    async function siFlash(id, patch) {
+        await si(id, patch), flashSave()
+    }
     async function cancelItem(it) {
         if (it.paid || isCancelled(it)) return;
         const orig = gr(it.montant_prevu);
@@ -18252,7 +18263,7 @@ function Jv(t) {
             montant_reel: null,
             paid: !1
         };
-        ei(it.id, patch), await si(it.id, patch)
+        ei(it.id, patch), await si(it.id, patch), flashSave("Poste annulé ✓")
     }
 
     async function restoreItem(it) {
@@ -18262,7 +18273,7 @@ function Jv(t) {
             label: it.label.replace(CANCEL_RE, ""),
             montant_prevu: Number(m[1].replace(",", ".")) || 0
         };
-        ei(it.id, patch), await si(it.id, patch)
+        ei(it.id, patch), await si(it.id, patch), flashSave("Poste rétabli ✓")
     }
 
     function Pocket({
@@ -18359,12 +18370,32 @@ function Jv(t) {
                                 fontWeight: 600,
                                 marginBottom: 6
                             },
-                            children: "Détail par mois"
+                        children: "Détail par mois"
+                        }), msgSave && h.jsx("div", {
+                        style: {
+                            position: "sticky",
+                            top: 4,
+                            zIndex: 5,
+                            background: "var(--green, #12a07a)",
+                            color: "#fff",
+                            borderRadius: 8,
+                            padding: "6px 10px",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            marginBottom: 8,
+                            textAlign: "center"
+                        },
+                        children: msgSave
                         }), months.map(mi => {
                             const its = byMonth[mi],
                                 total = its.reduce((s, x) => s + (x.paid ? (x.montant_reel ?? x.montant_prevu) : x.montant_prevu), 0);
                             return h.jsxs("details", {
                                 className: "collapsible",
+                                open: !!moisOuverts[mi],
+                                onToggle: ev => setMoisOuverts(p => p[mi] === ev.target.open ? p : {
+                                    ...p,
+                                    [mi]: ev.target.open
+                                }),
                                 style: {
                                     marginBottom: 8
                                 },
@@ -18396,7 +18427,7 @@ function Jv(t) {
                                             onChange: g => ei(it.id, {
                                                 label: g.target.value
                                             }),
-                                            onBlur: g => si(it.id, {
+                                            onBlur: g => siFlash(it.id, {
                                                 label: g.target.value
                                             }),
                                             style: {
@@ -18446,7 +18477,7 @@ function Jv(t) {
                                                 onChange: g => ei(it.id, {
                                                     montant_prevu: g.target.value
                                                 }),
-                                                onBlur: g => si(it.id, {
+                                                onBlur: g => siFlash(it.id, {
                                                     montant_prevu: Number(g.target.value) || 0
                                                 }),
                                                 style: {
@@ -18489,7 +18520,7 @@ function Jv(t) {
                                                 onChange: g => ei(it.id, {
                                                     montant_reel: g.target.value
                                                 }),
-                                                onBlur: g => si(it.id, {
+                                                onBlur: g => siFlash(it.id, {
                                                     montant_reel: Number(g.target.value) || 0
                                                 }),
                                                 style: {
