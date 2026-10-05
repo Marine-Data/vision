@@ -17109,7 +17109,41 @@ const Av = [{
         scap_s1_reel: "SCAP S1 — réellement payé à ce jour",
         cible: "Matelas cible (6 mois de salaire)"
     },
-    ve = ["Août 26", "Sep", "Oct", "Nov", "Déc", "Jan 27", "Fév", "Mars", "Avr", "Mai", "Juin", "Juil", "Août 27", "Sep 27", "Oct 27", "Nov 27", "Déc 27"],
+    // ---------------------------------------------------------------
+    // Horizon des mois (ve) — généré, plus écrit en dur.
+    // ANCRE = mois 0 = mois_index 0 dans Supabase. NE JAMAIS LA CHANGER :
+    // tous les mois_index enregistrés (dépenses, items, clôtures) sont
+    // comptés à partir d'elle. La changer décalerait tout l'historique.
+    // L'horizon s'étend tout seul pour garder au moins HORIZON_AVANCE
+    // mois devant le mois courant, donc l'app ne "sort pas du tableau"
+    // en janvier 2028 comme avec l'ancienne liste figée de 17 mois.
+    // ---------------------------------------------------------------
+    VISION_ANCRE = {
+        annee: 2026,
+        mois: 7
+    },
+    VISION_HORIZON_MIN = 17,
+    VISION_HORIZON_AVANCE = 12,
+    VISION_HORIZON_MAX = 60,
+    VISION_MOIS_COURTS = ["Jan", "Fév", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"],
+    moisDepuisAncre = dt => (dt.getFullYear() - VISION_ANCRE.annee) * 12 + (dt.getMonth() - VISION_ANCRE.mois),
+    ve = (() => {
+        const ecoule = moisDepuisAncre(new Date);
+        let n = Math.max(VISION_HORIZON_MIN, ecoule + VISION_HORIZON_AVANCE + 1);
+        n = Math.min(VISION_HORIZON_MAX, Math.max(1, n));
+        const out = [],
+            vus = {};
+        for (let i = 0; i < n; i++) {
+            const m = (VISION_ANCRE.mois + i) % 12,
+                an = VISION_ANCRE.annee + Math.floor((VISION_ANCRE.mois + i) / 12),
+                nom = VISION_MOIS_COURTS[m],
+                // année affichée au 1er mois, en janvier, et dès qu'un nom de
+                // mois se répète — c'est la règle de l'ancienne liste figée
+                avecAnnee = i === 0 || m === 0 || vus[nom];
+            vus[nom] = !0, out.push(avecAnnee ? nom + " " + String(an).slice(-2) : nom)
+        }
+        return out
+    })(),
     Vv = {
         scap_s1: 1,
         du_paiement: 4
@@ -17206,9 +17240,8 @@ function planDisponible(planArr, vac, form, sport, i) {
 }
 
 function moisNow() {
-    const b = new Date(2026, 7, 1),
-        n = new Date;
-    return Math.max(0, (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth()))
+    // Index du mois courant dans ve, borné au tableau (jamais hors limites).
+    return Math.min(ve.length - 1, Math.max(0, moisDepuisAncre(new Date)))
 }
 
 function salaireMensuel(budget) {
