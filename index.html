@@ -17439,6 +17439,61 @@ const Wv = (t, e) => {
         return e ? e.montant : 0
     };
 
+// Contenu de départ d'un nouvel utilisateur : recopié depuis les listes
+// historiques. Une fois en base, c'est la base qui fait foi et l'utilisateur
+// peut tout modifier depuis l'app.
+function contenuDefauts(uid) {
+    const out = [];
+    Br.forEach((x, i) => out.push({
+        user_id: uid,
+        type: "suivi",
+        item_key: x.key,
+        titre: x.etape,
+        detail: x.echeance,
+        extra: x.action,
+        sort: i
+    }));
+    let p = 0;
+    Ba.forEach(g => g.items.forEach(x => out.push({
+        user_id: uid,
+        type: "piece",
+        item_key: x.key,
+        groupe: g.titre,
+        titre: x.label,
+        sort: p++
+    })));
+    Ev.forEach((x, i) => out.push({
+        user_id: uid,
+        type: "chrono",
+        item_key: "chrono:" + (i + 1),
+        titre: x.titre,
+        detail: x.detail,
+        date_iso: x.date,
+        sort: i
+    }));
+    Wc.forEach((x, i) => out.push({
+        user_id: uid,
+        type: "cours",
+        item_key: "cours:" + (i + 1),
+        titre: x.nom,
+        detail: x.quand,
+        extra: x.di,
+        sort: i
+    }));
+    ["Anglais", "Droit"].forEach((x, i) => out.push({
+        user_id: uid,
+        type: "matiere",
+        item_key: "matiere:" + (i + 1),
+        titre: x,
+        sort: i
+    }));
+    return out
+}
+
+function contenuDe(rows, type) {
+    return (rows || []).filter(x => x.type === type).sort((a, b) => (a.sort || 0) - (b.sort || 0))
+}
+
 function Mv({
     progress: t = {},
     budget: e,
@@ -17446,13 +17501,15 @@ function Mv({
     items: im,
     hw: hwList = [],
     setHw: setHwList,
-    readOnly: hwRO
+    readOnly: hwRO,
+    contenu: ctRows
 }) {
     const n = Iv(3),
         s = n[0],
-        i = Br.filter(d => t[d.key]).length,
-        o = Ba.flatMap(d => d.items),
-        a = o.filter(d => t[d.key]).length,
+        suiviRows = contenuDe(ctRows, "suivi"),
+        i = suiviRows.filter(d => t[d.item_key]).length,
+        o = contenuDe(ctRows, "piece"),
+        a = o.filter(d => t[d.item_key]).length,
         u = getCible(r, e),
         Mm = moisNow(),
         MvacArr = pocketCalc(im, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
@@ -17639,7 +17696,7 @@ function Mv({
                         className: "detail",
                         children: "Étapes de suivi"
                     }), h.jsxs("b", {
-                        children: [i, " / ", Br.length]
+                        children: [i, " / ", suiviRows.length]
                     })]
                 }), h.jsxs("div", {
                     style: {
@@ -17771,18 +17828,25 @@ function Dv() {
 function Bv({
     progress: t,
     toggle: e,
-    readOnly: r
+    readOnly: r,
+    rows: ctRows,
+    edit: ctEdit,
+    save: ctSave,
+    add: ctAdd,
+    del: ctDel
 }) {
-    const n = Br.filter(o => t[o.key]).length,
-        s = Math.round(n / Br.length * 100),
-        i = [...Br].sort((o, a) => (t[o.key] ? 1 : 0) - (t[a.key] ? 1 : 0));
+    const [mode, setMode] = re.useState(!1),
+        list = contenuDe(ctRows, "suivi"),
+        n = list.filter(o => t[o.item_key]).length,
+        s = list.length ? Math.round(n / list.length * 100) : 0,
+        vue = mode ? list : [...list].sort((o, a) => (t[o.item_key] ? 1 : 0) - (t[a.item_key] ? 1 : 0));
     return h.jsxs("section", {
         className: "sec",
         children: [h.jsx("h2", {
             children: "Tableau de suivi"
         }), h.jsxs("p", {
             className: "sub",
-            children: [n, " / ", Br.length, " étapes faites · coché = sauvegardé."]
+            children: [n, " / ", list.length, " étapes faites · coché = sauvegardé."]
         }), h.jsx("div", {
             className: "prog",
             children: h.jsx("i", {
@@ -17790,28 +17854,92 @@ function Bv({
                     width: s + "%"
                 }
             })
-        }), h.jsx("div", {
+        }), !r && h.jsx("div", {
+            style: {
+                margin: "10px 0"
+            },
+            children: h.jsx("button", {
+                className: "btn-outline btn-sm",
+                onClick: () => setMode(!mode),
+                children: mode ? "✓ Terminer" : "✎ Modifier les étapes"
+            })
+        }), mode ? h.jsxs("div", {
+            className: "card",
+            children: [list.map(o => h.jsxs("div", {
+                style: {
+                    borderBottom: "1px solid var(--line)",
+                    padding: "8px 0"
+                },
+                children: [h.jsxs("div", {
+                    style: {
+                        display: "flex",
+                        gap: 6,
+                        alignItems: "center"
+                    },
+                    children: [h.jsx("input", {
+                        className: "bedit lbl",
+                        value: o.titre || "",
+                        placeholder: "Étape",
+                        onChange: w => ctEdit(o.id, {
+                            titre: w.target.value
+                        }),
+                        onBlur: () => ctSave(o.id)
+                    }), h.jsx("button", {
+                        className: "bdel",
+                        onClick: () => ctDel(o.id),
+                        "aria-label": "Supprimer",
+                        children: "×"
+                    })]
+                }), h.jsx("input", {
+                    className: "bedit",
+                    style: {
+                        width: "100%"
+                    },
+                    value: o.detail || "",
+                    placeholder: "Échéance",
+                    onChange: w => ctEdit(o.id, {
+                        detail: w.target.value
+                    }),
+                    onBlur: () => ctSave(o.id)
+                }), h.jsx("input", {
+                    className: "bedit",
+                    style: {
+                        width: "100%"
+                    },
+                    value: o.extra || "",
+                    placeholder: "Action à faire",
+                    onChange: w => ctEdit(o.id, {
+                        extra: w.target.value
+                    }),
+                    onBlur: () => ctSave(o.id)
+                })]
+            }, o.id)), h.jsx("button", {
+                className: "badd",
+                onClick: () => ctAdd("suivi"),
+                children: "+ Ajouter une étape"
+            })]
+        }) : h.jsx("div", {
             className: "card",
             style: {
                 padding: "4px 12px"
             },
-            children: i.map(o => h.jsxs("label", {
-                className: "check" + (t[o.key] ? " done" : ""),
+            children: vue.map(o => h.jsxs("label", {
+                className: "check" + (t[o.item_key] ? " done" : ""),
                 children: [h.jsx("input", {
                     type: "checkbox",
-                    checked: !!t[o.key],
+                    checked: !!t[o.item_key],
                     disabled: r,
-                    onChange: () => e(o.key)
+                    onChange: () => e(o.item_key)
                 }), h.jsxs("span", {
                     className: "lbl",
                     children: [h.jsx("b", {
-                        children: o.etape
+                        children: o.titre
                     }), h.jsxs("span", {
                         className: "meta",
-                        children: [o.echeance, o.action !== "—" ? " · " + o.action : ""]
+                        children: [o.detail || "", o.extra && o.extra !== "—" ? " · " + o.extra : ""]
                     })]
                 })]
-            }, o.key))
+            }, o.item_key))
         })]
     })
 }
@@ -19396,11 +19524,26 @@ function Zv() {
 function Yv({
     progress: t,
     toggle: e,
-    readOnly: r
+    readOnly: r,
+    rows: ctRows,
+    edit: ctEdit,
+    save: ctSave,
+    add: ctAdd,
+    del: ctDel
 }) {
-    const n = Ba.flatMap(o => o.items),
-        s = n.filter(o => t[o.key]).length,
-        i = Math.round(s / n.length * 100);
+    const [mode, setMode] = re.useState(!1),
+        n = contenuDe(ctRows, "piece"),
+        s = n.filter(o => t[o.item_key]).length,
+        i = n.length ? Math.round(s / n.length * 100) : 0,
+        groupes = [];
+    n.forEach(o => {
+        const g = o.groupe || "Autres";
+        let e2 = groupes.find(x => x.titre === g);
+        e2 || (e2 = {
+            titre: g,
+            items: []
+        }, groupes.push(e2)), e2.items.push(o)
+    });
     return h.jsxs("section", {
         className: "sec",
         children: [h.jsx("h2", {
@@ -19415,7 +19558,60 @@ function Yv({
                     width: i + "%"
                 }
             })
-        }), Ba.map((o, a) => h.jsxs("div", {
+        }), !r && h.jsx("div", {
+            style: {
+                margin: "10px 0"
+            },
+            children: h.jsx("button", {
+                className: "btn-outline btn-sm",
+                onClick: () => setMode(!mode),
+                children: mode ? "✓ Terminer" : "✎ Modifier les pièces"
+            })
+        }), mode ? h.jsxs("div", {
+            className: "card",
+            children: [n.map(o => h.jsxs("div", {
+                style: {
+                    borderBottom: "1px solid var(--line)",
+                    padding: "8px 0"
+                },
+                children: [h.jsxs("div", {
+                    style: {
+                        display: "flex",
+                        gap: 6,
+                        alignItems: "center"
+                    },
+                    children: [h.jsx("input", {
+                        className: "bedit lbl",
+                        value: o.titre || "",
+                        placeholder: "Pièce",
+                        onChange: w => ctEdit(o.id, {
+                            titre: w.target.value
+                        }),
+                        onBlur: () => ctSave(o.id)
+                    }), h.jsx("button", {
+                        className: "bdel",
+                        onClick: () => ctDel(o.id),
+                        "aria-label": "Supprimer",
+                        children: "×"
+                    })]
+                }), h.jsx("input", {
+                    className: "bedit",
+                    style: {
+                        width: "100%"
+                    },
+                    value: o.groupe || "",
+                    placeholder: "Groupe (ex. DU Paris 1)",
+                    onChange: w => ctEdit(o.id, {
+                        groupe: w.target.value
+                    }),
+                    onBlur: () => ctSave(o.id)
+                })]
+            }, o.id)), h.jsx("button", {
+                className: "badd",
+                onClick: () => ctAdd("piece"),
+                children: "+ Ajouter une pièce"
+            })]
+        }) : groupes.map((o, a) => h.jsxs("div", {
             children: [h.jsx("div", {
                 className: "h3",
                 children: o.titre
@@ -19424,20 +19620,20 @@ function Yv({
                 style: {
                     padding: "4px 12px"
                 },
-                children: [...o.items].sort((l, u) => (t[l.key] ? 1 : 0) - (t[u.key] ? 1 : 0)).map(l => h.jsxs("label", {
-                    className: "check" + (t[l.key] ? " done" : ""),
+                children: [...o.items].sort((l, u) => (t[l.item_key] ? 1 : 0) - (t[u.item_key] ? 1 : 0)).map(l => h.jsxs("label", {
+                    className: "check" + (t[l.item_key] ? " done" : ""),
                     children: [h.jsx("input", {
                         type: "checkbox",
-                        checked: !!t[l.key],
+                        checked: !!t[l.item_key],
                         disabled: r,
-                        onChange: () => e(l.key)
+                        onChange: () => e(l.item_key)
                     }), h.jsx("span", {
                         className: "lbl",
                         children: h.jsx("b", {
-                            children: l.label
+                            children: l.titre
                         })
                     })]
-                }, l.key))
+                }, l.item_key))
             })]
         }, a))]
     })
@@ -20178,7 +20374,9 @@ function nk({
 }
 
 function sk() {
-    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState("");
+    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]);
+    const ctRef = re.useRef([]);
+    ctRef.current = ct;
     re.useEffect(() => {
         if (at) {
             n(!0);
@@ -20243,6 +20441,13 @@ function sk() {
             })), {
                 onConflict: "user_id,line_key"
             }), K = (await J.from("vision_voyages").select("*").order("mois_index").order("sort")).data), m(K || [])
+        }), (async () => {
+            let {
+                data: K
+            } = await J.from("vision_contenu").select("*").order("type").order("sort");
+            (!K || K.length === 0) && (await J.from("vision_contenu").upsert(contenuDefauts(N), {
+                onConflict: "user_id,type,item_key"
+            }), K = (await J.from("vision_contenu").select("*").order("type").order("sort")).data), sct(K || [])
         })(), (async () => {
             const {
                 data: K
@@ -20280,6 +20485,47 @@ function sk() {
             ssv(K || [])
         })()
     }, [t]);
+    function ctEdit(id, patch) {
+        sct(p => p.map(x => x.id === id ? {
+            ...x,
+            ...patch
+        } : x))
+    }
+    async function ctSave(id) {
+        const row = ctRef.current.find(x => x.id === id);
+        if (!row) return;
+        await J.from("vision_contenu").update({
+            titre: row.titre,
+            detail: row.detail,
+            extra: row.extra,
+            groupe: row.groupe,
+            date_iso: row.date_iso,
+            sort: row.sort,
+            updated_at: new Date().toISOString()
+        }).eq("id", id)
+    }
+    async function ctAdd(type, groupe) {
+        const {
+            data: u2
+        } = await J.auth.getUser(), uid = u2 && u2.user ? u2.user.id : null,
+            rows = ctRef.current.filter(x => x.type === type),
+            ligne = {
+                user_id: uid,
+                type,
+                item_key: type + ":" + Date.now(),
+                groupe: groupe || (rows.length ? rows[rows.length - 1].groupe : null),
+                titre: "",
+                sort: rows.length ? Math.max(...rows.map(x => x.sort || 0)) + 1 : 0
+            },
+            {
+                data: nouveau
+            } = await J.from("vision_contenu").insert(ligne).select().single();
+        nouveau && sct(p => [...p, nouveau])
+    }
+    async function ctDel(id) {
+        if (!window.confirm("Supprimer cette ligne ?")) return;
+        sct(p => p.filter(x => x.id !== id)), await J.from("vision_contenu").delete().eq("id", id)
+    }
     async function x(N) {
         if (at) return;
         const K = !o[N];
@@ -20571,11 +20817,17 @@ function sk() {
                 items: vi,
                 hw: hwRows,
                 setHw: setHwRows,
-                readOnly: at
+                readOnly: at,
+                contenu: ct
             }), s === "planning" && h.jsx(Dv, {}), s === "suivi" && h.jsx(Bv, {
                 progress: o,
                 toggle: x,
-                readOnly: at
+                readOnly: at,
+                rows: ct,
+                edit: ctEdit,
+                save: ctSave,
+                add: ctAdd,
+                del: ctDel
             }), s === "budget" && h.jsx(Gv, {
                 items: vi
             }), s === "tresorerie" && gt(h.jsx(Jv, {
@@ -20589,7 +20841,12 @@ function sk() {
             })), s === "sport" && h.jsx(Zv, {}), s === "pieces" && h.jsx(Yv, {
                 progress: o,
                 toggle: x,
-                readOnly: at
+                readOnly: at,
+                rows: ct,
+                edit: ctEdit,
+                save: ctSave,
+                add: ctAdd,
+                del: ctDel
             }), s === "homework" && h.jsx(HWK, {
                 rows: hwRows,
                 setRows: setHwRows,
