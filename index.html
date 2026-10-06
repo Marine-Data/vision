@@ -21290,9 +21290,25 @@ function sk() {
                 sort: rows.length ? Math.max(...rows.map(x => x.sort || 0)) + 1 : 0
             },
             {
-                data: nouveau
+                data: nouveau,
+                error: E
             } = await J.from("vision_contenu").insert(ligne).select().single();
-        nouveau && sct(p => [...p, nouveau])
+        if (nouveau) return sct(p => [...p, nouveau]);
+        // L'index unique sur le rang peut refuser l'ajout si deux onglets
+        // calculent le même rang en même temps : on réessaie une fois plus loin.
+        if (E && E.code === "23505") {
+            const second = {
+                ...ligne,
+                item_key: type + ":" + Date.now() + "-2",
+                sort: (ligne.sort || 0) + 1 + Math.floor(Math.random() * 50)
+            }, {
+                data: n2,
+                error: E2
+            } = await J.from("vision_contenu").insert(second).select().single();
+            if (n2) return sct(p => [...p, n2]);
+            E = E2
+        }
+        E && (console.warn("ajout impossible :", E.message), window.alert("Impossible d'ajouter la ligne : " + E.message))
     }
     // Monter / descendre une ligne. Le rang est unique par type ET par groupe :
     // une pièce se déplace dans son groupe, pas dans toute la liste.
