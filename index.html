@@ -17607,6 +17607,42 @@ function ligneBudgetId(w) {
     return w && (w.budget_line_id || w.id)
 }
 
+// Flèches de réordonnancement : pas de glisser-déposer, qui est pénible au
+// doigt sur téléphone et inaccessible au clavier.
+function Fleches({
+    onUp,
+    onDown,
+    nom
+}) {
+    const st = {
+        background: "none",
+        border: 0,
+        color: "var(--slate)",
+        fontSize: 15,
+        lineHeight: 1,
+        padding: "4px 5px"
+    };
+    return h.jsxs("span", {
+        style: {
+            flex: "0 0 auto",
+            whiteSpace: "nowrap"
+        },
+        children: [h.jsx("button", {
+            style: st,
+            onClick: onUp,
+            "aria-label": "Monter " + (nom || ""),
+            title: "Monter",
+            children: "↑"
+        }), h.jsx("button", {
+            style: st,
+            onClick: onDown,
+            "aria-label": "Descendre " + (nom || ""),
+            title: "Descendre",
+            children: "↓"
+        })]
+    })
+}
+
 function contenuDe(rows, type) {
     return (rows || []).filter(x => x.type === type).sort((a, b) => (a.sort || 0) - (b.sort || 0))
 }
@@ -17956,6 +17992,7 @@ function Dv({
     save: ctSave,
     add: ctAdd,
     del: ctDel,
+    move: ctMove,
     readOnly: ro
 }) {
     const [mode, setMode] = re.useState(!1),
@@ -18019,6 +18056,10 @@ function Dv({
                                 titre: w.target.value
                             }),
                             onBlur: () => ctSave(o.id)
+                        }), h.jsx(Fleches, {
+                            nom: o.titre,
+                            onUp: () => ctMove(o.id, "jour", -1),
+                            onDown: () => ctMove(o.id, "jour", 1)
                         }), h.jsx("button", {
                             className: "bdel",
                             onClick: () => ctDel(o.id),
@@ -18096,6 +18137,10 @@ function Dv({
                                 titre: w.target.value
                             }),
                             onBlur: () => ctSave(o.id)
+                        }), h.jsx(Fleches, {
+                            nom: o.titre,
+                            onUp: () => ctMove(o.id, "cours", -1),
+                            onDown: () => ctMove(o.id, "cours", 1)
                         }), h.jsx("button", {
                             className: "bdel",
                             onClick: () => ctDel(o.id),
@@ -18222,7 +18267,8 @@ function Bv({
     edit: ctEdit,
     save: ctSave,
     add: ctAdd,
-    del: ctDel
+    del: ctDel,
+    move: ctMove
 }) {
     const [mode, setMode] = re.useState(!1),
         list = contenuDe(ctRows, "suivi"),
@@ -18276,6 +18322,10 @@ function Bv({
                             titre: w.target.value
                         }),
                         onBlur: () => ctSave(o.id)
+                    }), h.jsx(Fleches, {
+                        nom: o.titre,
+                        onUp: () => ctMove(o.id, "suivi", -1),
+                        onDown: () => ctMove(o.id, "suivi", 1)
                     }), h.jsx("button", {
                         className: "bdel",
                         onClick: () => ctDel(o.id),
@@ -18471,10 +18521,22 @@ function zo({
                         poste: c.target.value
                     }),
                     onBlur: () => s(u.id)
-                }), u.detail ? h.jsx("div", {
-                    className: "bdet",
-                    children: u.detail
-                }) : null]
+                }), h.jsx("input", {
+                    className: "bedit",
+                    style: {
+                        width: "100%",
+                        fontSize: 12,
+                        marginTop: 2
+                    },
+                    disabled: a,
+                    value: u.detail || "",
+                    placeholder: "détail (ex. EDF 28 · ENGIE 98)",
+                    "aria-label": "Détail de " + u.poste,
+                    onChange: c => n(u.id, {
+                        detail: c.target.value
+                    }),
+                    onBlur: () => s(u.id)
+                })]
             }), h.jsx("input", {
                 className: "bedit bnum",
                 type: "number",
@@ -18510,6 +18572,14 @@ function Jv(t) {
         spend: spendAll,
         savings: savingsAll,
         saveSpend: saveSpendFn,
+        editLine: editLineFn2,
+        saveLine: saveLineFn2,
+        addLine: addLineFn,
+        removeLine: removeLineFn,
+        editVoyage: editVoyageFn,
+        saveVoyage: saveVoyageFn,
+        addVoyage: addVoyageFn,
+        removeVoyage: removeVoyageFn,
         transactions: txAll,
         onEditTx: onEditTx,
         budgetMois: bmAll,
@@ -18949,6 +19019,20 @@ function Jv(t) {
                                             onClick: () => ri(it.id),
                                             "aria-label": "Supprimer",
                                             children: "✕"
+                                        }), h.jsx("input", {
+                                            className: "bedit",
+                                            style: {
+                                                flexBasis: "100%",
+                                                fontSize: 12,
+                                                marginTop: 2
+                                            },
+                                            disabled: v,
+                                            value: it.detail || "",
+                                            placeholder: "détail (ex. payé par chèque, facture à venir)",
+                                            "aria-label": "Détail de « " + (it.label || "") + " »",
+                                            onChange: g => eiAuto(it.id, {
+                                                detail: g.target.value
+                                            })
                                         }), !itemCompte(it) && h.jsxs("div", {
                                         style: {
                                             display: "flex",
@@ -19541,31 +19625,22 @@ function Jv(t) {
         }), h.jsxs("details", {
             className: "collapsible",
             children: [h.jsx("summary", {
-                children: "Budget mensuel"
-            }), h.jsx("div", {
+                children: "Budget mensuel — modèle"
+            }), h.jsxs("div", {
                 className: "inner",
-                children: h.jsxs("table", {
-                    className: "tbl",
-                    children: [h.jsx("thead", {
-                        children: h.jsxs("tr", {
-                            children: [h.jsx("th", {
-                                children: "Poste"
-                            }), h.jsx("th", {
-                                className: "num",
-                                children: "/ mois"
-                            })]
-                        })
-                    }), h.jsx("tbody", {
-                        children: (e || []).map(w => h.jsxs("tr", {
-                            children: [h.jsx("td", {
-                                children: w.poste
-                            }), h.jsx("td", {
-                                className: "num",
-                                children: ot(gr(w.montant))
-                            })]
-                        }, w.id))
-                    })]
-                })
+                children: [h.jsx("div", {
+                    className: "editable-hint",
+                    children: "C'est le modèle qui s'applique à tous les mois. Pour n'ajuster qu'un mois, utilise « Ajuster le budget de … » plus bas."
+                }), ["revenu", "charge", "epargne"].map(k => h.jsx(zo, {
+                    titre: k === "revenu" ? "Revenus" : k === "charge" ? "Charges" : "Épargne",
+                    kind: k,
+                    budget: e || [],
+                    editLine: editLineFn2,
+                    saveLine: saveLineFn2,
+                    addLine: addLineFn,
+                    removeLine: removeLineFn,
+                    readOnly: v
+                }, k))]
             })]
         }), (() => {
             const budgetMoisSel = budgetDuMois(bmAll, e, moisSel),
@@ -19957,6 +20032,76 @@ function Jv(t) {
             pocket: "vacances",
             calc: vac,
             note: ot(mt(r, "provision_vacances_mensuelle")) + "/mois de provision + les dépenses réelles de voyage."
+        }), h.jsxs("details", {
+            className: "collapsible",
+            style: {
+                marginBottom: 12
+            },
+            children: [h.jsxs("summary", {
+                children: ["Voyages — ", (n || []).length, h.jsx("span", {
+                    style: {
+                        color: "var(--slate)",
+                        fontWeight: 400,
+                        marginLeft: 8
+                    },
+                    children: ot((n || []).reduce((s2, x) => s2 + gr(x.montant), 0))
+                })]
+            }), h.jsxs("div", {
+                className: "inner",
+                children: [h.jsx("div", {
+                    className: "editable-hint",
+                    children: "Les voyages prévus alimentent la courbe de la poche vacances. Le mois indique quand la dépense tombe."
+                }), [...(n || [])].sort((a, b) => gr(a.mois_index) - gr(b.mois_index) || (a.sort || 0) - (b.sort || 0)).map(w => h.jsxs("div", {
+                    className: "brow",
+                    children: [h.jsxs("div", {
+                        className: "bcol",
+                        children: [h.jsx("input", {
+                            className: "bedit lbl",
+                            disabled: v,
+                            value: w.label || "",
+                            placeholder: "Voyage",
+                            "aria-label": "Nom du voyage",
+                            onChange: g => editVoyageFn(w.id, {
+                                label: g.target.value
+                            }),
+                            onBlur: () => saveVoyageFn(w.id)
+                        }), h.jsx("select", {
+                            className: "bsel",
+                            disabled: v,
+                            value: gr(w.mois_index),
+                            "aria-label": "Mois du voyage",
+                            onChange: g => {
+                                editVoyageFn(w.id, {
+                                    mois_index: Number(g.target.value)
+                                }), setTimeout(() => saveVoyageFn(w.id), 0)
+                            },
+                            children: ve.map((lab, idx) => h.jsx("option", {
+                                value: idx,
+                                children: lab
+                            }, idx))
+                        })]
+                    }), h.jsx("input", {
+                        className: "bedit bnum",
+                        inputMode: "decimal",
+                        disabled: v,
+                        value: w.montant,
+                        "aria-label": "Montant du voyage",
+                        onChange: g => editVoyageFn(w.id, {
+                            montant: g.target.value
+                        }),
+                        onBlur: () => saveVoyageFn(w.id)
+                    }), !v && h.jsx("button", {
+                        className: "bdel",
+                        onClick: () => removeVoyageFn(w.id),
+                        "aria-label": "Supprimer ce voyage",
+                        children: "×"
+                    })]
+                }, w.id)), !v && h.jsx("button", {
+                    className: "badd",
+                    onClick: () => addVoyageFn(),
+                    children: "+ Ajouter un voyage"
+                })]
+            })]
         }), h.jsx(Pocket, {
             title: "Provision formation — prévu vs réel",
             pocket: "formation",
@@ -20115,7 +20260,8 @@ function Yv({
     edit: ctEdit,
     save: ctSave,
     add: ctAdd,
-    del: ctDel
+    del: ctDel,
+    move: ctMove
 }) {
     const [mode, setMode] = re.useState(!1),
         n = contenuDe(ctRows, "piece"),
@@ -20177,6 +20323,10 @@ function Yv({
                             titre: w.target.value
                         }),
                         onBlur: () => ctSave(o.id)
+                    }), h.jsx(Fleches, {
+                        nom: o.titre,
+                        onUp: () => ctMove(o.id, "piece", -1),
+                        onDown: () => ctMove(o.id, "piece", 1)
                     }), h.jsx("button", {
                         className: "bdel",
                         onClick: () => ctDel(o.id),
@@ -21510,6 +21660,7 @@ function sk() {
                 save: ctSave,
                 add: ctAdd,
                 del: ctDel,
+                move: ctMove,
                 readOnly: at
             }), s === "suivi" && h.jsx(Bv, {
                 progress: o,
@@ -21519,7 +21670,8 @@ function sk() {
                 edit: ctEdit,
                 save: ctSave,
                 add: ctAdd,
-                del: ctDel
+                del: ctDel,
+                move: ctMove
             }), s === "budget" && h.jsx(Gv, {
                 items: vi
             }), s === "tresorerie" && gt(h.jsx(Jv, {
@@ -21541,7 +21693,8 @@ function sk() {
                 edit: ctEdit,
                 save: ctSave,
                 add: ctAdd,
-                del: ctDel
+                del: ctDel,
+                move: ctMove
             }), s === "historique" && gt(h.jsx(Historique, {
                 audit: aud,
                 items: vi,
@@ -21551,7 +21704,11 @@ function sk() {
                 setRows: setHwRows,
                 loading: hwLoading,
                 err: hwErr,
-                contenu: ct
+                contenu: ct,
+                edit: ctEdit,
+                save: ctSave,
+                add: ctAdd,
+                del: ctDel
             })]
         }), !at && h.jsx("button", {
             className: "fab",
@@ -22269,8 +22426,13 @@ function HWK({
     setRows,
     loading,
     err,
-    contenu: ctRows
+    contenu: ctRows,
+    edit: ctEdit,
+    save: ctSave,
+    add: ctAdd,
+    del: ctDel
 }) {
+    const [modeMat, setModeMat] = re.useState(!1);
     // Matières : celles enregistrées en base, plus toute matière déjà utilisée
     // par un devoir — pour qu'aucun devoir ne disparaisse des filtres.
     const matieres = [...new Set([...contenuDe(ctRows, "matiere").map(x => x.titre), ...(rows || []).map(x => x.subject)])].filter(Boolean);
@@ -22559,6 +22721,43 @@ function HWK({
             },
             children: toast
         }) : null, h.jsx("div", {
+            className: "h3",
+            children: "Matières"
+        }), h.jsx("button", {
+            className: "btn-outline btn-sm",
+            onClick: () => setModeMat(!modeMat),
+            children: modeMat ? "✓ Terminer" : "✎ Gérer les matières"
+        }), modeMat && h.jsxs("div", {
+            className: "card",
+            style: {
+                marginTop: 8
+            },
+            children: [h.jsx("div", {
+                className: "editable-hint",
+                children: "Renommer une matière ici ne renomme pas les devoirs déjà enregistrés : ils gardent leur ancienne matière, qui reste proposée dans les filtres."
+            }), contenuDe(ctRows, "matiere").map(o => h.jsxs("div", {
+                className: "brow",
+                children: [h.jsx("input", {
+                    className: "bedit lbl",
+                    value: o.titre || "",
+                    placeholder: "Matière",
+                    "aria-label": "Nom de la matière",
+                    onChange: w => ctEdit(o.id, {
+                        titre: w.target.value
+                    }),
+                    onBlur: () => ctSave(o.id)
+                }), h.jsx("button", {
+                    className: "bdel",
+                    onClick: () => ctDel(o.id),
+                    "aria-label": "Supprimer cette matière",
+                    children: "×"
+                })]
+            }, o.id)), h.jsx("button", {
+                className: "badd",
+                onClick: () => ctAdd("matiere"),
+                children: "+ Ajouter une matière"
+            })]
+        }), h.jsx("div", {
             className: "h3",
             children: "Filtres"
         }), h.jsx("div", {
