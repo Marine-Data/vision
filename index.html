@@ -18608,6 +18608,10 @@ function Jv(t) {
         setBudgetMois: setBmAll,
         poches: pochesRows,
         setPoches: setPochesRows,
+        editPoche: pocheEditFn,
+        savePoche: pocheSaveFn,
+        addPoche: pocheAddFn,
+        delPoche: pocheDelFn,
         addSaving: addSavingFn,
         saveSaving: saveSavingFn,
         delSaving: delSavingFn,
@@ -20129,6 +20133,109 @@ function Jv(t) {
                     children: "+ Ajouter un voyage"
                 })]
             })]
+        }), !v && h.jsxs("details", {
+            className: "collapsible",
+            style: {
+                marginBottom: 12
+            },
+            children: [h.jsx("summary", {
+                children: "Gérer les poches"
+            }), h.jsxs("div", {
+                className: "inner",
+                children: [h.jsx("div", {
+                    className: "editable-hint",
+                    children: "Archiver une poche la retire de l'affichage, mais ses postes encore actifs restent provisionnés : l'archivage ne solde pas, sinon ton épargne disponible remonterait sans que rien n'ait changé."
+                }), (pochesRows || []).map(p => {
+                    const postesActifs = (items || []).filter(x => x.pocket === p.cle && itemCompte(x)),
+                        nonSoldes = postesActifs.filter(x => !x.paid).length;
+                    return h.jsxs("div", {
+                        style: {
+                            borderBottom: "1px solid var(--line)",
+                            padding: "8px 0",
+                            opacity: pocheAffichee(p) ? 1 : .6
+                        },
+                        children: [h.jsxs("div", {
+                            style: {
+                                display: "flex",
+                                gap: 6,
+                                alignItems: "center"
+                            },
+                            children: [h.jsx("input", {
+                                className: "bedit lbl",
+                                value: p.label || "",
+                                placeholder: "Nom de la poche",
+                                "aria-label": "Nom de la poche",
+                                onChange: g => pocheEditFn(p.id, {
+                                    label: g.target.value
+                                })
+                            }), h.jsx("button", {
+                                className: "btn-outline btn-sm",
+                                onClick: () => {
+                                    if (pocheAffichee(p) && nonSoldes) {
+                                        if (!window.confirm(nonSoldes + " poste(s) actif(s) non soldé(s) resteront comptés après archivage. Pour les solder, il faudra désarchiver. Continuer ?")) return
+                                    }
+                                    pocheEditFn(p.id, {
+                                        statut: pocheAffichee(p) ? "archive" : "actif"
+                                    })
+                                },
+                                children: pocheAffichee(p) ? "Archiver" : "Désarchiver"
+                            }), h.jsx("button", {
+                                className: "bdel",
+                                onClick: () => pocheDelFn(p),
+                                "aria-label": "Supprimer la poche",
+                                children: "×"
+                            })]
+                        }), h.jsxs("div", {
+                            className: "bdet",
+                            children: [p.regime === "provision_mensuelle" ? "provision mensuelle" : "postes datés", " · ", postesActifs.length, " poste(s) actif(s)", nonSoldes ? " dont " + nonSoldes + " non soldé(s)" : "", pocheAffichee(p) ? "" : " · archivée"]
+                        }), h.jsxs("div", {
+                            style: {
+                                display: "flex",
+                                gap: 6,
+                                marginTop: 4
+                            },
+                            children: [h.jsx("input", {
+                                className: "bedit bnum",
+                                inputMode: "decimal",
+                                value: p.seuil_bas == null ? "" : p.seuil_bas,
+                                placeholder: "seuil",
+                                "aria-label": "Seuil d'alerte",
+                                onChange: g => pocheEditFn(p.id, {
+                                    seuil_bas: g.target.value
+                                })
+                            }), h.jsx("input", {
+                                className: "bedit",
+                                style: {
+                                    flex: 1
+                                },
+                                value: p.note || "",
+                                placeholder: "Note affichée sous le titre",
+                                "aria-label": "Note de la poche",
+                                onChange: g => pocheEditFn(p.id, {
+                                    note: g.target.value
+                                })
+                            })]
+                        })]
+                    }, p.id)
+                }), h.jsx("button", {
+                    className: "badd",
+                    onClick: pocheAddFn,
+                    children: "+ Ajouter une poche"
+                }), h.jsxs("label", {
+                    style: {
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 7,
+                        marginTop: 10,
+                        fontSize: 13
+                    },
+                    children: [h.jsx("input", {
+                        type: "checkbox",
+                        checked: montrerArchivees,
+                        onChange: g => setMontrerArchivees(g.target.checked)
+                    }), "Afficher les poches archivées dans la Trésorerie"]
+                })]
+            })]
         }), (pochesRows || []).filter(p => p.cle !== "vacances" && (pocheAffichee(p) || montrerArchivees)).map(p => h.jsx(Pocket, {
             title: p.label + " — prévu vs réel" + (pocheAffichee(p) ? "" : " (archivée)"),
             pocket: p.cle,
@@ -21143,6 +21250,8 @@ function sk() {
     const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]), [tx, stx] = re.useState([]), [bm, sbm] = re.useState([]), [poches, setPoches] = re.useState([]), [saisieOuverte, setSaisieOuverte] = re.useState(!1), [txEdit, setTxEdit] = re.useState(null);
     const ctRef = re.useRef([]);
     ctRef.current = ct;
+    const pochesRef = re.useRef([]);
+    pochesRef.current = poches;
     re.useEffect(() => {
         if (at) {
             n(!0);
@@ -21387,6 +21496,59 @@ function sk() {
             ...x,
             sort: sb
         } : x)))
+    }
+
+    // Poches : création, renommage, seuil, note, archivage. Une poche archivée
+    // reste comptée tant qu'elle a des postes actifs (voir pocheComptee).
+    function pocheEdit(id, patch) {
+        setPoches(p => p.map(x => x.id === id ? {
+            ...x,
+            ...patch
+        } : x)), debounceSave("poche:" + id, () => pocheSave(id))
+    }
+    async function pocheSave(id) {
+        const r = pochesRef.current.find(x => x.id === id);
+        if (!r) return;
+        await J.from("vision_poches").update({
+            label: r.label,
+            seuil_bas: r.seuil_bas === "" || r.seuil_bas == null ? null : Number(r.seuil_bas),
+            note: r.note,
+            statut: r.statut,
+            sort: r.sort,
+            updated_at: new Date().toISOString()
+        }).eq("id", id)
+    }
+    async function pocheAdd() {
+        const nom = window.prompt("Nom de la nouvelle poche (ex. Permis, Mariage)", "");
+        if (!nom || !nom.trim()) return;
+        const cle = nom.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        if (!cle) return window.alert("Ce nom ne donne pas d'identifiant utilisable.");
+        if (pochesRef.current.some(x => x.cle === cle)) return window.alert("Une poche porte déjà ce nom.");
+        const {
+            data: u2
+        } = await J.auth.getUser(), uid = u2 && u2.user ? u2.user.id : null,
+            {
+                data: K,
+                error: E
+            } = await J.from("vision_poches").insert({
+                user_id: uid,
+                cle,
+                label: nom.trim(),
+                regime: "postes_dates",
+                seuil_bas: 200,
+                note: "",
+                sort: Math.max(0, ...pochesRef.current.map(x => x.sort || 0)) + 1
+            }).select().single();
+        E ? window.alert("Création impossible : " + E.message) : K && setPoches(p => [...p, K])
+    }
+    async function pocheDel(p) {
+        const postes = (vi || []).filter(x => x.pocket === p.cle);
+        if (postes.length) return window.alert("« " + p.label + " » contient encore " + postes.length + " poste(s). Déplace-les ou supprime-les avant, sinon ils resteraient rattachés à une poche qui n'existe plus.");
+        if (!window.confirm("Supprimer la poche « " + p.label + " » ?")) return;
+        const {
+            error: E
+        } = await J.from("vision_poches").delete().eq("id", p.id);
+        E ? window.alert("Suppression impossible : " + E.message) : setPoches(x => x.filter(y => y.id !== p.id))
     }
 
     async function ctDel(id) {
@@ -21652,6 +21814,10 @@ function sk() {
             setBudgetMois: sbm,
             poches: poches,
             setPoches: setPoches,
+            editPoche: pocheEdit,
+            savePoche: pocheSave,
+            addPoche: pocheAdd,
+            delPoche: pocheDel,
             savings: sv,
             ...at ? {
                 readOnly: !0,
