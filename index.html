@@ -17074,9 +17074,25 @@ const Av = [{
         montant: 375,
         sort: 42
     }],
+    // Paramètres créés pour un compte neuf, uniquement si la table est vide.
+    // Les trois premiers sont LUS par les calculs : sans eux la courbe d'épargne
+    // démarre à zéro et la poche vacances ne se provisionne pas.
+    // (« start_livrets » et « cible » ont été retirés : aucun calcul ne les lit.)
     Wi = [{
-        param_key: "start_livrets",
+        param_key: "plan_baseline",
         montant: 13321.59
+    }, {
+        param_key: "epargne_mensuelle",
+        montant: 500
+    }, {
+        param_key: "provision_vacances_mensuelle",
+        montant: 375
+    }, {
+        param_key: "seuil_ecart_epargne",
+        montant: 300
+    }, {
+        param_key: "seuil_poche_min",
+        montant: 200
     }, {
         param_key: "du_paiement",
         montant: 5660
@@ -17086,9 +17102,6 @@ const Av = [{
     }, {
         param_key: "scap_s1",
         montant: 420
-    }, {
-        param_key: "cible",
-        montant: 12900
     }],
     zc = [{
         line_key: "v_avion_lisbonne",
@@ -17110,7 +17123,13 @@ const Av = [{
         sort: 2
     }],
     Kv = {
-        start_livrets: "Épargne de départ (livrets, mi-août 2026, hors provisions)",
+        plan_baseline: "Épargne de départ (livrets, hors provisions)",
+        epargne_mensuelle: "Épargne versée chaque mois sur les livrets",
+        provision_vacances_mensuelle: "Provision vacances mise de côté chaque mois",
+        seuil_ecart_epargne: "Seuil d'alerte sur l'écart d'épargne",
+        seuil_poche_min: "Seuil d'alerte « poche basse »",
+        cible_override: "Matelas cible imposé (0 = calculé sur 6 mois de salaire)",
+        start_livrets: "Épargne de départ (ancienne clé, non utilisée)",
         du_paiement: "Coût du DU (payé en déc. 2026)",
         sport: "Sport — En Avant! (600 €, SEPA 3×200)",
         scap_s1: "SCAP semestre 1 (prévu, sept. 2026)",
@@ -17149,10 +17168,6 @@ const Av = [{
         }
         return out
     })(),
-    Vv = {
-        scap_s1: 1,
-        du_paiement: 4
-    },
     gr = t => Number(t) || 0,
     Vf = (t, e, r = 0) => {
         const n = (t || []).find(s => s.param_key === e);
