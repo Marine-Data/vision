@@ -20538,7 +20538,8 @@ function Xv({
     budget: t,
     params: e,
     voyages: vg,
-    items: im
+    items: im,
+    poches: pochesRows
 }) {
     const rawPlan = planEpargne(im, e),
         vacX = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
@@ -20734,7 +20735,8 @@ function Xv({
 function Qv({
     budget: t,
     params: e,
-    items: im
+    items: im,
+    poches: pochesRows
 }) {
     const rawPlan = planEpargne(im, e),
         n = getCible(e, t),
@@ -21195,14 +21197,16 @@ function ek({
             budget: t,
             params: e,
             voyages: r,
-            items: im
+            items: im,
+            poches: pochesRows
         }), h.jsx("div", {
             className: "h3",
             children: "Matelas de sécurité"
         }), h.jsx(Qv, {
             budget: t,
             params: e,
-            items: im
+            items: im,
+            poches: pochesRows
         }), h.jsx("div", {
             className: "h3",
             children: "Poche vacances"
