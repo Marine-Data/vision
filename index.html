@@ -21297,10 +21297,17 @@ function sk() {
         // L'index unique sur le rang peut refuser l'ajout si deux onglets
         // calculent le même rang en même temps : on réessaie une fois plus loin.
         if (E && E.code === "23505") {
+            // On relit le rang maximum en base plutôt que d'incrémenter le nôtre :
+            // un autre onglet a pu insérer entre-temps et prendre le suivant.
+            const {
+                data: dernier
+            } = await J.from("vision_contenu").select("sort").eq("type", type).order("sort", {
+                ascending: !1
+            }).limit(1), max = dernier && dernier.length ? gr(dernier[0].sort) : gr(ligne.sort);
             const second = {
                 ...ligne,
                 item_key: type + ":" + Date.now() + "-2",
-                sort: (ligne.sort || 0) + 1 + Math.floor(Math.random() * 50)
+                sort: max + 1
             }, {
                 data: n2,
                 error: E2
