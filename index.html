@@ -16964,6 +16964,9 @@ const Av = [{
     }, {
         id: "homework",
         label: "Devoirs"
+    }, {
+        id: "historique",
+        label: "Historique"
     }],
     Lc = [{
         line_key: "revenu_salaire",
@@ -20818,7 +20821,7 @@ function ek({
     })
 }
 const at = typeof window < "u" && (new URLSearchParams(window.location.search).has("partage") || (window.location.hash || "").includes("partage")),
-    tk = ["tresorerie", "stats"],
+    tk = ["tresorerie", "stats", "historique"],
     rk = "vision2027",
     lt = () => {};
 
@@ -20962,7 +20965,7 @@ function sk() {
                 data: K
             } = await J.from("vision_audit").select("*").order("changed_at", {
                 ascending: !1
-            }).limit(30);
+            }).limit(400);
             saud(K || [])
         })(), (async () => {
             // Initialise les 12 prochains mois une fois pour toutes, puis relit.
@@ -21438,7 +21441,11 @@ function sk() {
                 save: ctSave,
                 add: ctAdd,
                 del: ctDel
-            }), s === "homework" && h.jsx(HWK, {
+            }), s === "historique" && gt(h.jsx(Historique, {
+                audit: aud,
+                items: vi,
+                params: c
+            })), s === "homework" && h.jsx(HWK, {
                 rows: hwRows,
                 setRows: setHwRows,
                 loading: hwLoading,
@@ -21509,6 +21516,177 @@ function isoAujourdhui() {
 // une dépense existante : dans ce cas `initial` est la transaction à modifier.
 // Éditeur du budget d'un mois donné. N'écrit jamais dans vision_budget :
 // le modèle reste la référence qu'on copie pour initialiser un mois.
+// Journal des décisions. Lit vision_audit, rempli par trigger : rien n'est
+// recalculé ici, on ne fait que relire ce qui s'est réellement passé.
+const AUDIT_GROUPES = [
+    ["decision", "Décisions", ["statut", "date_effet", "raison"]],
+    ["montant", "Montants", ["montant_prevu", "montant_reel", "paid"]],
+    ["organisation", "Organisation", ["label", "pocket", "mois_index"]]
+];
+const AUDIT_CHAMPS = {
+    statut: "état",
+    date_effet: "date d'effet",
+    raison: "raison",
+    montant_prevu: "montant prévu",
+    montant_reel: "montant réel",
+    paid: "payé",
+    label: "libellé",
+    pocket: "poche",
+    mois_index: "mois",
+    montant: "montant"
+};
+
+function auditValeur(champ, v) {
+    if (v == null || v === "") return "—";
+    if (champ === "statut") return statutLibelle(v);
+    if (champ === "paid") return v === "true" ? "payé" : "non payé";
+    if (champ === "mois_index") return ve[gr(v)] || v;
+    if (champ === "montant_prevu" || champ === "montant_reel" || champ === "montant") return ot(gr(v));
+    return v
+}
+
+function Historique({
+    audit,
+    items,
+    params
+}) {
+    const [fTable, setFTable] = re.useState("Toutes"),
+        [fGroupe, setFGroupe] = re.useState("Tous"),
+        [fPeriode, setFPeriode] = re.useState("30 jours"),
+        lignes = audit || [];
+
+    const nomDe = l => {
+        if (l.table_name === "vision_items") {
+            const it = (items || []).find(x => x.id === l.record_id);
+            return it ? it.label : "poste supprimé"
+        }
+        if (l.table_name === "vision_params") {
+            const p = (params || []).find(x => String(x.id) === l.record_id || x.param_key === l.record_id);
+            return p ? (Kv[p.param_key] || p.param_key) : "paramètre"
+        }
+        return l.record_id
+    },
+    groupeDe = c => {
+        const g = AUDIT_GROUPES.find(([, , champs]) => champs.includes(c));
+        return g ? g[0] : "autre"
+    },
+    tables = ["Toutes", ...new Set(lignes.map(l => l.table_name))],
+    seuil = fPeriode === "Tout" ? null : new Date(Date.now() - (fPeriode === "7 jours" ? 7 : 30) * 864e5),
+    visibles = lignes.filter(l => (fTable === "Toutes" || l.table_name === fTable) && (fGroupe === "Tous" || groupeDe(l.field) === fGroupe) && (!seuil || new Date(l.changed_at) >= seuil));
+
+    // Regroupées par jour : c'est l'unité à laquelle on se souvient d'une décision.
+    const jours = [];
+    visibles.forEach(l => {
+        const j = (l.changed_at || "").slice(0, 10);
+        let e = jours.find(x => x.jour === j);
+        e || (e = {
+            jour: j,
+            lignes: []
+        }, jours.push(e)), e.lignes.push(l)
+    });
+
+    const btn = a => ({
+        padding: "7px 12px",
+        borderRadius: 999,
+        border: "1px solid " + (a ? "var(--oxblood)" : "var(--line)"),
+        background: a ? "var(--oxblood)" : "#fff",
+        color: a ? "#fff" : "var(--ink)",
+        fontSize: 12.5,
+        fontWeight: 600,
+        marginRight: 6,
+        marginBottom: 6
+    });
+
+    return h.jsxs("section", {
+        className: "sec",
+        children: [h.jsx("h2", {
+            children: "Historique"
+        }), h.jsx("p", {
+            className: "sub",
+            children: "Ce qui a changé dans ton plan, et quand. Enregistré automatiquement."
+        }), h.jsx("div", {
+            className: "detail",
+            children: "Quoi"
+        }), h.jsx("div", {
+            children: ["Tous", ...AUDIT_GROUPES.map(([k]) => k)].map(k => h.jsx("button", {
+                style: btn(fGroupe === k),
+                onClick: () => setFGroupe(k),
+                children: k === "Tous" ? "Tout" : (AUDIT_GROUPES.find(([g]) => g === k) || [])[1]
+            }, k))
+        }), h.jsx("div", {
+            className: "detail",
+            style: {
+                marginTop: 6
+            },
+            children: "Où"
+        }), h.jsx("div", {
+            children: tables.map(t => h.jsx("button", {
+                style: btn(fTable === t),
+                onClick: () => setFTable(t),
+                children: t === "Toutes" ? "Partout" : t.replace("vision_", "")
+            }, t))
+        }), h.jsx("div", {
+            className: "detail",
+            style: {
+                marginTop: 6
+            },
+            children: "Quand"
+        }), h.jsx("div", {
+            children: ["7 jours", "30 jours", "Tout"].map(p => h.jsx("button", {
+                style: btn(fPeriode === p),
+                onClick: () => setFPeriode(p),
+                children: p
+            }, p))
+        }), h.jsx("div", {
+            className: "h3",
+            children: visibles.length + (visibles.length > 1 ? " changements" : " changement")
+        }), jours.length === 0 ? h.jsx("div", {
+            className: "card",
+            children: h.jsx("div", {
+                className: "detail",
+                children: "Rien sur cette période. Élargis les filtres pour voir plus loin."
+            })
+        }) : jours.map(j => h.jsxs("div", {
+            children: [h.jsx("div", {
+                className: "bgrouplab",
+                children: hwkFmt(j.jour)
+            }), h.jsx("div", {
+                className: "card",
+                style: {
+                    padding: "4px 12px"
+                },
+                children: j.lignes.map(l => h.jsxs("div", {
+                    style: {
+                        padding: "9px 0",
+                        borderBottom: "1px solid var(--line)"
+                    },
+                    children: [h.jsxs("div", {
+                        style: {
+                            fontWeight: 600,
+                            fontSize: 13.5
+                        },
+                        children: [nomDe(l), h.jsx("span", {
+                            className: "chip",
+                            style: {
+                                marginLeft: 6
+                            },
+                            children: AUDIT_CHAMPS[l.field] || l.field
+                        })]
+                    }), h.jsxs("div", {
+                        className: "detail",
+                        style: {
+                            marginTop: 2
+                        },
+                        children: [auditValeur(l.field, l.old_value), " → ", h.jsx("b", {
+                            children: auditValeur(l.field, l.new_value)
+                        }), "  ·  ", (l.changed_at || "").slice(11, 16)]
+                    })]
+                }, l.id))
+            })]
+        }, j.jour))]
+    })
+}
+
 function BudgetMoisEditor({
     moisIndex,
     rows,
