@@ -17237,11 +17237,6 @@ function planEpargne(items, e, r = ve.length) {
     return a
 }
 
-function reelEpargnePure(rawReel, vac, form, epg, i, sport) {
-    if (rawReel[i] == null) return null;
-    return rawReel[i] - vac.reel[i] - form.reel[i] - epg.reel[i] - (sport ? sport.reel[i] : 0)
-}
-
 // Les provisions sont désormais une liste, pas trois noms. Chaque entrée est
 // le résultat de pocketCalc pour une poche. Une poche archivée reste comptée
 // tant qu'elle a des postes actifs : archiver masque, ça ne solde pas.
@@ -20069,20 +20064,20 @@ function Jv(t) {
                 marginBottom: 12
             },
             children: [h.jsxs("summary", {
-                children: ["Voyages — ", (n || []).length, h.jsx("span", {
+                children: ["Voyages — ", (n || []).filter(x => (x.poche_cle || "vacances") === (pocheVacances ? pocheVacances.cle : "vacances")).length, h.jsx("span", {
                     style: {
                         color: "var(--slate)",
                         fontWeight: 400,
                         marginLeft: 8
                     },
-                    children: ot((n || []).reduce((s2, x) => s2 + gr(x.montant), 0))
+                    children: ot((n || []).filter(x => (x.poche_cle || "vacances") === (pocheVacances ? pocheVacances.cle : "vacances")).reduce((s2, x) => s2 + gr(x.montant), 0))
                 })]
             }), h.jsxs("div", {
                 className: "inner",
                 children: [h.jsx("div", {
                     className: "editable-hint",
                     children: "Les voyages prévus alimentent la courbe de la poche vacances. Le mois indique quand la dépense tombe."
-                }), [...(n || [])].sort((a, b) => gr(a.mois_index) - gr(b.mois_index) || (a.sort || 0) - (b.sort || 0)).map(w => h.jsxs("div", {
+                }), [...(n || []).filter(x => (x.poche_cle || "vacances") === (pocheVacances ? pocheVacances.cle : "vacances"))].sort((a, b) => gr(a.mois_index) - gr(b.mois_index) || (a.sort || 0) - (b.sort || 0)).map(w => h.jsxs("div", {
                     className: "brow",
                     children: [h.jsxs("div", {
                         className: "bcol",
@@ -21543,7 +21538,10 @@ function sk() {
     }
     async function pocheDel(p) {
         const postes = (vi || []).filter(x => x.pocket === p.cle);
-        if (postes.length) return window.alert("« " + p.label + " » contient encore " + postes.length + " poste(s). Déplace-les ou supprime-les avant, sinon ils resteraient rattachés à une poche qui n'existe plus.");
+        if (postes.length) {
+            const actifs = postes.filter(itemCompte).length;
+            return window.alert("« " + p.label + " » contient encore " + postes.length + " poste(s)" + (actifs ? ", dont " + actifs + " actif(s)" : ", tous abandonnés ou reportés — ils comptent quand même ici") + ". Supprime-les d'abord, sinon ils resteraient rattachés à une poche qui n'existe plus. Pour la retirer de l'affichage sans toucher aux postes, archive-la.");
+        }
         if (!window.confirm("Supprimer la poche « " + p.label + " » ?")) return;
         const {
             error: E
@@ -21646,6 +21644,7 @@ function sk() {
                 mois_index: 1,
                 label: "",
                 montant: 0,
+                poche_cle: "vacances",
                 sort: K
             },
             {
