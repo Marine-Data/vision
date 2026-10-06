@@ -21294,6 +21294,43 @@ function sk() {
             } = await J.from("vision_contenu").insert(ligne).select().single();
         nouveau && sct(p => [...p, nouveau])
     }
+    // Monter / descendre une ligne. Le rang est unique par type ET par groupe :
+    // une pièce se déplace dans son groupe, pas dans toute la liste.
+    async function ctMove(id, type, sens) {
+        const ligne = ctRef.current.find(x => x.id === id);
+        if (!ligne) return;
+        const liste = ctRef.current.filter(x => x.type === type && (x.groupe || null) === (ligne.groupe || null)).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
+            i = liste.findIndex(x => x.id === id),
+            j = i + sens;
+        if (i < 0 || j < 0 || j >= liste.length) return;
+        const a = liste[i],
+            b = liste[j],
+            sa = a.sort || 0,
+            sb = b.sort || 0;
+        sct(p => p.map(x => x.id === a.id ? {
+            ...x,
+            sort: sb
+        } : x.id === b.id ? {
+            ...x,
+            sort: sa
+        } : x));
+        // Un seul appel : les deux écritures sont dans la même transaction,
+        // donc pas de rangs en double si la seconde échoue.
+        const {
+            error: E
+        } = await J.rpc("vision_swap_sort", {
+            p_a: a.id,
+            p_b: b.id
+        });
+        E && (console.warn("vision_swap_sort :", E.message), sct(p => p.map(x => x.id === a.id ? {
+            ...x,
+            sort: sa
+        } : x.id === b.id ? {
+            ...x,
+            sort: sb
+        } : x)))
+    }
+
     async function ctDel(id) {
         if (!window.confirm("Supprimer cette ligne ?")) return;
         sct(p => p.filter(x => x.id !== id)), await J.from("vision_contenu").delete().eq("id", id)
@@ -21779,12 +21816,13 @@ function isoAujourdhui() {
 const AUDIT_GROUPES = [
     ["decision", "Décisions", ["statut", "date_effet", "raison"]],
     ["montant", "Montants", ["montant_prevu", "montant_reel", "paid"]],
-    ["organisation", "Organisation", ["label", "pocket", "mois_index"]]
+    ["organisation", "Organisation", ["label", "detail", "pocket", "mois_index"]]
 ];
 const AUDIT_CHAMPS = {
     statut: "état",
     date_effet: "date d'effet",
     raison: "raison",
+    detail: "détail",
     montant_prevu: "montant prévu",
     montant_reel: "montant réel",
     paid: "payé",
@@ -22433,6 +22471,31 @@ function HWK({
     del: ctDel
 }) {
     const [modeMat, setModeMat] = re.useState(!1);
+    // Supprimer une matière encore utilisée par des devoirs ne suffit pas : la
+    // liste des matières réunit les matières déclarées et celles réellement
+    // employées, donc elle reviendrait aussitôt. On réaffecte d'abord.
+    async function supprimerMatiere(o) {
+        const utilises = (rows || []).filter(x => x.subject === o.titre);
+        if (utilises.length) {
+            const dest = window.prompt(utilises.length + " devoir(s) utilisent « " + o.titre + " ». À quelle matière les rattacher ? (laisse vide pour annuler)", "Divers");
+            if (!dest || !dest.trim()) return;
+            const nouvelle = dest.trim();
+            setRows(p => p.map(x => x.subject === o.titre ? {
+                ...x,
+                subject: nouvelle
+            } : x));
+            const {
+                error: E
+            } = await J.from("vision_homework").update({
+                subject: nouvelle
+            }).eq("subject", o.titre);
+            if (E) {
+                window.alert("Impossible de réaffecter les devoirs : " + E.message);
+                return
+            }
+        }
+        ctDel(o.id)
+    }
     // Matières : celles enregistrées en base, plus toute matière déjà utilisée
     // par un devoir — pour qu'aucun devoir ne disparaisse des filtres.
     const matieres = [...new Set([...contenuDe(ctRows, "matiere").map(x => x.titre), ...(rows || []).map(x => x.subject)])].filter(Boolean);
@@ -22734,7 +22797,7 @@ function HWK({
             },
             children: [h.jsx("div", {
                 className: "editable-hint",
-                children: "Renommer une matière ici ne renomme pas les devoirs déjà enregistrés : ils gardent leur ancienne matière, qui reste proposée dans les filtres."
+                children: "Renommer une matière ne renomme pas les devoirs déjà enregistrés : ils gardent l'ancienne, qui reste proposée dans les filtres. Supprimer une matière encore utilisée te demandera d'abord à quelle autre matière rattacher ces devoirs — sinon elle reviendrait toute seule dans la liste."
             }), contenuDe(ctRows, "matiere").map(o => h.jsxs("div", {
                 className: "brow",
                 children: [h.jsx("input", {
@@ -22748,7 +22811,7 @@ function HWK({
                     onBlur: () => ctSave(o.id)
                 }), h.jsx("button", {
                     className: "bdel",
-                    onClick: () => ctDel(o.id),
+                    onClick: () => supprimerMatiere(o),
                     "aria-label": "Supprimer cette matière",
                     children: "×"
                 })]
