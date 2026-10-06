@@ -21299,7 +21299,12 @@ function sk() {
     async function ctMove(id, type, sens) {
         const ligne = ctRef.current.find(x => x.id === id);
         if (!ligne) return;
-        const liste = ctRef.current.filter(x => x.type === type && (x.groupe || null) === (ligne.groupe || null)).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
+        // `groupe` ne veut pas dire la même chose selon le type : un vrai
+        // regroupement pour les pièces et les notes, un simple drapeau pour les
+        // jours (« fixe ») ou une catégorie pour les cours, qui s'affichent en
+        // une seule liste. On ne restreint donc au groupe que là où ça a un sens.
+        const parGroupe = type === "piece" || type === "note",
+            liste = ctRef.current.filter(x => x.type === type && (!parGroupe || (x.groupe || null) === (ligne.groupe || null))).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
             i = liste.findIndex(x => x.id === id),
             j = i + sens;
         if (i < 0 || j < 0 || j >= liste.length) return;
