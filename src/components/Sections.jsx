@@ -47,16 +47,51 @@ export function Apercu({ progress = {}, budget, params }) {
       )}
 
       <div className="h3">Où j'en suis</div>
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span>Matelas de sécurité</span>
-          <b>{matelasPct} %</b>
-        </div>
-        <div className="prog" style={{ margin: '6px 0 14px' }}><i style={{ width: matelasPct + '%' }} /></div>
-        <div style={{ display: 'flex', gap: 16 }}>
-          <div style={{ flex: 1 }}><div className="detail">Étapes de suivi</div><b>{suiviDone} / {suivi.length}</b></div>
-          <div style={{ flex: 1 }}><div className="detail">Pièces prêtes</div><b>{piecesDone} / {piecesAll.length}</b></div>
-        </div>
+          <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(2, 1fr)",
+        gap: 10,
+        marginBottom: 14,
+      }} role="group" aria-label={"Résumé de " + MOIS[0]}>
+        {[
+          { 
+            icon: matelasPct >= 100 ? "✓" : "◐",
+            val: matelasPct + " %",
+            lab: "Matelas",
+            tone: matelasPct >= 100 ? "green" : "ink" 
+          },
+          { 
+            icon: suiviDone === suivi.length ? "✓" : "◐",
+            val: suiviDone + " / " + suivi.length,
+            lab: "Suivi",
+            tone: suiviDone === suivi.length ? "green" : "ink" 
+          },
+          { 
+            icon: piecesDone === piecesAll.length ? "✓" : "◐",
+            val: piecesDone + " / " + piecesAll.length,
+            lab: "Pièces",
+            tone: piecesDone === piecesAll.length ? "green" : "ink" 
+          },
+          { 
+            icon: budget ? "€" : "—",
+            val: budget ? Math.round(sumKind(budget, 'charge')) + " €" : "—",
+            lab: "Charges",
+            tone: "ink" 
+          },
+        ].map((k, i) => (
+          <div key={i} className="card" style={{ textAlign: "center", padding: "14px 8px", margin: 0 }}>
+            <div style={{ fontSize: 20, lineHeight: 1, marginBottom: 6 }} aria-hidden="true">{k.icon}</div>
+            <div style={{
+              fontFamily: "Georgia,serif", fontWeight: 700, fontSize: "1.15rem",
+              fontVariantNumeric: "tabular-nums",
+              color: k.tone === "green" ? "var(--green)" : k.tone === "red" ? "var(--red)" : "var(--ink)"
+            }}>{k.val}</div>
+            <div style={{
+              fontSize: 11, color: "var(--slate)", textTransform: "uppercase",
+              letterSpacing: ".05em", marginTop: 4, fontWeight: 600
+            }}>{k.lab}</div>
+          </div>
+        ))}
       </div>
 
       <div className="h3">Chronologie de l'année</div>
