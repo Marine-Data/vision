@@ -17534,6 +17534,56 @@ function debounceSave(key, fn, ms = 800) {
     clearTimeout(visionTimers[key]), visionTimers[key] = setTimeout(fn, ms)
 }
 
+// mois_index (ancre) <-> mois calendaire. L'ancre reste définie une seule fois,
+// dans VISION_CONFIG : rien n'est recopié en base.
+function anneeMoisDe(i) {
+    const m = VISION_ANCRE.mois + gr(i);
+    return {
+        annee: VISION_ANCRE.annee + Math.floor(m / 12),
+        mois: ((m % 12) + 12) % 12
+    }
+}
+
+// Budget applicable à un mois. Lit d'abord vision_budget_mois ; à défaut, le
+// modèle vision_budget, en lecture seule (source "modele"). Jamais d'écriture
+// ici : l'initialisation se fait au démarrage, donc pas de course entre onglets.
+function budgetDuMois(bmRows, modele, moisIndex) {
+    const {
+        annee,
+        mois
+    } = anneeMoisDe(moisIndex), lignes = (bmRows || []).filter(x => x.annee === annee && x.mois === mois);
+    return lignes.length ? [...lignes].sort((a, b) => (a.sort || 0) - (b.sort || 0)).map(x => ({
+        id: x.id,
+        line_key: x.line_key,
+        kind: x.kind,
+        poste: x.poste,
+        detail: x.detail,
+        montant: x.montant,
+        sort: x.sort,
+        type: x.type,
+        budget_line_id: x.budget_line_id,
+        est_override: x.est_override,
+        source: "mois"
+    })) : (modele || []).map(b => ({
+        id: b.id,
+        line_key: b.line_key,
+        kind: b.kind,
+        poste: b.poste,
+        detail: b.detail,
+        montant: b.montant,
+        sort: b.sort,
+        type: b.type,
+        budget_line_id: b.id,
+        est_override: !1,
+        source: "modele"
+    }))
+}
+
+// Identifiant de rattachement aux dépenses : toujours celui du modèle.
+function ligneBudgetId(w) {
+    return w && (w.budget_line_id || w.id)
+}
+
 function contenuDe(rows, type) {
     return (rows || []).filter(x => x.type === type).sort((a, b) => (a.sort || 0) - (b.sort || 0))
 }
@@ -18342,6 +18392,8 @@ function Jv(t) {
         saveSpend: saveSpendFn,
         transactions: txAll,
         onEditTx: onEditTx,
+        budgetMois: bmAll,
+        setBudgetMois: setBmAll,
         addSaving: addSavingFn,
         saveSaving: saveSavingFn,
         delSaving: delSavingFn,
@@ -19359,9 +19411,10 @@ function Jv(t) {
                 })
             })]
         }), (() => {
-            const chargeLines = (e || []).filter(w => w.kind === "charge"),
+            const budgetMoisSel = budgetDuMois(bmAll, e, moisSel),
+                chargeLines = budgetMoisSel.filter(w => w.kind === "charge"),
                 spendFor = w => {
-                    const rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel);
+                    const rec = (spendAll || []).find(x => x.budget_line_id === ligneBudgetId(w) && x.mois_index === moisSel);
                     return rec ? gr(rec.montant) : null
                 },
                 totalBudget = chargeLines.reduce((s, w) => s + gr(w.montant), 0),
@@ -19381,7 +19434,7 @@ function Jv(t) {
                 chargeLines.forEach(w => {
                     const prev = gr(w.montant),
                         reel = spendFor(w),
-                        rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel);
+                        rec = (spendAll || []).find(x => x.budget_line_id === ligneBudgetId(w) && x.mois_index === moisSel);
                     l.push([w.poste, prev, reel == null ? "" : reel, reel == null ? "" : reel - prev, rec && rec.note ? rec.note : ""])
                 });
                 l.push([], ["Total", totalBudget, totalSpent, totalSpent - totalBudget, ""]);
@@ -19446,6 +19499,12 @@ function Jv(t) {
                                 }), " compare ce disponible à ce qui était prévu. Positif, tu n'as pas encore versé des provisions prévues : cet argent partira les mois suivants, ce ne sont pas des sous en plus. Négatif, tu as dépensé plus que prévu."]
                             })]
                         })]
+                    }), !v && h.jsx(BudgetMoisEditor, {
+                        moisIndex: moisSel,
+                        rows: bmAll,
+                        setRows: setBmAll,
+                        modele: e,
+                        verrouille: selClosed
                     }), h.jsx("button", {
                         className: "btn-outline btn-sm",
                         style: {
@@ -19455,7 +19514,7 @@ function Jv(t) {
                         children: "↓ Exporter ce mois (Excel)"
                     }), (() => {
                         const liste = (txAll || []).filter(t => gr(t.mois_index) === moisSel && gr(t.montant) > 0).sort((a, b) => (b.date_depense || "").localeCompare(a.date_depense || "")),
-                            posteDe = id => (chargeLines.find(w => w.id === id) || {}).poste || "—";
+                            posteDe = id => (chargeLines.find(w => ligneBudgetId(w) === id) || {}).poste || "—";
                         return h.jsxs("details", {
                             className: "collapsible",
                             style: {
@@ -19504,7 +19563,7 @@ function Jv(t) {
                     })(), chargeLines.map(w => {
                         const val = spendFor(w),
                             over = val != null && depasseCategorie(val, gr(w.montant)),
-                            rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel),
+                            rec = (spendAll || []).find(x => x.budget_line_id === ligneBudgetId(w) && x.mois_index === moisSel),
                             noteVal = rec ? rec.note : "";
                         return h.jsxs("div", {
                             style: {
@@ -19691,7 +19750,7 @@ function Jv(t) {
                                 children: [h.jsx("option", {
                                     value: "",
                                     children: "— aucune —"
-                                }), (e || []).filter(w => w.kind === "charge").map(w => h.jsx("option", {
+                                }), budgetDuMois(bmAll, e, moisSel).filter(w => w.kind === "charge").map(w => h.jsx("option", {
                                     value: w.id,
                                     children: w.poste + " (" + ot(gr(w.montant)) + ")"
                                 }, w.id))]
@@ -20647,12 +20706,14 @@ function $v({
 }
 
 function ek({
-    budget: t,
+    budget: modele,
     params: e,
     voyages: r,
     items: im,
-    spend: spAll
+    spend: spAll,
+    budgetMois: bmAll
 }) {
+    const t = modele ? budgetDuMois(bmAll, modele, moisNow()) : null;
     if (!t) return h.jsx("section", {
         className: "sec",
         children: h.jsx("p", {
@@ -20747,7 +20808,7 @@ function nk({
 }
 
 function sk() {
-    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]), [tx, stx] = re.useState([]), [saisieOuverte, setSaisieOuverte] = re.useState(!1), [txEdit, setTxEdit] = re.useState(null);
+    const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]), [tx, stx] = re.useState([]), [bm, sbm] = re.useState([]), [saisieOuverte, setSaisieOuverte] = re.useState(!1), [txEdit, setTxEdit] = re.useState(null);
     const ctRef = re.useRef([]);
     ctRef.current = ct;
     re.useEffect(() => {
@@ -20846,6 +20907,22 @@ function sk() {
                 ascending: !1
             }).limit(30);
             saud(K || [])
+        })(), (async () => {
+            // Initialise les 12 prochains mois une fois pour toutes, puis relit.
+            const base = moisNow();
+            for (let q = 0; q < 12; q++) {
+                const am = anneeMoisDe(base + q);
+                try {
+                    await J.rpc("vision_budget_mois_init", {
+                        p_annee: am.annee,
+                        p_mois: am.mois
+                    })
+                } catch (E) {}
+            }
+            const {
+                data: K
+            } = await J.from("vision_budget_mois").select("*").order("annee").order("mois").order("sort");
+            sbm(K || [])
         })(), (async () => {
             const {
                 data: K
@@ -21164,6 +21241,8 @@ function sk() {
             spend: sp,
             transactions: tx,
             onEditTx: setTxEdit,
+            budgetMois: bm,
+            setBudgetMois: sbm,
             savings: sv,
             ...at ? {
                 readOnly: !0,
@@ -21284,7 +21363,8 @@ function sk() {
                 params: c,
                 voyages: p,
                 items: vi,
-                spend: sp
+                spend: sp,
+                budgetMois: bm
             })), s === "sport" && h.jsx(Zv, {
                 rows: ct
             }), s === "pieces" && h.jsx(Yv, {
@@ -21312,6 +21392,7 @@ function sk() {
             children: "+"
         }), (saisieOuverte || txEdit) && h.jsx(SaisieRapide, {
             budget: l,
+            budgetMois: bm,
             transactions: tx,
             onAdd: txAdd,
             onUpdate: txUpdate,
@@ -21364,8 +21445,181 @@ function isoAujourdhui() {
 
 // Panneau de saisie rapide. Sert aussi bien à créer une dépense qu'à corriger
 // une dépense existante : dans ce cas `initial` est la transaction à modifier.
+// Éditeur du budget d'un mois donné. N'écrit jamais dans vision_budget :
+// le modèle reste la référence qu'on copie pour initialiser un mois.
+function BudgetMoisEditor({
+    moisIndex,
+    rows,
+    setRows,
+    modele,
+    verrouille
+}) {
+    const {
+        annee,
+        mois
+    } = anneeMoisDe(moisIndex),
+    lignes = (rows || []).filter(x => x.annee === annee && x.mois === mois).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
+        [etat, setEtat] = re.useState(""),
+        modeleDe = l => (modele || []).find(b => b.line_key === l.line_key);
+
+    function maj(id, patch) {
+        setRows(p => p.map(x => x.id === id ? {
+            ...x,
+            ...patch
+        } : x)), debounceSave("bm:" + id, async () => {
+            setEtat("Enregistrement…");
+            const {
+                error: E
+            } = await J.from("vision_budget_mois").update({
+                ...patch,
+                updated_at: new Date().toISOString()
+            }).eq("id", id);
+            setEtat(E ? "Échec : " + E.message : "✓ Enregistré"), setTimeout(() => setEtat(p => p.startsWith("✓") ? "" : p), 2500)
+        }, 500)
+    }
+
+    async function initialiser() {
+        setEtat("Initialisation…");
+        const {
+            error: E
+        } = await J.rpc("vision_budget_mois_init", {
+            p_annee: annee,
+            p_mois: mois
+        });
+        if (E) {
+            setEtat("Échec : " + E.message);
+            return
+        }
+        const {
+            data: K
+        } = await J.from("vision_budget_mois").select("*").order("annee").order("mois").order("sort");
+        setRows(K || []), setEtat("✓ Mois initialisé"), setTimeout(() => setEtat(""), 2500)
+    }
+
+    async function reinitialiser(l) {
+        const m = modeleDe(l);
+        if (!m) return;
+        maj(l.id, {
+            montant: m.montant,
+            poste: m.poste,
+            est_override: !1
+        })
+    }
+
+    async function ajouterPonctuelle() {
+        const {
+            data: u2
+        } = await J.auth.getUser(), uid = u2 && u2.user ? u2.user.id : null,
+            ligne = {
+                user_id: uid,
+                annee,
+                mois,
+                budget_line_id: null,
+                line_key: "ponctuel-" + Date.now(),
+                kind: "charge",
+                poste: "",
+                montant: 0,
+                sort: (lignes.length ? Math.max(...lignes.map(x => x.sort || 0)) : 0) + 1,
+                est_override: !0
+            },
+            {
+                data: K,
+                error: E
+            } = await J.from("vision_budget_mois").insert(ligne).select().single();
+        E ? setEtat("Échec : " + E.message) : setRows(p => [...p, K])
+    }
+
+    async function supprimer(id) {
+        if (!window.confirm("Supprimer cette ligne du mois ?")) return;
+        const {
+            error: E
+        } = await J.from("vision_budget_mois").delete().eq("id", id);
+        E ? setEtat("Échec : " + E.message) : setRows(p => p.filter(x => x.id !== id))
+    }
+
+    return h.jsxs("details", {
+        className: "collapsible",
+        style: {
+            marginBottom: 12
+        },
+        children: [h.jsx("summary", {
+            children: "Ajuster le budget de " + ve[moisIndex]
+        }), h.jsxs("div", {
+            className: "inner",
+            children: [verrouille && h.jsx("div", {
+                className: "bwarn",
+                children: "🔒 Mois clôturé — le budget ne peut plus être ajusté. Tu peux toujours saisir une dépense oubliée : ce sont deux choses différentes."
+            }), !lignes.length ? h.jsxs("div", {
+                children: [h.jsx("p", {
+                    className: "detail",
+                    children: "Ce mois utilise le modèle général. Initialise-le pour pouvoir ajuster une ligne sans toucher aux autres mois."
+                }), !verrouille && h.jsx("button", {
+                    className: "btn-outline btn-sm",
+                    onClick: initialiser,
+                    children: "Initialiser ce mois"
+                })]
+            }) : h.jsxs("div", {
+                children: [h.jsx("p", {
+                    className: "detail",
+                    children: "Ces montants ne valent que pour ce mois. Le modèle général n'est pas modifié."
+                }), lignes.map(l => h.jsxs("div", {
+                    className: "brow",
+                    children: [h.jsxs("div", {
+                        className: "bcol",
+                        children: [h.jsx("input", {
+                            className: "bedit lbl",
+                            value: l.poste || "",
+                            placeholder: "Poste",
+                            disabled: verrouille,
+                            onChange: g => maj(l.id, {
+                                poste: g.target.value,
+                                est_override: !0
+                            })
+                        }), h.jsxs("div", {
+                            className: "bdet",
+                            children: [l.kind, l.est_override ? " · " : "", l.est_override && h.jsx("span", {
+                                className: "chip",
+                                children: "ajusté"
+                            })]
+                        })]
+                    }), h.jsx("input", {
+                        className: "bedit bnum",
+                        inputMode: "decimal",
+                        value: l.montant,
+                        disabled: verrouille,
+                        "aria-label": "Montant pour " + l.poste,
+                        onChange: g => maj(l.id, {
+                            montant: Number(String(g.target.value).replace(",", ".")) || 0,
+                            est_override: !0
+                        })
+                    }), !verrouille && l.est_override && modeleDe(l) && h.jsx("button", {
+                        className: "bdel",
+                        title: "Revenir au modèle",
+                        "aria-label": "Réinitialiser " + l.poste,
+                        onClick: () => reinitialiser(l),
+                        children: "↺"
+                    }), !verrouille && !l.budget_line_id && h.jsx("button", {
+                        className: "bdel",
+                        "aria-label": "Supprimer " + l.poste,
+                        onClick: () => supprimer(l.id),
+                        children: "×"
+                    })]
+                }, l.id)), !verrouille && h.jsx("button", {
+                    className: "badd",
+                    onClick: ajouterPonctuelle,
+                    children: "+ Ajouter une ligne ponctuelle"
+                })]
+            }), etat && h.jsx("div", {
+                className: etat.startsWith("Échec") ? "txfail" : "bok",
+                children: etat
+            })]
+        })]
+    })
+}
+
 function SaisieRapide({
     budget,
+    budgetMois,
     transactions,
     onAdd,
     onUpdate,
@@ -21374,7 +21628,10 @@ function SaisieRapide({
     initial
 }) {
     const edition = !!initial,
-        categories = (budget || []).filter(w => w.kind === "charge"),
+        categories = budgetDuMois(budgetMois, budget, moisNow()).filter(w => w.kind === "charge").map(w => ({
+            ...w,
+            id: ligneBudgetId(w)
+        })),
         [montant, setMontant] = re.useState(edition ? String(initial.montant) : ""),
         [ligneId, setLigneId] = re.useState(edition ? initial.budget_line_id : null),
         [note, setNote] = re.useState(edition && initial.note ? initial.note : ""),
