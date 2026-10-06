@@ -17512,6 +17512,28 @@ function contenuDefauts(uid) {
     return out
 }
 
+// Sauvegarde différée : on attend que la frappe s'arrête avant d'écrire en base,
+// au lieu d'attendre que l'utilisateur sorte du champ.
+const visionTimers = {};
+
+// Export du suivi mensuel : fichier CSV séparé par points-virgules, encodé avec
+// un BOM pour qu'Excel ouvre correctement les accents et les colonnes.
+function exportMoisCSV(nomMois, lignes) {
+    const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"',
+        corps = lignes.map(l => l.map(esc).join(";")).join("\r\n"),
+        blob = new Blob(["\ufeff" + corps], {
+            type: "text/csv;charset=utf-8;"
+        }),
+        url = URL.createObjectURL(blob),
+        a = document.createElement("a");
+    a.href = url, a.download = "vision-budget-" + String(nomMois).replace(/[^A-Za-z0-9]+/g, "-").toLowerCase() + ".csv",
+        document.body.appendChild(a), a.click(), document.body.removeChild(a), setTimeout(() => URL.revokeObjectURL(url), 1e3)
+}
+
+function debounceSave(key, fn, ms = 800) {
+    clearTimeout(visionTimers[key]), visionTimers[key] = setTimeout(fn, ms)
+}
+
 function contenuDe(rows, type) {
     return (rows || []).filter(x => x.type === type).sort((a, b) => (a.sort || 0) - (b.sort || 0))
 }
@@ -17799,6 +17821,9 @@ function Dv({
                 onClick: () => setMode(!mode),
                 children: mode ? "✓ Terminer" : "✎ Modifier l'emploi du temps"
             })
+        }), mode && h.jsx("div", {
+            className: "editable-hint",
+            children: "Champs sur fond gris : clique pour corriger. L'enregistrement est automatique."
         }), mode ? h.jsxs("div", {
             children: [h.jsx("div", {
                 className: "h3",
@@ -18057,6 +18082,9 @@ function Bv({
                 onClick: () => setMode(!mode),
                 children: mode ? "✓ Terminer" : "✎ Modifier les étapes"
             })
+        }), mode && h.jsx("div", {
+            className: "editable-hint",
+            children: "Champs sur fond gris : clique pour corriger. L'enregistrement est automatique."
         }), mode ? h.jsxs("div", {
             className: "card",
             children: [list.map(o => h.jsxs("div", {
@@ -18330,9 +18358,13 @@ function Jv(t) {
     // re-rendu (annulation, changement de mois) ils se refermaient tout seuls.
     // On mémorise ici quels mois sont ouverts pour que ça ne bouge plus.
     const [moisOuverts, setMoisOuverts] = re.useState({}),
-        [msgSave, setMsgSave] = re.useState("");
-    const flashSave = (txt = "Enregistré ✓") => {
-        setMsgSave(txt), setTimeout(() => setMsgSave(""), 2000)
+        [etatSave, setEtatSave] = re.useState("");
+    const flashSave = (txt = "Enregistré") => {
+        setEtatSave(txt), setTimeout(() => setEtatSave(p => p === txt ? "" : p), 2500)
+    };
+    // Modifie à l'écran tout de suite, enregistre 800 ms après la dernière frappe.
+    const eiAuto = (id, patch, savePatch) => {
+        ei(id, patch), setEtatSave("Modification en cours…"), debounceSave("item:" + id, () => si(id, savePatch || patch).then(() => flashSave()))
     };
     if (!e) return h.jsxs("section", {
         className: "sec",
@@ -18565,21 +18597,18 @@ function Jv(t) {
                                 marginBottom: 6
                             },
                         children: "Détail par mois"
-                        }), msgSave && h.jsx("div", {
-                        style: {
-                            position: "sticky",
-                            top: 4,
-                            zIndex: 5,
-                            background: "var(--green, #12a07a)",
-                            color: "#fff",
-                            borderRadius: 8,
-                            padding: "6px 10px",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            marginBottom: 8,
-                            textAlign: "center"
-                        },
-                        children: msgSave
+                        }), h.jsx("div", {
+                        className: "savebar",
+                        children: h.jsx("span", {
+                            className: "savetag " + (etatSave === "Enregistré" ? "on" : etatSave ? "wait" : ""),
+                            style: etatSave ? {} : {
+                                visibility: "hidden"
+                            },
+                            children: etatSave === "Enregistré" ? "✓ Enregistré" : etatSave || "—"
+                        })
+                        }), h.jsx("div", {
+                        className: "editable-hint",
+                        children: "Les champs sur fond gris sont modifiables : clique dessus pour corriger un libellé ou un montant. Tout s'enregistre automatiquement."
                         }), months.map(mi => {
                             const its = byMonth[mi],
                                 total = its.reduce((s, x) => s + (x.paid ? (x.montant_reel ?? x.montant_prevu) : x.montant_prevu), 0);
@@ -18618,7 +18647,7 @@ function Jv(t) {
                                         children: [h.jsx("input", {
                                             "aria-label": "Libellé",
                                             value: it.label,
-                                            onChange: g => ei(it.id, {
+                                            onChange: g => eiAuto(it.id, {
                                                 label: g.target.value
                                             }),
                                             onBlur: g => siFlash(it.id, {
@@ -18668,8 +18697,10 @@ function Jv(t) {
                                                 "aria-label": "Montant prévu",
                                                 inputMode: "decimal",
                                                 value: it.montant_prevu,
-                                                onChange: g => ei(it.id, {
+                                                onChange: g => eiAuto(it.id, {
                                                     montant_prevu: g.target.value
+                                                }, {
+                                                    montant_prevu: Number(g.target.value) || 0
                                                 }),
                                                 onBlur: g => siFlash(it.id, {
                                                     montant_prevu: Number(g.target.value) || 0
@@ -18711,8 +18742,10 @@ function Jv(t) {
                                                 "aria-label": "Montant réel",
                                                 inputMode: "decimal",
                                                 value: it.montant_reel ?? "",
-                                                onChange: g => ei(it.id, {
+                                                onChange: g => eiAuto(it.id, {
                                                     montant_reel: g.target.value
+                                                }, {
+                                                    montant_reel: Number(g.target.value) || 0
                                                 }),
                                                 onBlur: g => siFlash(it.id, {
                                                     montant_reel: Number(g.target.value) || 0
@@ -19335,6 +19368,33 @@ function Jv(t) {
                     return s + (val2 != null ? val2 : 0)
                 }, 0),
                 anySpent = chargeLines.some(w => spendFor(w) != null);
+            const exporter = () => {
+                const l = [
+                    ["Vision — suivi budget"],
+                    ["Mois", ve[moisSel]],
+                    ["Exporté le", new Date().toLocaleDateString(VISION_CONFIG.locale)],
+                    [],
+                    ["Poste", "Prévisionnel (€)", "Réalisé (€)", "Écart (€)", "Détail"]
+                ];
+                chargeLines.forEach(w => {
+                    const prev = gr(w.montant),
+                        reel = spendFor(w),
+                        rec = (spendAll || []).find(x => x.budget_line_id === w.id && x.mois_index === moisSel);
+                    l.push([w.poste, prev, reel == null ? "" : reel, reel == null ? "" : reel - prev, rec && rec.note ? rec.note : ""])
+                });
+                l.push([], ["Total", totalBudget, totalSpent, totalSpent - totalBudget, ""]);
+                l.push([], ["Provisions du mois", "Prévu (€)", "Réel (€)", "Solde (€)", ""]);
+                [
+                    ["Vacances", vac],
+                    ["Formation", form],
+                    ["Sport", sport]
+                ].forEach(([nom, p]) => l.push([nom, gr(p.prevu[moisSel]), gr(p.reel[moisSel]), gr(p.solde[moisSel]), ""]));
+                const ecartM = rawReel[moisSel] == null ? null : reelDisponible(rawReel, vac, form, sport, moisSel) - planDisponible(plan, vac, form, sport, moisSel);
+                l.push([], ["Épargne — plan disponible", gr(planDisponible(plan, vac, form, sport, moisSel))]);
+                l.push(["Épargne — réel disponible", rawReel[moisSel] == null ? "" : gr(reelDisponible(rawReel, vac, form, sport, moisSel))]);
+                l.push(["Écart", ecartM == null ? "" : Math.round(ecartM)]);
+                exportMoisCSV(ve[moisSel], l)
+            };
             return h.jsxs("details", {
                 className: "collapsible",
                 open: !0,
@@ -19347,7 +19407,50 @@ function Jv(t) {
                         style: {
                             marginTop: 0
                         },
-                        children: "Renseigne ce que tu as vraiment dépensé ce mois-ci dans chaque catégorie, pour voir où tu en es par rapport au budget. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets. L'écart épargne = solde livrets réel − plan prévu, APRÈS déduction des provisions (formation, sport, vacances réservées). Un écart positif n'est pas des sous en plus : c'est juste de l'argent réservé à dépenser les mois suivants."
+                        children: "Renseigne ce que tu as vraiment dépensé ce mois-ci dans chaque catégorie, pour voir où tu en es par rapport au budget. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets."
+                    }), h.jsxs("details", {
+                        className: "collapsible",
+                        style: {
+                            marginBottom: 10
+                        },
+                        children: [h.jsx("summary", {
+                            children: "Comprendre poches, provisions et écart"
+                        }), h.jsxs("div", {
+                            className: "inner",
+                            style: {
+                                fontSize: 13.5
+                            },
+                            children: [h.jsxs("p", {
+                                style: {
+                                    marginTop: 0
+                                },
+                                children: [h.jsx("b", {
+                                    children: "Une poche"
+                                }), " est une enveloppe d'épargne dédiée à un usage : vacances, formation, sport. L'argent est sur tes livrets, mais il est déjà promis à autre chose."]
+                            }), h.jsxs("p", {
+                                children: [h.jsx("b", {
+                                    children: "Une provision"
+                                }), " est ce que tu mets de côté chaque mois dans une poche, avant de dépenser. Exemple : 375 € par mois pour les vacances."]
+                            }), h.jsxs("p", {
+                                children: [h.jsx("b", {
+                                    children: "L'épargne disponible"
+                                }), " est ce qui reste quand on retire toutes les poches du solde des livrets. C'est ton vrai matelas, celui sur lequel tu peux compter."]
+                            }), h.jsxs("p", {
+                                style: {
+                                    marginBottom: 0
+                                },
+                                children: [h.jsx("b", {
+                                    children: "L'écart"
+                                }), " compare ce disponible à ce qui était prévu. Positif, tu n'as pas encore versé des provisions prévues : cet argent partira les mois suivants, ce ne sont pas des sous en plus. Négatif, tu as dépensé plus que prévu."]
+                            })]
+                        })]
+                    }), h.jsx("button", {
+                        className: "btn-outline btn-sm",
+                        style: {
+                            marginBottom: 12
+                        },
+                        onClick: exporter,
+                        children: "↓ Exporter ce mois (Excel)"
                     }), chargeLines.map(w => {
                         const val = spendFor(w),
                             over = val != null && depasseCategorie(val, gr(w.montant)),
@@ -19802,6 +19905,9 @@ function Yv({
                 onClick: () => setMode(!mode),
                 children: mode ? "✓ Terminer" : "✎ Modifier les pièces"
             })
+        }), mode && h.jsx("div", {
+            className: "editable-hint",
+            children: "Champs sur fond gris : clique pour corriger. L'enregistrement est automatique."
         }), mode ? h.jsxs("div", {
             className: "card",
             children: [n.map(o => h.jsxs("div", {
@@ -20724,7 +20830,7 @@ function sk() {
         sct(p => p.map(x => x.id === id ? {
             ...x,
             ...patch
-        } : x))
+        } : x)), debounceSave("ct:" + id, () => ctSave(id))
     }
     async function ctSave(id) {
         const row = ctRef.current.find(x => x.id === id);
@@ -21553,7 +21659,7 @@ class ik extends ai.Component {
     }
 }
 tf(document.getElementById("root")).render(ai.createElement(ik, null, ai.createElement(sk)));</script>
-    <style rel="stylesheet" crossorigin>:root{--paper:#eaf5f6;--surface:#ffffff;--ink:#0e3a42;--slate:#5a787e;--oxblood:#0e9fb2;--green:#12a07a;--amber:#e0794a;--line:#d7e7e8;--alert:#dd5f43}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0}body{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,system-ui,sans-serif;font-size:15px;line-height:1.5;padding-bottom:calc(70px + env(safe-area-inset-bottom))}a{color:var(--oxblood)}h1,h2,h3{font-family:Georgia,Times New Roman,serif;font-weight:600;line-height:1.2}.wrap{max-width:720px;margin:0 auto;padding:0 16px}.top{background:var(--ink);color:#fff;padding:22px 0 18px}.top .kick{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.85}.top h1{margin:6px 0 0;font-size:1.5rem;color:#fff}.top .who{font-size:12px;opacity:.85;margin-top:4px}.logout{position:absolute;top:16px;right:16px;background:#ffffff26;color:#fff;border:0;border-radius:8px;padding:7px 11px;font-size:12px}.top .wrap{position:relative}.sec{padding:20px 0 8px}.sec h2{font-size:1.28rem;margin:0 0 4px;color:var(--oxblood)}.sub{color:var(--slate);font-size:13.5px;margin:0 0 14px}.h3{font-family:Georgia,serif;font-weight:600;font-size:1.05rem;margin:22px 0 8px}.btn-outline{width:auto;padding:9px 14px;border-radius:12px;border:1.5px solid var(--oxblood);background:#fff;color:var(--oxblood);font-size:13px;font-weight:600;transition:background .12s ease}.btn-outline:active{background:var(--paper)}.btn-sm{padding:8px 12px;font-size:12.5px;border-radius:10px}.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(14,58,66,.07),0 1px 2px rgba(14,58,66,.05)}.tl{border-left:2px solid var(--oxblood);padding:2px 0 10px 14px;margin-left:4px;position:relative}.tl .when{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--oxblood);font-weight:700}.tl .what{font-weight:600;margin-top:2px}.tl .det{color:var(--slate);font-size:13px;margin-top:2px}.tbl{width:100%;border-collapse:collapse;font-size:13.5px}.tbl th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--slate);font-weight:700;padding:8px;border-bottom:1px solid var(--line)}.tbl td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}.tbl tr:last-child td{border-bottom:0}.tbl .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}.tbl .total td{font-weight:700;background:#0e9fb20d}.pos{color:var(--green)}.low{color:var(--alert);font-weight:700}.ok{color:var(--green);font-weight:700}.note{font-size:12.5px;color:var(--slate);background:#00000005;border-left:3px solid var(--line);padding:9px 11px;border-radius:0 8px 8px 0;margin:10px 0}.note.red{border-left-color:var(--alert)}.detail{color:var(--slate);font-size:12px}.check{display:flex;gap:11px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--line)}.check:last-child{border-bottom:0}.check input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--oxblood);flex:0 0 auto}.check .lbl{flex:1}.check .lbl b{display:block}.check .meta{color:var(--slate);font-size:12px;margin-top:2px}.check.done .lbl b{text-decoration:line-through;color:var(--slate)}.chip{display:inline-block;font-size:11px;padding:3px 8px;border-radius:6px;margin:3px 6px 0 0;background:#0e9fb21a;color:var(--oxblood);font-weight:600}.chip.free{background:#12a07a1f;color:var(--green)}.di{display:inline-flex;width:38px;height:38px;border-radius:9px;background:var(--oxblood);color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;flex:0 0 auto}.prog{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:2px 0 14px}.prog>i{display:block;height:100%;background:var(--green);transition:width .3s}.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;overflow-x:auto;padding-bottom:env(safe-area-inset-bottom);z-index:20}.nav button{flex:1 0 auto;background:none;border:0;padding:10px 12px 12px;font-size:11px;color:var(--slate);white-space:nowrap;font-weight:600}.nav button.on{color:var(--oxblood);border-top:2px solid var(--oxblood);margin-top:-1px}.auth{text-align:center}.auth h1{color:var(--oxblood);font-size:1.6rem}.auth p{color:var(--slate);font-size:14px}.auth input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin:14px 0;background:#fff}.btn{width:100%;padding:13px;border:0;border-radius:14px;background:var(--oxblood);color:#fff;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(14,159,178,.35);transition:transform .12s ease,box-shadow .12s ease}.btn:active{transform:scale(0.98);box-shadow:0 1px 4px rgba(14,159,178,.3)}.btn:disabled{opacity:.5}.warn{background:#fff3cd;border:1px solid #ffe08a;color:#7a5b00;padding:12px 14px;border-radius:12px;font-size:13px;margin:16px}.brow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.brow:last-of-type{border-bottom:0}.bcol{flex:1;min-width:0}.bedit{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px;background:#fff;color:var(--ink)}.bedit.lbl{font-weight:600;border-color:transparent;background:transparent;padding:6px 2px}.bedit.lbl:focus{border-color:var(--line);background:#fff}.bnum{width:96px;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}.bdet{font-size:11.5px;color:var(--slate);margin:2px 2px 0}.bdel{flex:0 0 auto;background:none;border:0;color:#b98;font-size:20px;line-height:1;padding:4px 6px}.badd{width:100%;background:none;border:1px dashed var(--line);border-radius:9px;padding:9px;color:var(--oxblood);font-weight:600;font-size:13px;margin-top:8px}.btot{display:flex;justify-content:space-between;align-items:baseline;padding:9px 2px;font-weight:700;border-top:2px solid var(--line);margin-top:4px}.btot.big{font-size:1.05rem}.bgrouplab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:16px 0 4px}.bwarn{background:#dd5f4314;border:1px solid rgba(221,95,67,.28);color:var(--alert);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bok{background:#12a07a1a;border:1px solid rgba(18,160,122,.25);color:var(--green);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bsel{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px;background:#fff;color:var(--ink);max-width:130px}.hyp{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}.hyp:last-child{border-bottom:0}.hyp .lbl{flex:1;font-size:13.5px}</style>
+    <style rel="stylesheet" crossorigin>:root{--paper:#eaf5f6;--surface:#ffffff;--ink:#0e3a42;--slate:#5a787e;--oxblood:#0e9fb2;--green:#12a07a;--amber:#e0794a;--line:#d7e7e8;--alert:#dd5f43}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0}body{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,system-ui,sans-serif;font-size:15px;line-height:1.5;padding-bottom:calc(70px + env(safe-area-inset-bottom))}a{color:var(--oxblood)}h1,h2,h3{font-family:Georgia,Times New Roman,serif;font-weight:600;line-height:1.2}.wrap{max-width:720px;margin:0 auto;padding:0 16px}.top{background:var(--ink);color:#fff;padding:22px 0 18px}.top .kick{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.85}.top h1{margin:6px 0 0;font-size:1.5rem;color:#fff}.top .who{font-size:12px;opacity:.85;margin-top:4px}.logout{position:absolute;top:16px;right:16px;background:#ffffff26;color:#fff;border:0;border-radius:8px;padding:7px 11px;font-size:12px}.top .wrap{position:relative}.sec{padding:20px 0 8px}.sec h2{font-size:1.28rem;margin:0 0 4px;color:var(--oxblood)}.sub{color:var(--slate);font-size:13.5px;margin:0 0 14px}.h3{font-family:Georgia,serif;font-weight:600;font-size:1.05rem;margin:22px 0 8px}.btn-outline{width:auto;padding:9px 14px;border-radius:12px;border:1.5px solid var(--oxblood);background:#fff;color:var(--oxblood);font-size:13px;font-weight:600;transition:background .12s ease}.btn-outline:active{background:var(--paper)}.btn-sm{padding:8px 12px;font-size:12.5px;border-radius:10px}.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(14,58,66,.07),0 1px 2px rgba(14,58,66,.05)}.tl{border-left:2px solid var(--oxblood);padding:2px 0 10px 14px;margin-left:4px;position:relative}.tl .when{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--oxblood);font-weight:700}.tl .what{font-weight:600;margin-top:2px}.tl .det{color:var(--slate);font-size:13px;margin-top:2px}.tbl{width:100%;border-collapse:collapse;font-size:13.5px}.tbl th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--slate);font-weight:700;padding:8px;border-bottom:1px solid var(--line)}.tbl td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}.tbl tr:last-child td{border-bottom:0}.tbl .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}.tbl .total td{font-weight:700;background:#0e9fb20d}.pos{color:var(--green)}.low{color:var(--alert);font-weight:700}.ok{color:var(--green);font-weight:700}.note{font-size:12.5px;color:var(--slate);background:#00000005;border-left:3px solid var(--line);padding:9px 11px;border-radius:0 8px 8px 0;margin:10px 0}.note.red{border-left-color:var(--alert)}.detail{color:var(--slate);font-size:12px}.check{display:flex;gap:11px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--line)}.check:last-child{border-bottom:0}.check input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--oxblood);flex:0 0 auto}.check .lbl{flex:1}.check .lbl b{display:block}.check .meta{color:var(--slate);font-size:12px;margin-top:2px}.check.done .lbl b{text-decoration:line-through;color:var(--slate)}.chip{display:inline-block;font-size:11px;padding:3px 8px;border-radius:6px;margin:3px 6px 0 0;background:#0e9fb21a;color:var(--oxblood);font-weight:600}.chip.free{background:#12a07a1f;color:var(--green)}.di{display:inline-flex;width:38px;height:38px;border-radius:9px;background:var(--oxblood);color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;flex:0 0 auto}.prog{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:2px 0 14px}.prog>i{display:block;height:100%;background:var(--green);transition:width .3s}.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;overflow-x:auto;padding-bottom:env(safe-area-inset-bottom);z-index:20}.nav button{flex:1 0 auto;background:none;border:0;padding:10px 12px 12px;font-size:11px;color:var(--slate);white-space:nowrap;font-weight:600}.nav button.on{color:var(--oxblood);border-top:2px solid var(--oxblood);margin-top:-1px}.auth{text-align:center}.auth h1{color:var(--oxblood);font-size:1.6rem}.auth p{color:var(--slate);font-size:14px}.auth input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin:14px 0;background:#fff}.btn{width:100%;padding:13px;border:0;border-radius:14px;background:var(--oxblood);color:#fff;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(14,159,178,.35);transition:transform .12s ease,box-shadow .12s ease}.btn:active{transform:scale(0.98);box-shadow:0 1px 4px rgba(14,159,178,.3)}.btn:disabled{opacity:.5}.warn{background:#fff3cd;border:1px solid #ffe08a;color:#7a5b00;padding:12px 14px;border-radius:12px;font-size:13px;margin:16px}.brow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.brow:last-of-type{border-bottom:0}.bcol{flex:1;min-width:0}.bedit{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px;background:#f4f8f9;color:var(--ink);transition:background .12s ease,border-color .12s ease}.bedit:hover{background:#eef5f6;border-color:#bcd9dc}.bedit:focus{background:#fff;border-color:var(--oxblood);outline:0;box-shadow:0 0 0 3px rgba(14,159,178,.15)}.bedit::placeholder{color:#9bb4b8}.bedit.lbl{font-weight:600;background:#f4f8f9;border-color:var(--line);padding:8px}.bedit.lbl:focus{border-color:var(--oxblood);background:#fff}.bnum{background:#f4f8f9}.bsel{background:#f4f8f9}.bsel:focus{background:#fff;border-color:var(--oxblood);outline:0}.editable-hint{font-size:12px;color:var(--slate);background:#0e9fb20d;border:1px dashed #9ed3da;border-radius:9px;padding:8px 11px;margin:0 0 10px}.savetag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:99px;padding:4px 11px}.savetag.on{background:#12a07a1a;color:var(--green)}.savetag.wait{background:#e0794a1a;color:var(--amber)}.savebar{position:sticky;top:0;z-index:6;display:flex;justify-content:flex-end;padding:6px 0;background:linear-gradient(var(--paper),var(--paper) 70%,transparent)}.bnum{width:96px;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}.bdet{font-size:11.5px;color:var(--slate);margin:2px 2px 0}.bdel{flex:0 0 auto;background:none;border:0;color:#b98;font-size:20px;line-height:1;padding:4px 6px}.badd{width:100%;background:none;border:1px dashed var(--line);border-radius:9px;padding:9px;color:var(--oxblood);font-weight:600;font-size:13px;margin-top:8px}.btot{display:flex;justify-content:space-between;align-items:baseline;padding:9px 2px;font-weight:700;border-top:2px solid var(--line);margin-top:4px}.btot.big{font-size:1.05rem}.bgrouplab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:16px 0 4px}.bwarn{background:#dd5f4314;border:1px solid rgba(221,95,67,.28);color:var(--alert);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bok{background:#12a07a1a;border:1px solid rgba(18,160,122,.25);color:var(--green);border-radius:10px;padding:11px 13px;font-size:13px;margin:12px 0}.bsel{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px;background:#fff;color:var(--ink);max-width:130px}.hyp{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}.hyp:last-child{border-bottom:0}.hyp .lbl{flex:1;font-size:13.5px}</style>
   </head>
   <body>
     <div id="root"></div>
