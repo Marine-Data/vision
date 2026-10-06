@@ -20913,11 +20913,16 @@ function sk() {
             for (let q = 0; q < 12; q++) {
                 const am = anneeMoisDe(base + q);
                 try {
-                    await J.rpc("vision_budget_mois_init", {
+                    const {
+                        error: E
+                    } = await J.rpc("vision_budget_mois_init", {
                         p_annee: am.annee,
                         p_mois: am.mois
-                    })
-                } catch (E) {}
+                    });
+                    E && console.warn("vision_budget_mois_init " + am.annee + "/" + (am.mois + 1) + " :", E.message)
+                } catch (E) {
+                    console.warn("vision_budget_mois_init " + am.annee + "/" + (am.mois + 1) + " :", E && E.message)
+                }
             }
             const {
                 data: K
@@ -21460,13 +21465,15 @@ function BudgetMoisEditor({
     } = anneeMoisDe(moisIndex),
     lignes = (rows || []).filter(x => x.annee === annee && x.mois === mois).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
         [etat, setEtat] = re.useState(""),
-        modeleDe = l => (modele || []).find(b => b.line_key === l.line_key);
+        modeleDe = l => (modele || []).find(b => l.budget_line_id ? b.id === l.budget_line_id : b.line_key === l.line_key);
 
     function maj(id, patch) {
+        if (verrouille) return;
         setRows(p => p.map(x => x.id === id ? {
             ...x,
             ...patch
         } : x)), debounceSave("bm:" + id, async () => {
+            if (verrouille) return;
             setEtat("Enregistrement…");
             const {
                 error: E
@@ -21552,7 +21559,7 @@ function BudgetMoisEditor({
             }), !lignes.length ? h.jsxs("div", {
                 children: [h.jsx("p", {
                     className: "detail",
-                    children: "Ce mois utilise le modèle général. Initialise-le pour pouvoir ajuster une ligne sans toucher aux autres mois."
+                    children: verrouille ? "Ce mois est clôturé et n'a jamais été ajusté : il garde le modèle général, figé. C'est cohérent avec la clôture." : "Ce mois utilise le modèle général. Initialise-le pour pouvoir ajuster une ligne sans toucher aux autres mois."
                 }), !verrouille && h.jsx("button", {
                     className: "btn-outline btn-sm",
                     onClick: initialiser,
@@ -21628,9 +21635,9 @@ function SaisieRapide({
     initial
 }) {
     const edition = !!initial,
-        categories = budgetDuMois(budgetMois, budget, moisNow()).filter(w => w.kind === "charge").map(w => ({
+        categories = budgetDuMois(budgetMois, budget, moisNow()).filter(w => w.kind === "charge" && w.budget_line_id).map(w => ({
             ...w,
-            id: ligneBudgetId(w)
+            id: w.budget_line_id
         })),
         [montant, setMontant] = re.useState(edition ? String(initial.montant) : ""),
         [ligneId, setLigneId] = re.useState(edition ? initial.budget_line_id : null),
