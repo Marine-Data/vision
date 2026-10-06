@@ -17360,7 +17360,7 @@ function Hv(t) {
 
 function Iv(t = 3, rows) {
     // Prochaines échéances : lues dans vision_contenu (type chrono), plus en dur.
-    return contenuDe(rows, "chrono").filter(e => e.date_iso).map(e => ({
+    return chronoTriee(rows).filter(e => e.date_iso).map(e => ({
         date: e.date_iso,
         titre: e.titre,
         detail: e.detail,
@@ -17611,6 +17611,13 @@ function contenuDe(rows, type) {
     return (rows || []).filter(x => x.type === type).sort((a, b) => (a.sort || 0) - (b.sort || 0))
 }
 
+// La chronologie se lit dans l'ordre du temps, pas dans l'ordre de saisie :
+// un jalon ajouté après coup avec une date ancienne doit se replacer tout seul.
+// Les jalons sans date restent à la fin, dans leur ordre d'origine.
+function chronoTriee(rows) {
+    return contenuDe(rows, "chrono").sort((a, b) => a.date_iso && b.date_iso ? a.date_iso.localeCompare(b.date_iso) : a.date_iso ? -1 : b.date_iso ? 1 : 0)
+}
+
 function Mv({
     progress: t = {},
     budget: e,
@@ -17619,8 +17626,13 @@ function Mv({
     hw: hwList = [],
     setHw: setHwList,
     readOnly: hwRO,
-    contenu: ctRows
+    contenu: ctRows,
+    edit: ctEdit,
+    save: ctSave,
+    add: ctAdd,
+    del: ctDel
 }) {
+    const [modeChrono, setModeChrono] = re.useState(!1);
     const n = Iv(3, ctRows),
         s = n[0],
         suiviRows = contenuDe(ctRows, "suivi"),
@@ -17830,9 +17842,94 @@ function Mv({
         }), h.jsx("div", {
             className: "h3",
             children: "Chronologie de l'année"
-        }), h.jsx("div", {
+        }), !hwRO && h.jsx("div", {
+            style: {
+                marginBottom: 10
+            },
+            children: h.jsx("button", {
+                className: "btn-outline btn-sm",
+                onClick: () => setModeChrono(!modeChrono),
+                children: modeChrono ? "✓ Terminer" : "✎ Modifier les jalons"
+            })
+        }), modeChrono ? h.jsxs("div", {
             className: "card",
-            children: contenuDe(ctRows, "chrono").map(d => h.jsxs("div", {
+            children: [h.jsx("div", {
+                className: "editable-hint",
+                children: "Champs sur fond gris : clique pour corriger. L'enregistrement est automatique. La date sert au compte à rebours de l'Aperçu."
+            }), chronoTriee(ctRows).map(o => h.jsxs("div", {
+                style: {
+                    borderBottom: "1px solid var(--line)",
+                    padding: "8px 0"
+                },
+                children: [h.jsxs("div", {
+                    style: {
+                        display: "flex",
+                        gap: 6,
+                        alignItems: "center"
+                    },
+                    children: [h.jsx("input", {
+                        className: "bedit lbl",
+                        value: o.titre || "",
+                        placeholder: "Jalon",
+                        onChange: w => ctEdit(o.id, {
+                            titre: w.target.value
+                        }),
+                        onBlur: () => ctSave(o.id)
+                    }), h.jsx("button", {
+                        className: "bdel",
+                        onClick: () => ctDel(o.id),
+                        "aria-label": "Supprimer",
+                        children: "×"
+                    })]
+                }), h.jsxs("div", {
+                    style: {
+                        display: "flex",
+                        gap: 6,
+                        alignItems: "center",
+                        marginTop: 4
+                    },
+                    children: [h.jsx("input", {
+                        type: "date",
+                        className: "bedit",
+                        style: {
+                            width: "auto"
+                        },
+                        value: o.date_iso || "",
+                        "aria-label": "Date du jalon",
+                        onChange: w => ctEdit(o.id, {
+                            date_iso: w.target.value || null
+                        }),
+                        onBlur: () => ctSave(o.id)
+                    }), h.jsx("input", {
+                        className: "bedit",
+                        value: o.complement || "",
+                        placeholder: "Période affichée (ex. 17 août → 7 sept.)",
+                        onChange: w => ctEdit(o.id, {
+                            complement: w.target.value
+                        }),
+                        onBlur: () => ctSave(o.id)
+                    })]
+                }), h.jsx("input", {
+                    className: "bedit",
+                    style: {
+                        width: "100%",
+                        marginTop: 4
+                    },
+                    value: o.detail || "",
+                    placeholder: "Détail",
+                    onChange: w => ctEdit(o.id, {
+                        detail: w.target.value
+                    }),
+                    onBlur: () => ctSave(o.id)
+                })]
+            }, o.id)), h.jsx("button", {
+                className: "badd",
+                onClick: () => ctAdd("chrono"),
+                children: "+ Ajouter un jalon"
+            })]
+        }) : h.jsx("div", {
+            className: "card",
+            children: chronoTriee(ctRows).map(d => h.jsxs("div", {
                 className: "tl",
                 children: [h.jsx("div", {
                     className: "when",
@@ -21402,7 +21499,11 @@ function sk() {
                 hw: hwRows,
                 setHw: setHwRows,
                 readOnly: at,
-                contenu: ct
+                contenu: ct,
+                edit: ctEdit,
+                save: ctSave,
+                add: ctAdd,
+                del: ctDel
             }), s === "planning" && h.jsx(Dv, {
                 rows: ct,
                 edit: ctEdit,
@@ -21605,6 +21706,9 @@ function Historique({
             className: "sub",
             children: "Ce qui a changé dans ton plan, et quand. Enregistré automatiquement."
         }), h.jsx("div", {
+            className: "note",
+            children: "Ce journal couvre les décisions de plan : provisions (formation, sport, vacances, épargne) et paramètres. Le budget, le budget mensuel, les dépenses et le contenu des onglets ne sont pas journalisés — ce sont des exécutions, pas des décisions."
+        }), h.jsx("div", {
             className: "detail",
             children: "Quoi"
         }), h.jsx("div", {
@@ -21680,6 +21784,14 @@ function Historique({
                         children: [auditValeur(l.field, l.old_value), " → ", h.jsx("b", {
                             children: auditValeur(l.field, l.new_value)
                         }), "  ·  ", (l.changed_at || "").slice(11, 16)]
+                    }), l.note && h.jsx("div", {
+                        className: "detail",
+                        style: {
+                            marginTop: 3,
+                            fontStyle: "italic",
+                            color: "var(--amber)"
+                        },
+                        children: "⚑ " + l.note
                     })]
                 }, l.id))
             })]
