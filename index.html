@@ -17172,8 +17172,28 @@ function qv(t) {
     return en(t, "revenu") - en(t, "charge") - en(t, "epargne")
 }
 
+const ITEM_STATUTS = [
+    ["actif", "Actif"],
+    ["termine", "Terminé"],
+    ["abandonne", "Abandonné"],
+    ["reporte", "Reporté"]
+];
+
+// Un poste abandonné ou reporté ne fait plus partie du plan : il n'est ni
+// provisionné ni compté. Terminé reste dans le plan — c'est une dépense menée
+// à son terme, pas une dépense annulée.
+function itemCompte(it) {
+    const s = it && it.statut || "actif";
+    return s === "actif" || s === "termine"
+}
+
+function statutLibelle(s) {
+    const t = ITEM_STATUTS.find(([k]) => k === (s || "actif"));
+    return t ? t[1] : s
+}
+
 function pocketCalc(items, pocket, monthlyRate, r = ve.length, totalMode) {
-    const list = (items || []).filter(x => x.pocket === pocket);
+    const list = (items || []).filter(x => x.pocket === pocket && itemCompte(x));
     const prevu = [],
         reel = [],
         solde = [];
@@ -17201,7 +17221,7 @@ function planEpargne(items, e, r = ve.length) {
     // Formule : plan_baseline + (epargne_mensuelle × mois) - items épargne prévus
     const base = mt(e, "plan_baseline"),
         s = mt(e, "epargne_mensuelle"),
-        du = (items || []).filter(x => x.pocket === "epargne");
+        du = (items || []).filter(x => x.pocket === "epargne" && itemCompte(x));
     const a = [];
     let cur = base,
         cost = 0;
@@ -18522,40 +18542,37 @@ function Jv(t) {
         ei(it.id, patch), await si(it.id, patch)
     }
 
-    // Poste « annulé » = cours / dépense qui ne sera finalement pas faite.
-    // Pas de nouvelle colonne : le montant d'origine est gardé dans le libellé
-    // « … — annulé (160 €) » pour pouvoir le rétablir.
-    const CANCEL_RE = /\s*—\s*annulé \(([\d.,]+) €\)$/;
+    // Changer l'état d'un poste du plan : actif, terminé, abandonné, reporté.
+    // Plus de « — annulé » écrit dans le libellé : c'est une donnée, avec sa
+    // date d'effet et sa raison, et le montant d'origine n'est jamais perdu.
+    async function setStatut(it, statut) {
+        const patch = {
+            statut,
+            date_effet: it.date_effet || isoAujourdhui()
+        };
+        statut === "actif" && (patch.date_effet = null, patch.raison = null);
+        ei(it.id, patch), await si(it.id, patch), flashSave(statut === "actif" ? "Poste réactivé" : "Poste " + statutLibelle(statut).toLowerCase())
+    }
 
-    function isCancelled(it) {
-        return CANCEL_RE.test(it.label || "")
+    async function setRaison(it, raison) {
+        ei(it.id, {
+            raison
+        }), await si(it.id, {
+            raison
+        })
+    }
+
+    async function setDateEffet(it, date_effet) {
+        ei(it.id, {
+            date_effet
+        }), await si(it.id, {
+            date_effet
+        })
     }
 
     async function siFlash(id, patch) {
         await si(id, patch), flashSave()
     }
-    async function cancelItem(it) {
-        if (it.paid || isCancelled(it)) return;
-        const orig = gr(it.montant_prevu);
-        const patch = {
-            label: (it.label || "") + " — annulé (" + String(orig).replace(".", ",") + " €)",
-            montant_prevu: 0,
-            montant_reel: null,
-            paid: !1
-        };
-        ei(it.id, patch), await si(it.id, patch), flashSave("Poste annulé ✓")
-    }
-
-    async function restoreItem(it) {
-        const m = (it.label || "").match(CANCEL_RE);
-        if (!m) return;
-        const patch = {
-            label: it.label.replace(CANCEL_RE, ""),
-            montant_prevu: Number(m[1].replace(",", ".")) || 0
-        };
-        ei(it.id, patch), await si(it.id, patch), flashSave("Poste rétabli ✓")
-    }
-
     function Pocket({
         title,
         pocket,
@@ -18689,7 +18706,7 @@ function Jv(t) {
                                     className: "inner",
                                     children: its.map(it => h.jsxs("div", {
                                         style: {
-                                            opacity: isCancelled(it) ? .5 : 1,
+                                            opacity: itemCompte(it) ? 1 : .55,
                                             display: "flex",
                                             gap: 6,
                                             alignItems: "center",
@@ -18813,18 +18830,58 @@ function Jv(t) {
                                                     textAlign: "right"
                                                 }
                                             })]
-                                        }), (isCancelled(it) || !it.paid) && h.jsx("button", {
-                                            className: "btn-outline btn-sm",
-                                            onClick: () => isCancelled(it) ? restoreItem(it) : cancelItem(it),
-                                            "aria-label": isCancelled(it) ? "Rétablir ce poste" : "Annuler ce poste (ne sera pas fait)",
-                                            title: isCancelled(it) ? "Remet le montant prévu d'origine" : "Retire ce poste du plan sans le supprimer",
-                                            children: isCancelled(it) ? "↺ Rétablir" : "⊘ Annuler"
+                                        }), h.jsx("select", {
+                                            className: "bsel",
+                                            style: {
+                                                maxWidth: 118
+                                            },
+                                            value: it.statut || "actif",
+                                            disabled: v,
+                                            "aria-label": "État de « " + (it.label || "") + " »",
+                                            title: "Un poste abandonné ou reporté sort du plan : il n'est plus provisionné.",
+                                            onChange: g => setStatut(it, g.target.value),
+                                            children: ITEM_STATUTS.map(([k, lib]) => h.jsx("option", {
+                                                value: k,
+                                                children: lib
+                                            }, k))
                                         }), h.jsx("button", {
                                             className: "btn-outline btn-sm",
                                             onClick: () => ri(it.id),
                                             "aria-label": "Supprimer",
                                             children: "✕"
+                                        }), !itemCompte(it) && h.jsxs("div", {
+                                        style: {
+                                            display: "flex",
+                                            gap: 6,
+                                            alignItems: "center",
+                                            flexBasis: "100%",
+                                            margin: "2px 0 4px"
+                                        },
+                                        children: [h.jsx("span", {
+                                            className: "detail",
+                                            style: {
+                                                whiteSpace: "nowrap"
+                                            },
+                                            children: "Depuis le"
+                                        }), h.jsx("input", {
+                                            type: "date",
+                                            className: "bedit",
+                                            style: {
+                                                width: "auto"
+                                            },
+                                            disabled: v,
+                                            value: it.date_effet || "",
+                                            "aria-label": "Date d'effet pour « " + (it.label || "") + " »",
+                                            onChange: g => setDateEffet(it, g.target.value || null)
+                                        }), h.jsx("input", {
+                                            className: "bedit",
+                                            placeholder: "Pourquoi ? (facultatif)",
+                                            disabled: v,
+                                            defaultValue: it.raison || "",
+                                            "aria-label": "Raison pour « " + (it.label || "") + " »",
+                                            onBlur: g => setRaison(it, g.target.value || null)
                                         })]
+                                    })]
                                     }, it.id))
                                 })]
                             }, mi)
