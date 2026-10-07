@@ -5,7 +5,7 @@ import { Apercu, Planning, Suivi, Budget, Tresorerie, Sport, Pieces, Homework } 
 import BudgetMensuel from './components/BudgetMensuel.jsx'
 import Stats from './components/Charts.jsx'
 import { underwaterBanner } from './data/media.js'
-import { tabs, defaultBudget, defaultParams, defaultVoyages } from './data/dossier.js'
+import { tabs, defaultBudget, defaultParams, defaultVoyages, pocketCalc, planEpargne, reelDisponible } from './data/dossier.js'
 
 // Mode partage : ?partage dans l'URL → accès public sans connexion.
 const SHARE = typeof window !== 'undefined' &&
@@ -43,13 +43,13 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState('apercu')
-  const [moisIndex, setMoisIndex] = useState(0)  // ← NOUVEAU : état pour le mois dans BudgetMensuel
+  const [moisIndex, setMoisIndex] = useState(0)
   const [progress, setProgress] = useState({})
   const [budget, setBudget] = useState(null)
-  const [budgetMois, setBudgetMois] = useState([])  // ← NOUVEAU : budget mensuel
-  const [transactions, setTransactions] = useState([])  // ← NOUVEAU : transactions
-  const [poches, setPoches] = useState([])  // ← NOUVEAU : poches
-  const [items, setItems] = useState([])  // ← NOUVEAU : items (provisions)
+  const [budgetMois, setBudgetMois] = useState([])
+  const [transactions, setTransactions] = useState([])
+  const [poches, setPoches] = useState([])
+  const [items, setItems] = useState([])
   const [params, setParams] = useState([])
   const [voyages, setVoyages] = useState([])
   const [unlocked, setUnlocked] = useState(false)
@@ -101,7 +101,6 @@ export default function App() {
       }
       setVoyages(data || [])
     })()
-    // ← NOUVEAU : charger budgetMois, transactions, poches, items
     ;(async () => {
       const { data } = await supabase.from('vision_budget_mois').select('*').order('annee').order('mois').order('sort')
       setBudgetMois(data || [])
@@ -173,9 +172,8 @@ export default function App() {
     else window.prompt('Lien de partage :', url)
   }
 
-  // ← NOUVEAU : utilitaires pour BudgetMensuel
   const anneeMoisDe = (moisIndex) => {
-    const d = new Date(2026, 7, 1) // ancre : août 2026
+    const d = new Date(2026, 7, 1)
     d.setMonth(d.getMonth() + moisIndex)
     return { annee: d.getFullYear(), mois: d.getMonth() }
   }
@@ -223,6 +221,9 @@ export default function App() {
           onSelectMonth={setMoisIndex}
           onTransactionClick={(line) => console.log('Clicked line:', line.poste)}
           anneeMoisDe={anneeMoisDe}
+          pocketCalc={pocketCalc}
+          planEpargne={planEpargne}
+          reelDisponible={reelDisponible}
         />)}
         {tab === 'tresorerie' && gate(<Tresorerie {...tresoProps} />)}
         {tab === 'stats' && gate(<Stats budget={budget} params={params} voyages={voyages} />)}
