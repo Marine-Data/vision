@@ -16955,7 +16955,7 @@ const Av = [{
         icon: "portefeuille"
     }, {
         id: "tresorerie",
-        label: "Trésorerie",
+        label: "Budget mois",
         icon: "curseurs"
     }, {
         id: "stats",
@@ -19706,217 +19706,6 @@ function Jv(t) {
                 }, k))]
             })]
         }), (() => {
-            const budgetMoisSel = budgetDuMois(bmAll, e, moisSel),
-                chargeLines = budgetMoisSel.filter(w => w.kind === "charge"),
-                spendFor = w => {
-                    const rec = (spendAll || []).find(x => x.budget_line_id === ligneBudgetId(w) && x.mois_index === moisSel);
-                    return rec ? gr(rec.montant) : null
-                },
-                totalBudget = chargeLines.reduce((s, w) => s + gr(w.montant), 0),
-                totalSpent = chargeLines.reduce((s, w) => {
-                    const val2 = spendFor(w);
-                    return s + (val2 != null ? val2 : 0)
-                }, 0),
-                anySpent = chargeLines.some(w => spendFor(w) != null);
-            const exporter = () => {
-                const l = [
-                    ["Vision — suivi budget"],
-                    ["Mois", ve[moisSel]],
-                    ["Exporté le", new Date().toLocaleDateString(VISION_CONFIG.locale)],
-                    [],
-                    ["Poste", "Prévisionnel (€)", "Réalisé (€)", "Écart (€)", "Détail"]
-                ];
-                chargeLines.forEach(w => {
-                    const prev = gr(w.montant),
-                        reel = spendFor(w),
-                        rec = (spendAll || []).find(x => x.budget_line_id === ligneBudgetId(w) && x.mois_index === moisSel);
-                    l.push([w.poste, prev, reel == null ? "" : reel, reel == null ? "" : reel - prev, rec && rec.note ? rec.note : ""])
-                });
-                l.push([], ["Total", totalBudget, totalSpent, totalSpent - totalBudget, ""]);
-                l.push([], ["Provisions du mois", "Prévu (€)", "Réel (€)", "Solde (€)", ""]);
-                [
-                    ["Vacances", vac],
-                    ["Formation", form],
-                    ["Sport", sport]
-                ].forEach(([nom, p]) => l.push([nom, gr(p.prevu[moisSel]), gr(p.reel[moisSel]), gr(p.solde[moisSel]), ""]));
-                const ecartM = rawReel[moisSel] == null ? null : reelDisponible(rawReel, pocheCalcs, moisSel) - planDisponible(plan, pocheCalcs, moisSel);
-                l.push([], ["Épargne — plan disponible", gr(planDisponible(plan, pocheCalcs, moisSel))]);
-                l.push(["Épargne — réel disponible", rawReel[moisSel] == null ? "" : gr(reelDisponible(rawReel, pocheCalcs, moisSel))]);
-                l.push(["Écart", ecartM == null ? "" : Math.round(ecartM)]);
-                exportMoisCSV(ve[moisSel], l)
-            };
-            return h.jsxs("details", {
-                className: "collapsible",
-                open: !0,
-                children: [h.jsx("summary", {
-                    children: "📊 Dépenses réelles par catégorie — " + ve[moisSel]
-                }), h.jsxs("div", {
-                    className: "inner",
-                    children: [h.jsx("p", {
-                        className: "sub",
-                        style: {
-                            marginTop: 0
-                        },
-                        children: "Ces totaux sont calculés à partir de tes dépenses saisies : ajoute-les avec le bouton + en bas à droite, ou corrige-les dans la liste ci-dessous. Ce suivi porte sur ton compte courant — il est indépendant de l'écart épargne ci-dessus, qui lui vient uniquement de ton relevé livrets."
-                    }), h.jsxs("details", {
-                        className: "collapsible",
-                        style: {
-                            marginBottom: 10
-                        },
-                        children: [h.jsx("summary", {
-                            children: "Comprendre poches, provisions et écart"
-                        }), h.jsxs("div", {
-                            className: "inner",
-                            style: {
-                                fontSize: 13.5
-                            },
-                            children: [h.jsxs("p", {
-                                style: {
-                                    marginTop: 0
-                                },
-                                children: [h.jsx("b", {
-                                    children: "Une poche"
-                                }), " est une enveloppe d'épargne dédiée à un usage : vacances, formation, sport. L'argent est sur tes livrets, mais il est déjà promis à autre chose."]
-                            }), h.jsxs("p", {
-                                children: [h.jsx("b", {
-                                    children: "Une provision"
-                                }), " est ce que tu mets de côté chaque mois dans une poche, avant de dépenser. Exemple : 375 € par mois pour les vacances."]
-                            }), h.jsxs("p", {
-                                children: [h.jsx("b", {
-                                    children: "L'épargne disponible"
-                                }), " est ce qui reste quand on retire toutes les poches du solde des livrets. C'est ton vrai matelas, celui sur lequel tu peux compter."]
-                            }), h.jsxs("p", {
-                                style: {
-                                    marginBottom: 0
-                                },
-                                children: [h.jsx("b", {
-                                    children: "L'écart"
-                                }), " compare ce disponible à ce qui était prévu. Positif, tu n'as pas encore versé des provisions prévues : cet argent partira les mois suivants, ce ne sont pas des sous en plus. Négatif, tu as dépensé plus que prévu."]
-                            })]
-                        })]
-                    }), !v && h.jsx(BudgetMoisEditor, {
-                        moisIndex: moisSel,
-                        rows: bmAll,
-                        setRows: setBmAll,
-                        modele: e,
-                        verrouille: selClosed
-                    }), h.jsx("button", {
-                        className: "btn-outline btn-sm",
-                        style: {
-                            marginBottom: 12
-                        },
-                        onClick: exporter,
-                        children: "↓ Exporter ce mois (Excel)"
-                    }), (() => {
-                        const liste = (txAll || []).filter(t => gr(t.mois_index) === moisSel && gr(t.montant) > 0).sort((a, b) => (b.date_depense || "").localeCompare(a.date_depense || "")),
-                            posteDe = id => (chargeLines.find(w => ligneBudgetId(w) === id) || {}).poste || "—";
-                        return h.jsxs("details", {
-                            className: "collapsible",
-                            style: {
-                                marginBottom: 12
-                            },
-                            children: [h.jsxs("summary", {
-                                children: ["Dépenses saisies — ", liste.length, h.jsx("span", {
-                                    style: {
-                                        color: "var(--slate)",
-                                        fontWeight: 400,
-                                        marginLeft: 8
-                                    },
-                                    children: ot(liste.reduce((s, t) => s + gr(t.montant), 0))
-                                })]
-                            }), h.jsx("div", {
-                                className: "inner",
-                                children: liste.length ? liste.map(t => h.jsxs("button", {
-                                    className: "txrow",
-                                    onClick: () => onEditTx && onEditTx(t),
-                                    children: [h.jsxs("span", {
-                                        style: {
-                                            minWidth: 0
-                                        },
-                                        children: [h.jsxs("span", {
-                                            style: {
-                                                fontWeight: 600
-                                            },
-                                            children: [catIcone(posteDe(t.budget_line_id)), " ", posteDe(t.budget_line_id)]
-                                        }), h.jsxs("span", {
-                                            className: "detail",
-                                            style: {
-                                                display: "block"
-                                            },
-                                            children: [hwkFmt(t.date_depense), t.note ? " · " + t.note : ""]
-                                        })]
-                                    }), h.jsx("span", {
-                                        className: "m",
-                                        children: ot(gr(t.montant))
-                                    })]
-                                }, t.id)) : h.jsx("div", {
-                                    className: "detail",
-                                    children: "Aucune dépense saisie pour ce mois. Utilise le bouton + en bas à droite."
-                                })
-                            })]
-                        })
-                    })(), chargeLines.map(w => {
-                        const val = spendFor(w),
-                            over = val != null && depasseCategorie(val, gr(w.montant)),
-                            rec = (spendAll || []).find(x => x.budget_line_id === ligneBudgetId(w) && x.mois_index === moisSel),
-                            noteVal = rec ? rec.note : "";
-                        return h.jsxs("div", {
-                            style: {
-                                marginBottom: 8
-                            },
-                            children: [h.jsxs("div", {
-                                style: {
-                                    display: "flex",
-                                    gap: 8,
-                                    alignItems: "center"
-                                },
-                                children: [h.jsxs("span", {
-                                    style: {
-                                        flex: 1,
-                                        fontSize: 13.5
-                                    },
-                                    children: [w.poste, " ", h.jsx("span", {
-                                        style: {
-                                            color: "var(--slate)",
-                                            fontSize: 11.5
-                                        },
-                                        children: "(budget " + ot(gr(w.montant)) + ")"
-                                    })]
-                                }), h.jsx("span", {
-                                    style: {
-                                        width: 90,
-                                        textAlign: "right",
-                                        fontWeight: 700,
-                                        fontVariantNumeric: "tabular-nums",
-                                        color: over ? "var(--alert)" : "var(--ink)"
-                                    },
-                                    children: val != null ? ot(val) : "—"
-                                })]
-                            }), noteVal && h.jsx("div", {
-                                className: "detail",
-                                style: {
-                                    marginTop: 2,
-                                    fontStyle: "italic"
-                                },
-                                children: noteVal
-                            })]
-                        }, w.id)
-                    }), anySpent && h.jsxs("div", {
-                        className: "note",
-                        style: {
-                            marginTop: 8,
-                            background: depasseCategorie(totalSpent, totalBudget) ? "#fbe9e4" : "#eef7f4"
-                        },
-                        children: ["Total dépensé : ", h.jsx("b", {
-                            children: ot(totalSpent)
-                        }), " sur ", ot(totalBudget), " prévu — ", h.jsx("span", {
-                            className: depasseCategorie(totalSpent, totalBudget) ? "low" : "ok",
-                            children: depasseCategorie(totalSpent, totalBudget) ? "dépassement de " + ot(totalSpent - totalBudget) : "marge de " + ot(totalBudget - totalSpent)
-                        })]
-                    })]
-                })]
-            })
-        })(), (() => {
             const list = savingsAll || [];
             return h.jsxs("details", {
                 className: "collapsible",
@@ -20352,6 +20141,580 @@ function Jv(t) {
                     }, a.id))
                 })]
             })]
+        })]
+    })
+}
+
+// Budget mensuel — reproduit BUDGET_TABLEAU.xlsx.
+// Écart = Budget − Réalisé. Total des sorties (SOLDE Excel) = courantes + épargne.
+// Reste disponible = salaire − total des sorties. Provision vacances = pocketCalc.
+function BudgetMensuel({
+    budget,
+    budgetMois,
+    setBudgetMois,
+    transactions,
+    poches,
+    items,
+    params,
+    clotures,
+    ve: mois,
+    readOnly,
+    onEditTx,
+    onNewTx,
+    onAddVacances,
+    onSaveVacances,
+    onDelVacances
+}) {
+    const [moisSel, setMoisSel] = re.useState(moisNow()),
+        [modalOuverte, setModalOuverte] = re.useState(null),
+        [ajusterOuvert, setAjusterOuvert] = re.useState(!1),
+        [vacDesc, setVacDesc] = re.useState(""),
+        [vacMontant, setVacMontant] = re.useState(""),
+        [vacEtat, setVacEtat] = re.useState(""),
+        [vacEdit, setVacEdit] = re.useState(null);
+    if (!budget) return h.jsxs("section", {
+        className: "sec",
+        children: [h.jsx("h2", {
+            children: "Budget mensuel"
+        }), h.jsx("p", {
+            className: "sub",
+            children: "Chargement du budget…"
+        })]
+    });
+    const n = mois.length,
+        allerA = i => {
+            setMoisSel(Math.max(0, Math.min(n - 1, i))), setModalOuverte(null), setVacEdit(null), setVacEtat("")
+        },
+        ferme = (clotures || []).some(x => x.mois_index === moisSel),
+        lignes = budgetDuMois(budgetMois, budget, moisSel),
+        catDe = w => {
+            const m = budget.find(b => b.id === ligneBudgetId(w)),
+                c = m ? m.categorie : null;
+            return c != null ? c : w.kind === "charge" ? "courantes" : w.kind === "epargne" ? "epargne" : null
+        },
+        txMois = (transactions || []).filter(x => gr(x.mois_index) === moisSel),
+        txDe = id => txMois.filter(x => x.budget_line_id === id).sort((a, b) => (b.date_depense || "").localeCompare(a.date_depense || "")),
+        reelDe = id => txDe(id).reduce((s, x) => s + gr(x.montant), 0),
+        avecReel = l => l.map(w => ({
+            ...w,
+            lid: ligneBudgetId(w),
+            b: gr(w.montant),
+            r: reelDe(ligneBudgetId(w))
+        })),
+        courantes = avecReel(lignes.filter(w => catDe(w) === "courantes")).sort((a, b) => (a.poste || "").localeCompare(b.poste || "", "fr")),
+        epargne = avecReel(lignes.filter(w => catDe(w) === "epargne")),
+        somme = (l, k) => l.reduce((s, w) => s + w[k], 0),
+        totC = {
+            b: somme(courantes, "b"),
+            r: somme(courantes, "r")
+        },
+        totE = {
+            b: somme(epargne, "b"),
+            r: somme(epargne, "r")
+        },
+        sorties = {
+            b: totC.b + totE.b,
+            r: totC.r + totE.r
+        },
+        revenus = lignes.filter(w => w.kind === "revenu"),
+        salaire = revenus.reduce((s, w) => s + gr(w.montant), 0),
+        salaireReel = revenus.some(w => txDe(ligneBudgetId(w)).length) ? revenus.reduce((s, w) => s + reelDe(ligneBudgetId(w)), 0) : null,
+        reste = salaire - sorties.b,
+        pocheVac = (poches || []).find(p => p.cle === "vacances"),
+        vacActive = pocheVac ? pocheAffichee(pocheVac) : !0,
+        vacCalc = pocketCalc(items, "vacances", mt(params, "provision_vacances_mensuelle"), n),
+        vacSolde = vacCalc.solde[moisSel],
+        vacPrec = moisSel > 0 ? vacCalc.solde[moisSel - 1] : null,
+        vacPayes = (items || []).filter(x => x.pocket === "vacances" && itemCompte(x) && x.paid && gr(x.mois_index) === moisSel).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
+        calcs = calcsDesPoches(poches, items, params, n),
+        rawReel = Cv(params, n),
+        planArr = planEpargne(items, params, n),
+        epReel = reelDisponible(rawReel, calcs, moisSel),
+        epDispo = epReel != null ? epReel : planDisponible(planArr, calcs, moisSel),
+        {
+            annee,
+            mois: m0
+        } = anneeMoisDe(moisSel),
+        dateDefaut = moisSel === moisNow() ? isoAujourdhui() : annee + "-" + String(m0 + 1).padStart(2, "0") + "-01",
+        nombre = v => Number(String(v).replace(/\s/g, "").replace(",", "."));
+
+    async function depenser() {
+        const m = nombre(vacMontant);
+        if (!vacDesc.trim() || !(m > 0)) {
+            setVacEtat("Indique une description et un montant.");
+            return
+        }
+        setVacEtat("Enregistrement…");
+        try {
+            await onAddVacances(vacDesc.trim(), m, moisSel), setVacDesc(""), setVacMontant(""), setVacEtat("✓ " + euros(m) + " retiré de la provision vacances")
+        } catch (e) {
+            setVacEtat("Échec de l'enregistrement : " + (e && e.message ? e.message : "connexion") + ". Réessaie.")
+        }
+    }
+
+    async function enregistrerVac() {
+        const m = nombre(vacEdit.montant);
+        if (!String(vacEdit.label).trim() || !(m > 0)) {
+            setVacEtat("Indique une description et un montant.");
+            return
+        }
+        try {
+            await onSaveVacances(vacEdit.id, {
+                label: String(vacEdit.label).trim(),
+                montant_prevu: m,
+                montant_reel: m
+            }), setVacEdit(null), setVacEtat("✓ Corrigé")
+        } catch (e) {
+            setVacEtat("Échec de l'enregistrement : " + (e && e.message ? e.message : "connexion") + ".")
+        }
+    }
+
+    async function supprimerVac(it) {
+        if (!window.confirm("Supprimer « " + it.label + " » ?")) return;
+        try {
+            await onDelVacances(it.id), setVacEtat("Supprimé — la provision est recréditée")
+        } catch (e) {
+            setVacEtat("Suppression impossible : " + (e && e.message ? e.message : "connexion") + ".")
+        }
+    }
+
+    function exporter() {
+        const l = [
+            ["Vision — budget mensuel"],
+            ["Mois", mois[moisSel]],
+            [],
+            ["Poste", "Budget", "Réalisé", "Écart"],
+            ["DÉPENSES COURANTES"]
+        ];
+        courantes.forEach(w => l.push([w.poste, w.b, w.r, w.b - w.r]));
+        l.push(["Total courantes", totC.b, totC.r, totC.b - totC.r], [], ["ÉPARGNE PROGRAMMÉE"]);
+        epargne.forEach(w => l.push([w.poste, w.b, w.r, ""]));
+        l.push([], ["SOLDE", sorties.b, sorties.r, ""]);
+        l.push(["SALAIRE MENSUEL (net)", salaire, salaireReel == null ? "" : salaireReel, salaireReel == null ? "" : salaireReel - sorties.r]);
+        l.push([], ["Provision Vacances", Math.round(vacSolde * 100) / 100]);
+        vacPayes.forEach(it => l.push(["  " + it.label, "", -gr(it.montant_reel != null ? it.montant_reel : it.montant_prevu), ""]));
+        l.push(["Épargne disponible", Math.round(epDispo * 100) / 100]);
+        exportMoisCSV(mois[moisSel], l)
+    }
+
+    const btnPoste = {
+            background: "none",
+            border: 0,
+            padding: 0,
+            font: "inherit",
+            color: "var(--teal-dark)",
+            cursor: "pointer",
+            textAlign: "left",
+            textDecoration: "underline",
+            textUnderlineOffset: 3
+        },
+        thNum = {
+            textAlign: "right"
+        },
+        ecartTd = x => h.jsx("td", {
+            className: "num " + (x >= 0 ? "ok" : "low"),
+            children: (x > 0 ? "+" : "") + euros(x)
+        }),
+        posteTd = w => h.jsx("td", {
+            children: h.jsxs("button", {
+                style: btnPoste,
+                onClick: () => setModalOuverte(w.lid),
+                children: [catIcone(w.poste), " ", w.poste]
+            })
+        }),
+        carte = (titre, valeur, classe, sous) => h.jsxs("div", {
+            className: "card",
+            style: {
+                textAlign: "center",
+                padding: "10px 6px",
+                margin: 0
+            },
+            children: [h.jsx("div", {
+                className: classe,
+                style: {
+                    fontFamily: "Georgia,serif",
+                    fontWeight: 700,
+                    fontSize: "1.1rem"
+                },
+                children: valeur
+            }), h.jsx("div", {
+                style: {
+                    fontSize: 10.5,
+                    color: "var(--slate)",
+                    textTransform: "uppercase",
+                    letterSpacing: ".05em",
+                    fontWeight: 600
+                },
+                children: titre
+            }), sous && h.jsx("div", {
+                className: "detail",
+                style: {
+                    fontSize: 11.5,
+                    marginTop: 2
+                },
+                children: sous
+            })]
+        }),
+        ligneModal = modalOuverte ? [...courantes, ...epargne].find(w => w.lid === modalOuverte) : null;
+
+    return h.jsxs("section", {
+        className: "sec",
+        children: [h.jsx("h2", {
+            children: "Budget mensuel"
+        }), h.jsxs("div", {
+            style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                margin: "8px 0 14px"
+            },
+            children: [h.jsx("button", {
+                className: "btn-outline btn-sm",
+                disabled: moisSel <= 0,
+                onClick: () => allerA(moisSel - 1),
+                "aria-label": "Mois précédent",
+                children: "←"
+            }), h.jsx("select", {
+                className: "bsel",
+                style: {
+                    flex: 1,
+                    textAlign: "center"
+                },
+                value: moisSel,
+                "aria-label": "Mois",
+                onChange: g => allerA(Number(g.target.value)),
+                children: mois.map((lab, i) => h.jsx("option", {
+                    value: i,
+                    children: lab
+                }, i))
+            }), h.jsx("button", {
+                className: "btn-outline btn-sm",
+                disabled: moisSel >= n - 1,
+                onClick: () => allerA(moisSel + 1),
+                "aria-label": "Mois suivant",
+                children: "→"
+            }), h.jsx("button", {
+                className: "btn-outline btn-sm",
+                onClick: exporter,
+                "aria-label": "Exporter ce mois (Excel)",
+                title: "Exporter ce mois (Excel)",
+                children: "↓"
+            })]
+        }), h.jsxs("div", {
+            className: "sumrow",
+            style: {
+                display: "grid",
+                gridTemplateColumns: "repeat(2,1fr)",
+                gap: 8,
+                marginBottom: 16
+            },
+            role: "group",
+            "aria-label": "Résumé de " + mois[moisSel],
+            children: [carte("Total des sorties", euros(sorties.b), "", "SOLDE · réalisé " + euros(sorties.r)), carte("Reste disponible", (reste > 0 ? "+" : "") + euros(reste), reste >= 0 ? "ok" : "low", salaireReel != null ? "Salaire réel " + euros(salaireReel) + " · reste " + euros(salaireReel - sorties.r) : "Salaire " + euros(salaire)), carte("Provision vacances", euros(vacSolde), vacSolde < seuilPoche(params) ? "low" : "", vacPrec != null ? "Fin " + mois[moisSel - 1] + " : " + euros(vacPrec) : "Cumul de la poche"), carte("Épargne disponible", euros(epDispo), "", epReel != null ? "D'après ton relevé livrets" : "Prévu — relevé livrets non saisi")]
+        }), h.jsxs("div", {
+            style: {
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                flexWrap: "wrap"
+            },
+            children: [h.jsx("div", {
+                className: "h3",
+                style: {
+                    margin: 0
+                },
+                children: "DÉPENSES COURANTES"
+            }), !readOnly && h.jsx("button", {
+                className: "btn-outline btn-sm",
+                onClick: () => setAjusterOuvert(!ajusterOuvert),
+                children: ajusterOuvert ? "Fermer l'ajustement" : "Ajuster le budget de " + mois[moisSel]
+            })]
+        }), !readOnly && ajusterOuvert && h.jsx("div", {
+            style: {
+                marginTop: 10
+            },
+            children: h.jsx(BudgetMoisEditor, {
+                moisIndex: moisSel,
+                rows: budgetMois,
+                setRows: setBudgetMois,
+                modele: budget,
+                verrouille: ferme
+            })
+        }), h.jsx("div", {
+            className: "card",
+            style: {
+                padding: 0,
+                overflowX: "auto",
+                marginTop: 10
+            },
+            children: h.jsxs("table", {
+                className: "tbl",
+                children: [h.jsx("thead", {
+                    children: h.jsxs("tr", {
+                        children: [h.jsx("th", {
+                            children: "Poste"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Budget"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Réalisé"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Écart"
+                        })]
+                    })
+                }), h.jsxs("tbody", {
+                    children: [courantes.map(w => h.jsxs("tr", {
+                        children: [posteTd(w), h.jsx("td", {
+                            className: "num",
+                            children: euros(w.b)
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(w.r)
+                        }), ecartTd(w.b - w.r)]
+                    }, w.lid)), h.jsxs("tr", {
+                        className: "total",
+                        children: [h.jsx("td", {
+                            children: "Total courantes"
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(totC.b)
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(totC.r)
+                        }), ecartTd(totC.b - totC.r)]
+                    })]
+                })]
+            })
+        }), h.jsx("div", {
+            className: "h3",
+            style: {
+                marginTop: 18
+            },
+            children: "ÉPARGNE PROGRAMMÉE"
+        }), h.jsx("div", {
+            className: "card",
+            style: {
+                padding: 0,
+                overflowX: "auto"
+            },
+            children: h.jsxs("table", {
+                className: "tbl",
+                children: [h.jsx("thead", {
+                    children: h.jsxs("tr", {
+                        children: [h.jsx("th", {
+                            children: "Poste"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Budget"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Réalisé"
+                        })]
+                    })
+                }), h.jsx("tbody", {
+                    children: epargne.map(w => h.jsxs("tr", {
+                        children: [posteTd(w), h.jsx("td", {
+                            className: "num",
+                            children: euros(w.b)
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(w.r)
+                        })]
+                    }, w.lid))
+                })]
+            })
+        }), vacActive && h.jsxs(h.Fragment, {
+            children: [h.jsx("div", {
+                className: "h3",
+                style: {
+                    marginTop: 18
+                },
+                children: "DÉPENSES VACANCES"
+            }), h.jsxs("div", {
+                className: "card",
+                children: [h.jsxs("p", {
+                    style: {
+                        marginTop: 0
+                    },
+                    children: ["Provision vacances disponible : ", h.jsx("b", {
+                        className: vacSolde < seuilPoche(params) ? "low" : "ok",
+                        children: euros(vacSolde)
+                    })]
+                }), vacPayes.length ? vacPayes.map(it => vacEdit && vacEdit.id === it.id ? h.jsxs("div", {
+                    className: "brow",
+                    children: [h.jsx("input", {
+                        className: "bedit lbl",
+                        value: vacEdit.label,
+                        "aria-label": "Description",
+                        onChange: g => setVacEdit({
+                            ...vacEdit,
+                            label: g.target.value
+                        })
+                    }), h.jsx("input", {
+                        className: "bedit bnum",
+                        inputMode: "decimal",
+                        value: vacEdit.montant,
+                        "aria-label": "Montant",
+                        onChange: g => setVacEdit({
+                            ...vacEdit,
+                            montant: g.target.value
+                        })
+                    }), h.jsx("button", {
+                        className: "btn btn-sm",
+                        onClick: enregistrerVac,
+                        children: "Enregistrer"
+                    }), h.jsx("button", {
+                        className: "btn-outline btn-sm",
+                        onClick: () => setVacEdit(null),
+                        children: "Annuler"
+                    })]
+                }, it.id) : h.jsxs("div", {
+                    className: "txrow",
+                    style: {
+                        cursor: "default"
+                    },
+                    children: [h.jsx("span", {
+                        style: {
+                            minWidth: 0,
+                            flex: 1
+                        },
+                        children: it.label
+                    }), h.jsx("span", {
+                        className: "m",
+                        children: "−" + euros(it.montant_reel != null ? it.montant_reel : it.montant_prevu)
+                    }), !readOnly && h.jsxs("span", {
+                        style: {
+                            display: "flex",
+                            gap: 6
+                        },
+                        children: [h.jsx("button", {
+                            className: "btn-icon",
+                            "aria-label": "Corriger " + it.label,
+                            onClick: () => setVacEdit({
+                                id: it.id,
+                                label: it.label || "",
+                                montant: String(it.montant_reel != null ? it.montant_reel : it.montant_prevu)
+                            }),
+                            children: "✏️"
+                        }), h.jsx("button", {
+                            className: "btn-icon danger",
+                            "aria-label": "Supprimer " + it.label,
+                            onClick: () => supprimerVac(it),
+                            children: "×"
+                        })]
+                    })]
+                }, it.id)) : h.jsx("div", {
+                    className: "detail",
+                    children: "Aucune dépense vacances en " + mois[moisSel] + "."
+                }), !readOnly && h.jsxs("div", {
+                    className: "brow",
+                    style: {
+                        marginTop: 12
+                    },
+                    children: [h.jsx("input", {
+                        className: "bedit lbl",
+                        placeholder: "Description (ex. billet d'avion)",
+                        value: vacDesc,
+                        "aria-label": "Description de la dépense vacances",
+                        onChange: g => setVacDesc(g.target.value)
+                    }), h.jsx("input", {
+                        className: "bedit bnum",
+                        inputMode: "decimal",
+                        placeholder: "Montant",
+                        value: vacMontant,
+                        "aria-label": "Montant de la dépense vacances",
+                        onChange: g => setVacMontant(g.target.value),
+                        onKeyDown: g => {
+                            g.key === "Enter" && depenser()
+                        }
+                    }), h.jsx("button", {
+                        className: "btn btn-sm",
+                        onClick: depenser,
+                        children: "Dépenser"
+                    })]
+                }), vacEtat && h.jsx("div", {
+                    className: "detail",
+                    style: {
+                        marginTop: 8
+                    },
+                    children: vacEtat
+                }), h.jsx("div", {
+                    className: "detail",
+                    style: {
+                        marginTop: 8
+                    },
+                    children: "Chaque dépense vacances est retirée automatiquement de la provision vacances."
+                })]
+            })]
+        }), ligneModal && h.jsx("div", {
+            className: "sheetbg",
+            onClick: g => {
+                g.target === g.currentTarget && setModalOuverte(null)
+            },
+            children: h.jsxs("div", {
+                className: "sheet",
+                children: [h.jsxs("div", {
+                    className: "sheethead",
+                    children: [h.jsxs("h3", {
+                        children: [catIcone(ligneModal.poste), " ", ligneModal.poste]
+                    }), h.jsx("button", {
+                        className: "sheetclose",
+                        onClick: () => setModalOuverte(null),
+                        "aria-label": "Fermer",
+                        children: "×"
+                    })]
+                }), h.jsxs("div", {
+                    className: "detail",
+                    style: {
+                        marginBottom: 10
+                    },
+                    children: [mois[moisSel], " · Budget ", euros(ligneModal.b), " · Réalisé ", euros(ligneModal.r), catDe(ligneModal) === "courantes" ? h.jsxs("span", {
+                        className: ligneModal.b - ligneModal.r >= 0 ? "ok" : "low",
+                        children: [" · Écart ", euros(ligneModal.b - ligneModal.r)]
+                    }) : null]
+                }), txDe(ligneModal.lid).length ? txDe(ligneModal.lid).map(x => h.jsxs("button", {
+                    className: "txrow",
+                    disabled: readOnly,
+                    onClick: () => onEditTx(x),
+                    children: [h.jsxs("span", {
+                        style: {
+                            minWidth: 0
+                        },
+                        children: [h.jsx("span", {
+                            style: {
+                                fontWeight: 600
+                            },
+                            children: x.note || ligneModal.poste
+                        }), h.jsx("span", {
+                            className: "detail",
+                            style: {
+                                display: "block"
+                            },
+                            children: hwkFmt(x.date_depense)
+                        })]
+                    }), h.jsx("span", {
+                        className: "m",
+                        children: euros(x.montant)
+                    })]
+                }, x.id)) : h.jsx("div", {
+                    className: "detail",
+                    children: "Aucune dépense saisie pour ce poste en " + mois[moisSel] + "."
+                }), !readOnly && h.jsx("button", {
+                    className: "btn",
+                    style: {
+                        width: "100%",
+                        marginTop: 14
+                    },
+                    onClick: () => onNewTx({
+                        budget_line_id: ligneModal.lid,
+                        date_depense: dateDefaut
+                    }),
+                    children: "+ Ajouter une dépense"
+                })]
+            })
         })]
     })
 }
@@ -21723,6 +22086,38 @@ function sk() {
     async function itemDel(N) {
         mi(K => K.filter(H => H.id !== N)), await J.from("vision_items").delete().eq("id", N)
     }
+    async function vacAdd(label, montant, moisIdx) {
+        const K = {
+                user_id: t.user.id,
+                pocket: "vacances",
+                label,
+                montant_prevu: montant,
+                montant_reel: montant,
+                mois_index: moisIdx,
+                paid: !0,
+                sort: Math.max(0, ...vi.filter(A => A.pocket === "vacances").map(A => A.sort || 0)) + 1
+            },
+            {
+                data: H,
+                error: E
+            } = await J.from("vision_items").insert(K).select().single();
+        if (E) throw E;
+        H && mi(A => [...A, H])
+    }
+    async function vacSave(N, K) {
+        const {
+            error: E
+        } = await J.from("vision_items").update(K).eq("id", N);
+        if (E) throw E;
+        itemLocal(N, K)
+    }
+    async function vacDel(N) {
+        const {
+            error: E
+        } = await J.from("vision_items").delete().eq("id", N);
+        if (E) throw E;
+        mi(K => K.filter(H => H.id !== N))
+    }
     async function clore(moisIdx, snapshot) {
         const {
             data: K
@@ -21979,8 +22374,37 @@ function sk() {
                 move: ctMove
             }), s === "budget" && h.jsx(Gv, {
                 items: vi
-            }), s === "tresorerie" && gt(h.jsx(Jv, {
-                ...Ge
+            }), s === "tresorerie" && gt(h.jsxs(h.Fragment, {
+                children: [h.jsx(BudgetMensuel, {
+                    budget: l,
+                    budgetMois: bm,
+                    setBudgetMois: sbm,
+                    transactions: tx,
+                    poches: poches,
+                    items: vi,
+                    params: c,
+                    clotures: cl,
+                    ve: ve,
+                    readOnly: at,
+                    onEditTx: at ? lt : setTxEdit,
+                    onNewTx: at ? lt : setTxEdit,
+                    onAddVacances: at ? lt : vacAdd,
+                    onSaveVacances: at ? lt : vacSave,
+                    onDelVacances: at ? lt : vacDel
+                }), h.jsxs("details", {
+                    className: "collapsible",
+                    style: {
+                        marginTop: 24
+                    },
+                    children: [h.jsx("summary", {
+                        children: "🧰 Autres outils — relevé livrets, clôture du mois, poches, voyages, modèle de budget"
+                    }), h.jsx("div", {
+                        className: "inner",
+                        children: h.jsx(Jv, {
+                            ...Ge
+                        })
+                    })]
+                })]
             })), s === "stats" && gt(h.jsx(ek, {
                 budget: l,
                 params: c,
@@ -22455,16 +22879,22 @@ function SaisieRapide({
     onClose,
     initial
 }) {
-    const edition = !!initial,
-        categories = budgetDuMois(budgetMois, budget, moisNow()).filter(w => w.kind === "charge" && w.budget_line_id).map(w => ({
-            ...w,
-            id: w.budget_line_id
-        })),
+    const edition = !!(initial && initial.id),
+        categories = (() => {
+            const toutes = budgetDuMois(budgetMois, budget, moisNow()),
+                liste = toutes.filter(w => w.kind === "charge" && w.budget_line_id),
+                pre = initial && initial.budget_line_id;
+            pre && !liste.some(w => w.budget_line_id === pre) && toutes.filter(w => w.budget_line_id === pre).forEach(w => liste.push(w));
+            return liste.map(w => ({
+                ...w,
+                id: w.budget_line_id
+            }))
+        })(),
         [montant, setMontant] = re.useState(edition ? String(initial.montant) : ""),
-        [ligneId, setLigneId] = re.useState(edition ? initial.budget_line_id : null),
+        [ligneId, setLigneId] = re.useState(initial ? initial.budget_line_id || null : null),
         [note, setNote] = re.useState(edition && initial.note ? initial.note : ""),
-        [dateDep, setDateDep] = re.useState(edition ? initial.date_depense : isoAujourdhui()),
-        [toutesCats, setToutesCats] = re.useState(edition),
+        [dateDep, setDateDep] = re.useState(initial && initial.date_depense ? initial.date_depense : isoAujourdhui()),
+        [toutesCats, setToutesCats] = re.useState(!!initial),
         [etat, setEtat] = re.useState(""),
         [erreur, setErreur] = re.useState(""),
         champMontant = re.useRef(null);
