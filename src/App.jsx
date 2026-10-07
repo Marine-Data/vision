@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, supabaseConfigured } from './lib/supabase.js'
 import Auth from './components/Auth.jsx'
 import { Apercu, Planning, Suivi, Budget, Tresorerie, Sport, Pieces, Homework } from './components/Sections.jsx'
+import BudgetMensuel from './components/BudgetMensuel.jsx'
 import Stats from './components/Charts.jsx'
 import { underwaterBanner } from './data/media.js'
 import { tabs, defaultBudget, defaultParams, defaultVoyages } from './data/dossier.js'
@@ -9,7 +10,7 @@ import { tabs, defaultBudget, defaultParams, defaultVoyages } from './data/dossi
 // Mode partage : ?partage dans l'URL → accès public sans connexion.
 const SHARE = typeof window !== 'undefined' &&
   (new URLSearchParams(window.location.search).has('partage') || (window.location.hash || '').includes('partage'))
-const LOCKED = ['tresorerie', 'stats']       // pages finances protégées en mode partage
+const LOCKED = ['tresorerie', 'stats', 'budget-mensuel']       // pages finances protégées en mode partage
 const SHARE_PASSWORD = 'vision2027'
 const noop = () => {}
 
@@ -42,8 +43,13 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState('apercu')
+  const [moisIndex, setMoisIndex] = useState(0)  // ← NOUVEAU : état pour le mois dans BudgetMensuel
   const [progress, setProgress] = useState({})
   const [budget, setBudget] = useState(null)
+  const [budgetMois, setBudgetMois] = useState([])  // ← NOUVEAU : budget mensuel
+  const [transactions, setTransactions] = useState([])  // ← NOUVEAU : transactions
+  const [poches, setPoches] = useState([])  // ← NOUVEAU : poches
+  const [items, setItems] = useState([])  // ← NOUVEAU : items (provisions)
   const [params, setParams] = useState([])
   const [voyages, setVoyages] = useState([])
   const [unlocked, setUnlocked] = useState(false)
@@ -94,6 +100,23 @@ export default function App() {
         data = (await supabase.from('vision_voyages').select('*').order('mois_index').order('sort')).data
       }
       setVoyages(data || [])
+    })()
+    // ← NOUVEAU : charger budgetMois, transactions, poches, items
+    ;(async () => {
+      const { data } = await supabase.from('vision_budget_mois').select('*').order('annee').order('mois').order('sort')
+      setBudgetMois(data || [])
+    })()
+    ;(async () => {
+      const { data } = await supabase.from('vision_transactions').select('*').order('date_depense', { ascending: false })
+      setTransactions(data || [])
+    })()
+    ;(async () => {
+      const { data } = await supabase.from('vision_poches').select('*').order('sort')
+      setPoches(data || [])
+    })()
+    ;(async () => {
+      const { data } = await supabase.from('vision_items').select('*').order('mois_index').order('sort')
+      setItems(data || [])
     })()
   }, [session])
 
@@ -150,6 +173,13 @@ export default function App() {
     else window.prompt('Lien de partage :', url)
   }
 
+  // ← NOUVEAU : utilitaires pour BudgetMensuel
+  const anneeMoisDe = (moisIndex) => {
+    const d = new Date(2026, 7, 1) // ancre : août 2026
+    d.setMonth(d.getMonth() + moisIndex)
+    return { annee: d.getFullYear(), mois: d.getMonth() }
+  }
+
   if (!supabaseConfigured) return <div className="warn">Configuration Supabase manquante.</div>
   if (!ready) return null
   if (!SHARE && !session) return <Auth />
@@ -182,6 +212,18 @@ export default function App() {
         {tab === 'planning' && <Planning />}
         {tab === 'suivi' && <Suivi progress={progress} toggle={toggle} readOnly={SHARE} />}
         {tab === 'budget' && <Budget />}
+        {tab === 'budget-mensuel' && gate(<BudgetMensuel
+          budget={budget || []}
+          budgetMois={budgetMois}
+          transactions={transactions}
+          poches={poches}
+          items={items}
+          params={params}
+          moisIndex={moisIndex}
+          onSelectMonth={setMoisIndex}
+          onTransactionClick={(line) => console.log('Clicked line:', line.poste)}
+          anneeMoisDe={anneeMoisDe}
+        />)}
         {tab === 'tresorerie' && gate(<Tresorerie {...tresoProps} />)}
         {tab === 'stats' && gate(<Stats budget={budget} params={params} voyages={voyages} />)}
         {tab === 'sport' && <Sport />}
