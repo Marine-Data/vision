@@ -125,7 +125,7 @@ function BudgetMensuel({
     poches
       .filter(p => p.statut === 'actif')
       .forEach(pocket => {
-        const cumul = pocketCalc(items, pocket, params, moisIndex, 'cumul');
+        const cumul = pocketCalc(items, pocket.cle, params, moisIndex, 'cumul');
         calcs[pocket.id] = {
           id: pocket.id,
           label: pocket.label,
