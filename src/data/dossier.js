@@ -1,11 +1,11 @@
 export const chronologie = [
   { when: '17 août → 7 sept. 2026', what: 'Inscriptions SCAP semestre 1', det: "Ouverture le lundi 17 août à 10h. Anglais pro digital · Droit numérique au travail · IA pour la finance." },
   { when: 'Fin août / début sept. 2026', what: 'Inscription sport — En Avant! de Paris', det: 'Une fois les créneaux SCAP connus. Cotisation 2 cours (600 €, chèque) + certificat médical.' },
-  { when: '1er sept. → 30 nov. 2026', what: 'Candidature DU Paris 1 sur eCandidat', det: 'Dossier complet (CV, diplômes, justificatifs d\u2019expérience).' },
+  { when: '1er sept. → 30 nov. 2026', what: 'Candidature DU Paris 1 sur eCandidat', det: 'Dossier complet (CV, diplômes, justificatifs d’expérience).' },
   { when: '28 sept. 2026', what: 'Rentrée des cours SCAP (1er semestre)', det: "Cours du 1er semestre jusqu'au 6 février 2027." },
-  { when: '15 janvier 2027', what: 'Rentrée du DU Data / IA – Droit du numérique', det: 'Paris 1 Panthéon-Sorbonne — 2 jours/mois jusqu\u2019au 4 juillet 2027.' },
+  { when: '15 janvier 2027', what: 'Rentrée du DU Data / IA – Droit du numérique', det: 'Paris 1 Panthéon-Sorbonne — 2 jours/mois jusqu’au 4 juillet 2027.' },
   { when: 'Fév. 2027', what: 'SCAP semestre 2 — management (optionnel)', det: 'Cours du 2nd semestre du 22 février au 28 juin 2027.' },
-  { when: 'Juillet 2027', what: 'Fin du DU Paris 1', det: 'Bilan de l\u2019année et démarrage de la recherche de poste.' },
+  { when: 'Juillet 2027', what: 'Fin du DU Paris 1', det: 'Bilan de l’année et démarrage de la recherche de poste.' },
 ]
 
 export const semaine = [
@@ -25,13 +25,13 @@ export const semaineNotes = [
 ]
 
 export const suivi = [
-  { key: 'suivi:1', etape: 'Inscriptions SCAP semestre 1', echeance: '17 août → 7 sept. 2026', action: 'Compte « Mon Paris » + pièce d\u2019identité. Max 3 formations : tu es pile à 3.' },
-  { key: 'suivi:2', etape: 'Certificat médical (< 3 mois)', echeance: 'Avant l\u2019inscription sport', action: 'Prendre RDV médecin traitant.' },
+  { key: 'suivi:1', etape: 'Inscriptions SCAP semestre 1', echeance: '17 août → 7 sept. 2026', action: 'Compte « Mon Paris » + pièce d’identité. Max 3 formations : tu es pile à 3.' },
+  { key: 'suivi:2', etape: 'Certificat médical (< 3 mois)', echeance: 'Avant l’inscription sport', action: 'Prendre RDV médecin traitant.' },
   { key: 'suivi:3', etape: 'Inscription sport — En Avant! de Paris', echeance: 'Fin août / début sept. 2026', action: 'Chèque 600 € + certificat, après avoir vu les horaires SCAP.' },
-  { key: 'suivi:4', etape: 'Candidature DU Paris 1 (eCandidat)', echeance: '1er sept. → 30 nov. 2026', action: 'CV, diplômes, justificatifs des 2 ans d\u2019expérience.' },
+  { key: 'suivi:4', etape: 'Candidature DU Paris 1 (eCandidat)', echeance: '1er sept. → 30 nov. 2026', action: 'CV, diplômes, justificatifs des 2 ans d’expérience.' },
   { key: 'suivi:5', etape: 'Réponses candidatures SCAP', echeance: '8 → 25 sept. 2026', action: 'Régler en ligne (CB) avant le 2ᵉ cours.' },
   { key: 'suivi:6', etape: 'Rentrée des cours SCAP (S1)', echeance: '28 sept. 2026', action: '—' },
-  { key: 'suivi:7', etape: 'Confirmer le règlement du DU', echeance: 'À l\u2019admission (déc. 2026)', action: 'Paiement en une fois, prélevé sur les livrets.' },
+  { key: 'suivi:7', etape: 'Confirmer le règlement du DU', echeance: 'À l’admission (déc. 2026)', action: 'Paiement en une fois, prélevé sur les livrets.' },
   { key: 'suivi:8', etape: 'Rentrée du DU Paris 1', echeance: '15 janv. 2027', action: '—' },
   { key: 'suivi:9', etape: 'Inscriptions SCAP semestre 2 (si management)', echeance: '5 → 25 janv. 2027', action: 'Seulement si une soirée reste libre.' },
   { key: 'suivi:10', etape: 'Fin du DU', echeance: '4 juil. 2027', action: 'Lancer la recherche active de poste.' },
@@ -64,7 +64,7 @@ export const pieces = [
     titre: 'SCAP — Anglais, Droit numérique au travail, IA finance',
     items: [
       { key: 'piece:scap:0', label: 'Créer un compte « Mon Paris » / SCAP' },
-      { key: 'piece:scap:1', label: 'Pièce d\u2019identité (CNI ou passeport)' },
+      { key: 'piece:scap:1', label: 'Pièce d’identité (CNI ou passeport)' },
       { key: 'piece:scap:2', label: 'Moyen de paiement CB (règlement avant le 2ᵉ cours)' },
     ],
   },
@@ -74,8 +74,8 @@ export const pieces = [
       { key: 'piece:du:0', label: 'CV à jour' },
       { key: 'piece:du:1', label: 'Lettre de motivation' },
       { key: 'piece:du:2', label: 'Copie des diplômes (Licence + Master en droit)' },
-      { key: 'piece:du:3', label: 'Justificatifs des 2 ans d\u2019expérience' },
-      { key: 'piece:du:4', label: 'Pièce d\u2019identité' },
+      { key: 'piece:du:3', label: 'Justificatifs des 2 ans d’expérience' },
+      { key: 'piece:du:4', label: 'Pièce d’identité' },
       { key: 'piece:du:5', label: 'Dossier eCandidat complété' },
     ],
   },
@@ -84,7 +84,7 @@ export const pieces = [
     items: [
       { key: 'piece:sport:0', label: 'Inscription en ligne + formule « Free style gym 2 cours »' },
       { key: 'piece:sport:1', label: 'Certificat médical de moins de 3 mois' },
-      { key: 'piece:sport:2', label: 'Chèque de 600 € à l\u2019ordre de « En avant de Paris »' },
+      { key: 'piece:sport:2', label: 'Chèque de 600 € à l’ordre de « En avant de Paris »' },
       { key: 'piece:sport:3', label: 'Décharge de responsabilité' },
     ],
   },
@@ -98,6 +98,7 @@ export const tabs = [
   { id: 'planning', label: 'Emploi du temps' },
   { id: 'suivi', label: 'Suivi' },
   { id: 'budget', label: 'Budget' },
+  { id: 'budget-mensuel', label: 'Budget mensuel' },
   { id: 'tresorerie', label: 'Trésorerie' },
   { id: 'stats', label: 'Graphiques' },
   { id: 'sport', label: 'Sport' },
@@ -212,14 +213,14 @@ export function jalons(pts, cible) {
    Échéances datées — alimentent les comptes à rebours (Aperçu).
    ============================================================ */
 export const echeances = [
-  { date: '2026-08-17', titre: 'Inscriptions SCAP S1', detail: 'Ouverture — jusqu\u2019au 7 sept.' },
+  { date: '2026-08-17', titre: 'Inscriptions SCAP S1', detail: 'Ouverture — jusqu’au 7 sept.' },
   { date: '2026-08-24', titre: 'Inscription sport — En Avant!', detail: 'Chèque 600 € + certificat médical' },
-  { date: '2026-09-01', titre: 'Candidature DU sur eCandidat', detail: 'Dépôt jusqu\u2019au 1er déc.' },
+  { date: '2026-09-01', titre: 'Candidature DU sur eCandidat', detail: 'Dépôt jusqu’au 1er déc.' },
   { date: '2026-09-28', titre: 'Rentrée SCAP S1', detail: 'Début des cours' },
   { date: '2026-12-01', titre: 'Date limite dossier DU', detail: 'Dernier jour eCandidat' },
   { date: '2027-01-15', titre: 'Rentrée du DU', detail: 'Panthéon-Sorbonne' },
-  { date: '2027-07-04', titre: 'Fin du DU', detail: '\u2192 recherche de poste' },
-  { date: '2027-09-01', titre: 'Bascule PEA \ud83c\udf0a', detail: 'Matelas reconstitué — cap sur la mer' },
+  { date: '2027-07-04', titre: 'Fin du DU', detail: '→ recherche de poste' },
+  { date: '2027-09-01', titre: 'Bascule PEA 🌊', detail: 'Matelas reconstitué — cap sur la mer' },
 ]
 
 export function joursRestants(dateStr) {
@@ -252,4 +253,92 @@ export function serieReel(params, horizon = MOIS.length) {
 export const reelParam = (params, i) => {
   const p = (params || []).find((x) => x.param_key === 'reel_' + i)
   return p && p.montant != null ? p.montant : ''
+}
+
+/* ============================================================
+   NOUVELLES FONCTIONS POUR BudgetMensuel (P1)
+   Calculs de provisions et épargne — exportées pour React
+   ============================================================ */
+
+export function pocketCalc(items, pocketCle, params, moisIndex, totalMode) {
+  // Calcule prévu/reel/solde d'une poche pour UN mois
+  // items = vision_items filtrées par poche_cle
+  // totalMode = 'cumul' pour cumul, sinon mensuel
+  const itemsPocket = (items || []).filter(x => x.pocket === pocketCle)
+  const monthlyRate = num(getParam(params, pocketCle, 0))
+  
+  const prevu = []
+  const reel = []
+  const solde = []
+  
+  let cumPrevu = 0
+  let cumReel = 0
+  
+  for (let i = 0; i <= moisIndex; i++) {
+    cumPrevu += monthlyRate
+    
+    itemsPocket.forEach(it => {
+      if (num(it.mois_index) === i) {
+        cumPrevu += num(it.montant_prevu || 0)
+        if (it.paid) cumReel += num(it.montant_reel || it.montant_prevu || 0)
+      }
+    })
+    
+    prevu.push(cumPrevu)
+    reel.push(cumReel)
+    solde.push(cumPrevu - cumReel)
+  }
+  
+  return prevu
+}
+
+export function planEpargne(items, params, moisIndex) {
+  // Solde prévisionnel des livrets mois par mois
+  // Formule : plan_baseline + (epargne_mensuelle × mois) - items épargne prévus
+  const baseline = getParam(params, 'start_livrets', 13321.59)
+  const mensuelle = getParam(params, 'epargne_mensuelle', 500)
+  const itemsEpargne = (items || []).filter(x => x.pocket === 'epargne')
+  
+  const result = []
+  let current = baseline
+  let cost = 0
+  
+  for (let i = 0; i <= moisIndex; i++) {
+    if (i > 0) current += mensuelle
+    
+    itemsEpargne.forEach(it => {
+      if (num(it.mois_index) === i) {
+        cost += num(it.montant_prevu || 0)
+      }
+    })
+    
+    result.push(current - cost)
+  }
+  
+  return result
+}
+
+export function totalReserve(poches, items, params, moisIndex) {
+  // Somme des provisions prévues d'une poche au mois i
+  let total = 0
+  
+  (poches || []).forEach(poche => {
+    if (poche.statut === 'actif') {
+      const calc = pocketCalc(items, poche.cle, params, moisIndex, 'cumul')
+      if (calc && calc[moisIndex] != null) {
+        total += num(calc[moisIndex])
+      }
+    }
+  })
+  
+  return total
+}
+
+export function reelDisponible(params, poches, items, moisIndex) {
+  // Épargne RÉELLE disponible au mois i APRÈS déduction des provisions
+  const reelParam = params.find(p => p.param_key === `reel_${moisIndex}`)
+  const reelVal = reelParam ? num(reelParam.montant) : 0
+  const reserve = totalReserve(poches, items, params, moisIndex)
+  
+  return reelVal - reserve
 }
