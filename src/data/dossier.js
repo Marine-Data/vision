@@ -266,29 +266,29 @@ export function pocketCalc(items, pocketCle, params, moisIndex, totalMode) {
   // totalMode = 'cumul' pour cumul, sinon mensuel
   const itemsPocket = (items || []).filter(x => x.pocket === pocketCle)
   const monthlyRate = num(getParam(params, pocketCle, 0))
-  
+
   const prevu = []
   const reel = []
   const solde = []
-  
+
   let cumPrevu = 0
   let cumReel = 0
-  
+
   for (let i = 0; i <= moisIndex; i++) {
     cumPrevu += monthlyRate
-    
+
     itemsPocket.forEach(it => {
       if (num(it.mois_index) === i) {
         cumPrevu += num(it.montant_prevu || 0)
         if (it.paid) cumReel += num(it.montant_reel || it.montant_prevu || 0)
       }
     })
-    
+
     prevu.push(cumPrevu)
     reel.push(cumReel)
     solde.push(cumPrevu - cumReel)
   }
-  
+
   return prevu
 }
 
@@ -298,30 +298,30 @@ export function planEpargne(items, params, moisIndex) {
   const baseline = getParam(params, 'start_livrets', 13321.59)
   const mensuelle = getParam(params, 'epargne_mensuelle', 500)
   const itemsEpargne = (items || []).filter(x => x.pocket === 'epargne')
-  
+
   const result = []
   let current = baseline
   let cost = 0
-  
+
   for (let i = 0; i <= moisIndex; i++) {
     if (i > 0) current += mensuelle
-    
+
     itemsEpargne.forEach(it => {
       if (num(it.mois_index) === i) {
         cost += num(it.montant_prevu || 0)
       }
     })
-    
+
     result.push(current - cost)
   }
-  
+
   return result
 }
 
 export function totalReserve(poches, items, params, moisIndex) {
   // Somme des provisions prévues d'une poche au mois i
   let total = 0
-  
+
   (poches || []).forEach(poche => {
     if (poche.statut === 'actif') {
       const calc = pocketCalc(items, poche.cle, params, moisIndex, 'cumul')
@@ -330,7 +330,7 @@ export function totalReserve(poches, items, params, moisIndex) {
       }
     }
   })
-  
+
   return total
 }
 
@@ -339,6 +339,6 @@ export function reelDisponible(params, poches, items, moisIndex) {
   const reelParam = params.find(p => p.param_key === `reel_${moisIndex}`)
   const reelVal = reelParam ? num(reelParam.montant) : 0
   const reserve = totalReserve(poches, items, params, moisIndex)
-  
+
   return reelVal - reserve
 }
