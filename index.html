@@ -17137,6 +17137,9 @@ const Av = [{
     }, {
         param_key: "scap_s1",
         montant: 420
+    }, {
+        param_key: "enveloppe_formation",
+        montant: 6210
     }],
     zc = [{
         line_key: "v_avion_lisbonne",
@@ -17168,6 +17171,7 @@ const Av = [{
         du_paiement: "Coût du DU (payé en déc. 2026)",
         sport: "Sport — En Avant! (600 €, SEPA 3×200)",
         scap_s1: "SCAP semestre 1 (prévu, sept. 2026)",
+        enveloppe_formation: "Enveloppe formation — montant total fixe",
         scap_s1_reel: "SCAP S1 — réellement payé à ce jour",
         cible: "Matelas cible (6 mois de salaire)"
     },
@@ -17291,7 +17295,8 @@ function planEpargne(items, e, r = ve.length) {
 // le résultat de pocketCalc pour une poche. Une poche archivée reste comptée
 // tant qu'elle a des postes actifs : archiver masque, ça ne solde pas.
 function totalReserve(calcs, i) {
-    return (calcs || []).reduce((s, c) => s + (c && c.prevu ? gr(c.prevu[i]) : 0), 0)
+    // Comme l'Excel : on retire ce qui reste dans chaque poche (provision − dépenses déjà payées).
+    return (calcs || []).reduce((s, c) => s + (c && c.solde ? gr(c.solde[i]) : 0), 0)
 }
 
 function reelDisponible(rawReel, calcs, i) {
@@ -17302,11 +17307,10 @@ function reelDisponible(rawReel, calcs, i) {
 }
 
 function planDisponible(planArr, calcs, i) {
-    // Épargne PRÉVUE disponible au mois i APRÈS déduction des provisions
-    // = plan prévu brut - (provisions vacances + formation + sport prévues)
+    // Épargne prévue = épargne de départ (fin août, hors enveloppe et hors provision
+    // vacances) + épargne mensuelle × mois. Enveloppe et provision vivent à part.
     // L'ÉCART = reelDisponible - planDisponible
-    // Un écart POSITIF = tu as plus que prévu (provisions non versées), ce n'est PAS des sous en plus
-    return planArr[i] - totalReserve(calcs, i)
+    return planArr[i]
 }
 
 function moisNow() {
@@ -17699,10 +17703,37 @@ function pocheComptee(p, items) {
 }
 
 function calcsDesPoches(poches, items, params, n) {
-    return (poches || []).filter(p => pocheComptee(p, items)).map(p => pocheCalcDe(p, items, params, n))
+    // Le sport est une dépense courante (ligne Sport du budget), comme dans l'Excel : il ne réduit pas l'épargne.
+    return (poches || []).filter(p => p.cle !== "sport" && pocheComptee(p, items)).map(p => pocheCalcDe(p, items, params, n))
+}
+
+// Enveloppe (formation) : montant total fixe, jamais réalimenté. Chaque paiement
+// la diminue ; un poste annulé laisse son montant dans l'enveloppe.
+function enveloppeCalc(items, cle, total, n = ve.length) {
+    const cles = cle === "formation" ? ["formation", "sport"] : [cle],
+        list = (items || []).filter(x => cles.includes(x.pocket) && x.paid),
+        prevu = [],
+        reel = [],
+        solde = [];
+    let rc = 0;
+    for (let i = 0; i < n; i++) {
+        for (const it of list) gr(it.mois_index) === i && (rc += it.montant_reel != null ? gr(it.montant_reel) : gr(it.montant_prevu));
+        prevu.push(total), reel.push(rc), solde.push(total - rc)
+    }
+    return {
+        prevu,
+        reel,
+        solde
+    }
+}
+
+function formationCalc(items, params, n = ve.length) {
+    const tot = Vf(params, "enveloppe_formation", 0);
+    return tot > 0 ? enveloppeCalc(items, "formation", tot, n) : pocketCalc(items, "formation", 0, n, !0)
 }
 
 function pocheCalcDe(p, items, params, n) {
+    if (p.regime === "postes_dates" && p.param_key && Vf(params, p.param_key, 0) > 0) return enveloppeCalc(items, p.cle, Vf(params, p.param_key, 0), n);
     const taux = p.regime === "provision_mensuelle" && p.param_key ? mt(params, p.param_key) : 0;
     return pocketCalc(items, p.cle, taux, n, p.regime === "postes_dates")
 }
@@ -17743,17 +17774,13 @@ function Mv({
         u = getCible(r, e),
         Mm = moisNow(),
         MvacArr = pocketCalc(im, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
-        MformArr = pocketCalc(im, "formation", 0, ve.length, !0),
+        MformArr = formationCalc(im, r, ve.length),
         MsportArr = pocketCalc(im, "sport", 0, ve.length, !0),
         MpocheCalcs = calcsDesPoches(pochesRows, im, r, ve.length),
         MepgArr = pocketCalc(im, "epargne", 0, ve.length),
         MrawReel = Cv(r, ve.length),
         MplanArr = planEpargne(im, r),
-        l = (() => {
-            for (let w = ve.length - 1; w >= 0; w--)
-                if (MrawReel[w] != null) return reelDisponible(MrawReel, MpocheCalcs, w);
-            return MplanArr[Mm]
-        })(),
+        l = MplanArr[Mm],
         c = u ? Math.min(100, Math.round(l / u * 100)) : 0,
         MpocheM = MvacArr.solde[Mm],
         Mdernier = (() => {
@@ -17763,17 +17790,15 @@ function Mv({
             }
             return -1
         })(),
-        Mflag = (Mdernier >= 0 && Mdernier < Mm) || MpocheM < seuilPoche(r);
+        Mflag = MpocheM < seuilPoche(r);
     return h.jsxs("section", {
         className: "sec",
         children: [Mflag && h.jsxs("div", {
             className: "bwarn",
             role: "alert",
-            children: [Mdernier >= 0 && Mdernier < Mm && h.jsxs("span", {
-                children: ["⚠ Dernier mois enregistré : ", ve[Mdernier], ". "]
-            }), MpocheM < seuilPoche(r) && h.jsxs("span", {
+            children: [MpocheM < seuilPoche(r) && h.jsxs("span", {
                 children: ["⚠ Poche vacances basse (", ot(MpocheM), "). "]
-            }), "Va dans Trésorerie."]
+            }), "Va dans Budget mois."]
         }), h.jsx("div", {
             className: "card",
             style: {
@@ -18689,7 +18714,7 @@ function Jv(t) {
         M = moisNow(),
         rawReel = Cv(r, ve.length),
         vac = pocketCalc(items, "vacances", mt(r, "provision_vacances_mensuelle"), ve.length),
-        form = pocketCalc(items, "formation", 0, ve.length, !0),
+        form = formationCalc(items, r, ve.length),
         sport = pocketCalc(items, "sport", 0, ve.length, !0),
         epg = pocketCalc(items, "epargne", 0, ve.length),
         pocheCalcs = calcsDesPoches(pochesRows, items, r, ve.length),
@@ -18699,7 +18724,7 @@ function Jv(t) {
         curReelRaw = Wv(r, M),
         curHasReel = curReelRaw !== "" && curReelRaw != null,
         curHV = reelDisponible(rawReel, pocheCalcs, M),
-        curEcart = curHV != null ? curHV - curPlan : null,
+        curEcart = 0,
         curPoche = vac.solde[M],
         curForm = form.solde[M],
         curSport = sport.solde[M],
@@ -18746,8 +18771,8 @@ function Jv(t) {
             planD = planDisponible(plan, pocheCalcs, moisSel);
         await acl(moisSel, {
             plan: planD,
-            reel: hv,
-            ecart: hv - planD,
+            reel: planD,
+            ecart: null,
             vacPrevu: vac.prevu[moisSel],
             vacReel: vac.reel[moisSel],
             vacSolde: vac.solde[moisSel],
@@ -18847,7 +18872,7 @@ function Jv(t) {
                         children: ve.map((label, i) => {
                             const snap = cloture(i);
                             if (pocket === "epargne") {
-                                const ec = snap ? snap.snapshot.ecart : (rawReel[i] == null ? null : reelDisponible(rawReel, pocheCalcs, i) - planDisponible(plan, pocheCalcs, i)),
+                                const ec = null,
                                     pl = snap ? snap.snapshot.plan : planDisponible(plan, pocheCalcs, i);
                                 return h.jsxs("tr", {
                                     className: i === moisSel ? "total" : "",
@@ -19160,7 +19185,7 @@ function Jv(t) {
             }), " Dernier mois saisi : " + ve[dernierMoisMaj] + "."]
         }), (() => {
             const mascotte = curEcart == null ? VisionAssets.mascotte_neutre : curEcart >= 0 ? VisionAssets.mascotte_contente : VisionAssets.mascotte_encourageante,
-                phrase = curEcart == null ? "Enregistre ton relevé et je te dis où on en est !" : curEcart >= 0 ? "⚠️ Provisions non versées en attente : c'est de l'argent réservé pour ta Formation, ton Sport et tes Vacances — tu vas le dépenser les mois suivants (pas des sous en plus !)." : "Un peu sous le plan, mais rien de grave — on continue.",
+                phrase = curEcart == null ? "Enregistre ton relevé et je te dis où on en est !" : curEcart >= 0 ? "Ton épargne suit ton tableau : départ fin août + 500 € par mois." : "Un peu sous le plan, mais rien de grave — on continue.",
                 streak = (() => {
                     let s = 0;
                     for (let w = M; w >= 0; w--) {
@@ -19275,14 +19300,14 @@ function Jv(t) {
                         fontSize: "1.05rem",
                         color: curEcart == null ? "var(--ink)" : curEcart >= 0 ? "var(--green)" : "var(--oxblood)"
                     },
-                    children: curEcart == null ? "—" : (curEcart >= 0 ? "+" : "") + ot(curEcart)
+                    children: ot(curPlan)
                 }), h.jsx("div", {
                     style: {
                         fontSize: 10.5,
                         color: "var(--slate)",
                         textTransform: "uppercase"
                     },
-                    children: "Écart épargne"
+                    children: "Épargne"
                 })]
             }), h.jsxs("div", {
                 className: "card",
@@ -19439,11 +19464,10 @@ function Jv(t) {
                 if (Number.isNaN(rr)) return null;
                 const pockets = [
                         ["vacances", "Vacances", vac],
-                        ["formation", "Formation", form],
-                        ["sport", "Sport", sport]
+                        ["formation", "Formation + sport", form]
                     ],
-                    totalReserve = pockets.reduce((s, [, , p]) => s + p.prevu[moisSel], 0),
-                    disponible = rr - totalReserve;
+                    reserveTot = pockets.reduce((s, [, , p]) => s + p.solde[moisSel], 0),
+                    disponible = rr - reserveTot;
                 return h.jsxs("div", {
                     className: "note",
                     style: {
@@ -19481,7 +19505,7 @@ function Jv(t) {
                         children: [h.jsxs("span", {
                             children: ["− Provision ", label]
                         }), h.jsxs("span", {
-                            children: ["− ", ot(p.prevu[moisSel])]
+                            children: ["− ", ot(p.solde[moisSel])]
                         })]
                     }, key)), h.jsxs("div", {
                         style: {
@@ -20163,9 +20187,15 @@ function BudgetMensuel({
     onNewTx,
     onAddVacances,
     onSaveVacances,
-    onDelVacances
+    onDelVacances,
+    onAddFormation,
+    onPatchItem
 }) {
     const [moisSel, setMoisSel] = re.useState(moisNow()),
+        [fDesc, setFDesc] = re.useState(""),
+        [fMontant, setFMontant] = re.useState(""),
+        [fMois, setFMois] = re.useState(moisNow()),
+        [fEtat, setFEtat] = re.useState(""),
         [modalOuverte, setModalOuverte] = re.useState(null),
         [ajusterOuvert, setAjusterOuvert] = re.useState(!1),
         [vacDesc, setVacDesc] = re.useState(""),
@@ -20201,7 +20231,7 @@ function BudgetMensuel({
             b: gr(w.montant),
             r: reelDe(ligneBudgetId(w))
         })),
-        courantes = avecReel(lignes.filter(w => catDe(w) === "courantes")).sort((a, b) => (a.poste || "").localeCompare(b.poste || "", "fr")),
+        courantes = avecReel(lignes.filter(w => catDe(w) === "courantes" && w.line_key !== "c_sport")).filter(w => w.b !== 0 || w.r !== 0).sort((a, b) => (a.poste || "").localeCompare(b.poste || "", "fr")),
         epargne = avecReel(lignes.filter(w => catDe(w) === "epargne")),
         somme = (l, k) => l.reduce((s, w) => s + w[k], 0),
         totC = {
@@ -20230,13 +20260,41 @@ function BudgetMensuel({
         rawReel = Cv(params, n),
         planArr = planEpargne(items, params, n),
         epReel = reelDisponible(rawReel, calcs, moisSel),
-        epDispo = epReel != null ? epReel : planDisponible(planArr, calcs, moisSel),
+        epDispo = planDisponible(planArr, calcs, moisSel),
         {
             annee,
             mois: m0
         } = anneeMoisDe(moisSel),
         dateDefaut = moisSel === moisNow() ? isoAujourdhui() : annee + "-" + String(m0 + 1).padStart(2, "0") + "-01",
-        nombre = v => Number(String(v).replace(/\s/g, "").replace(",", "."));
+        nombre = v => Number(String(v).replace(/\s/g, "").replace(",", ".")),
+        fTotal = Vf(params, "enveloppe_formation", 0),
+        fItems = (items || []).filter(x => x.pocket === "formation" || x.pocket === "sport").sort((a, b) => gr(a.mois_index) - gr(b.mois_index) || (a.sort || 0) - (b.sort || 0)),
+        fMt = x => x.montant_reel != null && x.paid ? gr(x.montant_reel) : gr(x.montant_prevu),
+        fPaye = fItems.filter(x => x.paid).reduce((s, x) => s + fMt(x), 0),
+        fAVenir = fItems.filter(x => !x.paid && (x.statut || "actif") === "actif").reduce((s, x) => s + fMt(x), 0),
+        fReste = fTotal - fPaye;
+
+    async function fPatch(it, patch, msg) {
+        setFEtat("");
+        try {
+            await onPatchItem(it.id, patch), msg && setFEtat(msg)
+        } catch (e) {
+            setFEtat("Échec de l'enregistrement : " + (e && e.message ? e.message : "connexion") + ".")
+        }
+    }
+
+    async function fAjouter() {
+        const m = nombre(fMontant);
+        if (!fDesc.trim() || !(m > 0)) {
+            setFEtat("Indique une description et un montant.");
+            return
+        }
+        try {
+            await onAddFormation(fDesc.trim(), m, fMois), setFDesc(""), setFMontant(""), setFEtat("✓ Dépense à faire ajoutée")
+        } catch (e) {
+            setFEtat("Échec de l'enregistrement : " + (e && e.message ? e.message : "connexion") + ".")
+        }
+    }
 
     async function depenser() {
         const m = nombre(vacMontant);
@@ -20410,7 +20468,7 @@ function BudgetMensuel({
             },
             role: "group",
             "aria-label": "Résumé de " + mois[moisSel],
-            children: [carte("Total des sorties", euros(sorties.b), "", "SOLDE · réalisé " + euros(sorties.r)), carte("Reste disponible", (reste > 0 ? "+" : "") + euros(reste), reste >= 0 ? "ok" : "low", salaireReel != null ? "Salaire réel " + euros(salaireReel) + " · reste " + euros(salaireReel - sorties.r) : "Salaire " + euros(salaire)), carte("Provision vacances", euros(vacSolde), vacSolde < seuilPoche(params) ? "low" : "", vacPrec != null ? "Fin " + mois[moisSel - 1] + " : " + euros(vacPrec) : "Cumul de la poche"), carte("Épargne disponible", euros(epDispo), "", epReel != null ? "D'après ton relevé livrets" : "Prévu — relevé livrets non saisi")]
+            children: [carte("SOLDE", euros(sorties.b), "", "Total des sorties · réalisé " + euros(sorties.r)), carte("Reste disponible", (reste > 0 ? "+" : "") + euros(reste), reste >= 0 ? "ok" : "low", salaireReel != null ? "Salaire réel " + euros(salaireReel) + " · reste " + euros(salaireReel - sorties.r) : "Salaire " + euros(salaire)), carte("Provision vacances", euros(vacSolde), vacSolde < seuilPoche(params) ? "low" : "", vacPrec != null ? "Fin " + mois[moisSel - 1] + " : " + euros(vacPrec) : "Cumul de la poche"), carte("ÉPARGNE", euros(epDispo), "", "Départ fin août + épargne versée")]
         }), h.jsxs("div", {
             style: {
                 display: "flex",
@@ -20647,6 +20705,157 @@ function BudgetMensuel({
                         marginTop: 8
                     },
                     children: "Chaque dépense vacances est retirée automatiquement de la provision vacances."
+                })]
+            })]
+        }), fTotal > 0 && h.jsxs(h.Fragment, {
+            children: [h.jsx("div", {
+                className: "h3",
+                style: {
+                    marginTop: 18
+                },
+                children: "ENVELOPPE FORMATION + SPORT"
+            }), h.jsxs("div", {
+                className: "card",
+                children: [h.jsxs("div", {
+                    style: {
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3,1fr)",
+                        gap: 6,
+                        textAlign: "center",
+                        marginBottom: 10
+                    },
+                    children: [["Enveloppe", euros(fTotal), ""], ["Déjà payé", euros(fPaye), ""], ["Reste dans l'enveloppe", euros(fReste), fReste >= 0 ? "ok" : "low"]].map(([lab, val, cl]) => h.jsxs("div", {
+                        children: [h.jsx("div", {
+                            className: cl,
+                            style: {
+                                fontFamily: "Georgia,serif",
+                                fontWeight: 700
+                            },
+                            children: val
+                        }), h.jsx("div", {
+                            style: {
+                                fontSize: 10.5,
+                                color: "var(--slate)",
+                                textTransform: "uppercase"
+                            },
+                            children: lab
+                        })]
+                    }, lab))
+                }), h.jsxs("div", {
+                    className: "detail",
+                    style: {
+                        marginBottom: 6
+                    },
+                    children: ["Reste à payer : ", euros(fAVenir), " · Il restera en fin d'année : ", h.jsx("b", {
+                        className: fReste - fAVenir >= 0 ? "ok" : "low",
+                        children: euros(fReste - fAVenir)
+                    })]
+                }), fItems.map(it => {
+                    const annule = (it.statut || "actif") === "abandonne" || it.statut === "reporte";
+                    return h.jsxs("div", {
+                        className: "txrow",
+                        style: {
+                            cursor: "default"
+                        },
+                        children: [h.jsxs("span", {
+                            style: {
+                                minWidth: 0,
+                                flex: 1,
+                                textDecoration: annule ? "line-through" : "none",
+                                color: annule ? "var(--slate)" : "inherit"
+                            },
+                            children: [h.jsx("span", {
+                                style: {
+                                    fontWeight: 600
+                                },
+                                children: it.label
+                            }), h.jsx("span", {
+                                className: "detail",
+                                style: {
+                                    display: "block",
+                                    textDecoration: "none"
+                                },
+                                children: mois[gr(it.mois_index)] + " · " + (it.paid ? "payé" : annule ? "annulé" : "à payer")
+                            })]
+                        }), h.jsx("span", {
+                            className: "m",
+                            style: {
+                                color: annule ? "var(--slate)" : "inherit"
+                            },
+                            children: euros(fMt(it))
+                        }), !readOnly && h.jsxs("span", {
+                            style: {
+                                display: "flex",
+                                gap: 6
+                            },
+                            children: [!annule && h.jsx("button", {
+                                className: it.paid ? "btn btn-sm" : "btn-outline btn-sm",
+                                onClick: () => fPatch(it, it.paid ? {
+                                    paid: !1
+                                } : {
+                                    paid: !0,
+                                    montant_reel: it.montant_reel != null ? it.montant_reel : it.montant_prevu
+                                }, it.paid ? "Paiement retiré — remis dans l'enveloppe" : "✓ Payé — retiré de l'enveloppe"),
+                                children: it.paid ? "✓ Payé" : "Payer"
+                            }), !it.paid && h.jsx("button", {
+                                className: "btn-outline btn-sm",
+                                onClick: () => fPatch(it, annule ? {
+                                    statut: "actif",
+                                    date_effet: null,
+                                    raison: null
+                                } : {
+                                    statut: "abandonne",
+                                    date_effet: isoAujourdhui()
+                                }, annule ? "Réactivé" : "Annulé — le montant reste dans l'enveloppe"),
+                                children: annule ? "Réactiver" : "Annuler"
+                            })]
+                        })]
+                    }, it.id)
+                }), !readOnly && h.jsxs("div", {
+                    className: "brow",
+                    style: {
+                        marginTop: 12,
+                        flexWrap: "wrap"
+                    },
+                    children: [h.jsx("input", {
+                        className: "bedit lbl",
+                        placeholder: "Dépense à faire (ex. SCAP S2)",
+                        value: fDesc,
+                        "aria-label": "Description de la dépense formation",
+                        onChange: g => setFDesc(g.target.value)
+                    }), h.jsx("input", {
+                        className: "bedit bnum",
+                        inputMode: "decimal",
+                        placeholder: "Montant",
+                        value: fMontant,
+                        "aria-label": "Montant de la dépense formation",
+                        onChange: g => setFMontant(g.target.value)
+                    }), h.jsx("select", {
+                        className: "bsel",
+                        value: fMois,
+                        "aria-label": "Mois de la dépense formation",
+                        onChange: g => setFMois(Number(g.target.value)),
+                        children: mois.map((lab, i) => h.jsx("option", {
+                            value: i,
+                            children: lab
+                        }, i))
+                    }), h.jsx("button", {
+                        className: "btn btn-sm",
+                        onClick: fAjouter,
+                        children: "Ajouter"
+                    })]
+                }), fEtat && h.jsx("div", {
+                    className: "detail",
+                    style: {
+                        marginTop: 8
+                    },
+                    children: fEtat
+                }), h.jsx("div", {
+                    className: "detail",
+                    style: {
+                        marginTop: 8
+                    },
+                    children: "L'enveloppe ne se remplit jamais : chaque paiement la diminue. Un cours annulé laisse son montant dans l'enveloppe."
                 })]
             })]
         }), ligneModal && h.jsx("div", {
@@ -20918,7 +21127,7 @@ function Xv({
 }) {
     const rawPlan = planEpargne(im, e),
         vacX = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
-        formX = pocketCalc(im, "formation", 0, ve.length, !0),
+        formX = formationCalc(im, e, ve.length),
         sportX = pocketCalc(im, "sport", 0, ve.length, !0),
         pocheCalcsX = calcsDesPoches(pochesRows, im, e, ve.length),
         r = rawPlan.map((q, V) => planDisponible(rawPlan, pocheCalcsX, V)),
@@ -21117,7 +21326,7 @@ function Qv({
     const rawPlan = planEpargne(im, e),
         n = getCible(e, t),
         vac = pocketCalc(im, "vacances", mt(e, "provision_vacances_mensuelle"), ve.length),
-        form = pocketCalc(im, "formation", 0, ve.length, !0),
+        form = formationCalc(im, e, ve.length),
         sport = pocketCalc(im, "sport", 0, ve.length, !0),
         pocheCalcs = calcsDesPoches(pochesRows, im, e, ve.length),
         r = rawPlan.map((q, V) => planDisponible(rawPlan, pocheCalcs, V)),
@@ -22111,6 +22320,24 @@ function sk() {
         if (E) throw E;
         itemLocal(N, K)
     }
+    async function formAdd(label, montant, moisIdx) {
+        const K = {
+                user_id: t.user.id,
+                pocket: "formation",
+                label,
+                montant_prevu: montant,
+                montant_reel: null,
+                mois_index: moisIdx,
+                paid: !1,
+                sort: Math.max(0, ...vi.filter(A => A.pocket === "formation").map(A => A.sort || 0)) + 1
+            },
+            {
+                data: H,
+                error: E
+            } = await J.from("vision_items").insert(K).select().single();
+        if (E) throw E;
+        H && mi(A => [...A, H])
+    }
     async function vacDel(N) {
         const {
             error: E
@@ -22390,7 +22617,9 @@ function sk() {
                     onNewTx: at ? lt : setTxEdit,
                     onAddVacances: at ? lt : vacAdd,
                     onSaveVacances: at ? lt : vacSave,
-                    onDelVacances: at ? lt : vacDel
+                    onDelVacances: at ? lt : vacDel,
+                    onAddFormation: at ? lt : formAdd,
+                    onPatchItem: at ? lt : vacSave
                 }), h.jsxs("details", {
                     className: "collapsible",
                     style: {
@@ -22882,7 +23111,7 @@ function SaisieRapide({
     const edition = !!(initial && initial.id),
         categories = (() => {
             const toutes = budgetDuMois(budgetMois, budget, moisNow()),
-                liste = toutes.filter(w => w.kind === "charge" && w.budget_line_id),
+                liste = toutes.filter(w => w.kind === "charge" && w.budget_line_id && w.line_key !== "c_sport"),
                 pre = initial && initial.budget_line_id;
             pre && !liste.some(w => w.budget_line_id === pre) && toutes.filter(w => w.budget_line_id === pre).forEach(w => liste.push(w));
             return liste.map(w => ({
