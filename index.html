@@ -20189,7 +20189,9 @@ function BudgetMensuel({
     onSaveVacances,
     onDelVacances,
     onAddFormation,
-    onPatchItem
+    onPatchItem,
+    onAddTx,
+    onUpdateTx
 }) {
     const [moisSel, setMoisSel] = re.useState(moisNow()),
         [fDesc, setFDesc] = re.useState(""),
@@ -20273,6 +20275,32 @@ function BudgetMensuel({
         fPaye = fItems.filter(x => x.paid).reduce((s, x) => s + fMt(x), 0),
         fAVenir = fItems.filter(x => !x.paid && (x.statut || "actif") === "actif").reduce((s, x) => s + fMt(x), 0),
         fReste = fTotal - fPaye;
+
+    async function enregistrerSalaire(brut) {
+        if (String(brut).trim() === "") return;
+        const v = nombre(brut);
+        if (!(v >= 0)) {
+            setFEtat("");
+            return
+        }
+        const ids = revenus.map(ligneBudgetId),
+            txs = txMois.filter(x => ids.includes(x.budget_line_id)),
+            dFin = new Date(annee, m0 + 1, 0),
+            dateFin = annee + "-" + String(m0 + 1).padStart(2, "0") + "-" + String(dFin.getDate()).padStart(2, "0");
+        if (txs.length && gr(txs[0].montant) === v) return;
+        try {
+            txs.length ? await onUpdateTx(txs[0].id, {
+                montant: v
+            }) : revenus.length && await onAddTx({
+                budget_line_id: ids[0],
+                montant: v,
+                note: "Salaire réel",
+                date_depense: dateFin
+            })
+        } catch (e) {
+            window.alert("Salaire non enregistré : " + (e && e.message ? e.message : "connexion"))
+        }
+    }
 
     async function fPatch(it, patch, msg) {
         setFEtat("");
@@ -20468,7 +20496,7 @@ function BudgetMensuel({
             },
             role: "group",
             "aria-label": "Résumé de " + mois[moisSel],
-            children: [carte("SOLDE", euros(sorties.b), "", "Total des sorties · réalisé " + euros(sorties.r)), carte("Reste disponible", (reste > 0 ? "+" : "") + euros(reste), reste >= 0 ? "ok" : "low", salaireReel != null ? "Salaire réel " + euros(salaireReel) + " · reste " + euros(salaireReel - sorties.r) : "Salaire " + euros(salaire)), carte("Provision vacances", euros(vacSolde), vacSolde < seuilPoche(params) ? "low" : "", vacPrec != null ? "Fin " + mois[moisSel - 1] + " : " + euros(vacPrec) : "Cumul de la poche"), carte("ÉPARGNE", euros(epDispo), "", "Départ fin août + épargne versée")]
+            children: [carte("Provision vacances", euros(vacSolde), vacSolde < seuilPoche(params) ? "low" : "", vacPrec != null ? "Fin " + mois[moisSel - 1] + " : " + euros(vacPrec) : "Cumul de la poche"), carte("ÉPARGNE", euros(epDispo), "", "Départ fin août + épargne versée")]
         }), h.jsxs("div", {
             style: {
                 display: "flex",
@@ -20584,6 +20612,83 @@ function BudgetMensuel({
                     }, w.lid))
                 })]
             })
+        }), h.jsx("div", {
+            className: "h3",
+            style: {
+                marginTop: 18
+            },
+            children: "SOLDE"
+        }), h.jsx("div", {
+            className: "card",
+            style: {
+                padding: 0,
+                overflowX: "auto"
+            },
+            children: h.jsxs("table", {
+                className: "tbl",
+                children: [h.jsx("thead", {
+                    children: h.jsxs("tr", {
+                        children: [h.jsx("th", {
+                            children: "Poste"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Budget"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Réalisé"
+                        }), h.jsx("th", {
+                            style: thNum,
+                            children: "Écart"
+                        })]
+                    })
+                }), h.jsxs("tbody", {
+                    children: [h.jsxs("tr", {
+                        className: "total",
+                        children: [h.jsx("td", {
+                            children: "SOLDE"
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(sorties.b)
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(sorties.r)
+                        }), h.jsx("td", {})]
+                    }), h.jsxs("tr", {
+                        children: [h.jsx("td", {
+                            style: {
+                                fontWeight: 700
+                            },
+                            children: "SALAIRE MENSUEL (net)"
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: euros(salaire)
+                        }), h.jsx("td", {
+                            className: "num",
+                            children: readOnly ? (salaireReel == null ? "—" : euros(salaireReel)) : h.jsx("input", {
+                                key: moisSel + "|" + (salaireReel == null ? "" : salaireReel),
+                                className: "bedit bnum",
+                                inputMode: "decimal",
+                                placeholder: "✏️ réel",
+                                "aria-label": "Salaire réel de " + mois[moisSel],
+                                defaultValue: salaireReel == null ? "" : String(salaireReel).replace(".", ","),
+                                onBlur: g => enregistrerSalaire(g.target.value),
+                                onKeyDown: g => {
+                                    g.key === "Enter" && g.target.blur()
+                                }
+                            })
+                        }), salaireReel == null ? h.jsx("td", {
+                            className: "num",
+                            children: "—"
+                        }) : ecartTd(salaireReel - sorties.r)]
+                    })]
+                })]
+            })
+        }), h.jsx("div", {
+            className: "detail",
+            style: {
+                marginTop: 6
+            },
+            children: "SOLDE = dépenses courantes + épargne programmée. Écart salaire = salaire réel − SOLDE réalisé."
         }), vacActive && h.jsxs(h.Fragment, {
             children: [h.jsx("div", {
                 className: "h3",
@@ -22618,6 +22723,8 @@ function sk() {
                     onAddVacances: at ? lt : vacAdd,
                     onSaveVacances: at ? lt : vacSave,
                     onDelVacances: at ? lt : vacDel,
+                    onAddTx: at ? lt : txAdd,
+                    onUpdateTx: at ? lt : txUpdate,
                     onAddFormation: at ? lt : formAdd,
                     onPatchItem: at ? lt : vacSave
                 }), h.jsxs("details", {
