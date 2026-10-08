@@ -20226,7 +20226,8 @@ function BudgetMensuel({
         },
         txMois = (transactions || []).filter(x => gr(x.mois_index) === moisSel),
         txDe = id => txMois.filter(x => x.budget_line_id === id).sort((a, b) => (b.date_depense || "").localeCompare(a.date_depense || "")),
-        reelDe = id => txDe(id).reduce((s, x) => s + gr(x.montant), 0),
+        reelDe = id => txDe(id).reduce((s, x) => s + (x.type === "remboursement" ? -gr(x.montant) : gr(x.montant)), 0),
+        rembOk = w => /santé|sante|transport/i.test(w && w.poste || ""),
         avecReel = l => l.map(w => ({
             ...w,
             lid: ligneBudgetId(w),
@@ -21001,17 +21002,17 @@ function BudgetMensuel({
                             style: {
                                 fontWeight: 600
                             },
-                            children: x.note || ligneModal.poste
+                            children: (x.type === "remboursement" ? "↩︎ " : "") + (x.note || (x.type === "remboursement" ? "Remboursement" : ligneModal.poste))
                         }), h.jsx("span", {
                             className: "detail",
                             style: {
                                 display: "block"
                             },
-                            children: hwkFmt(x.date_depense)
+                            children: hwkFmt(x.date_depense) + (x.type === "remboursement" ? " · remboursement" : "")
                         })]
                     }), h.jsx("span", {
-                        className: "m",
-                        children: euros(x.montant)
+                        className: "m" + (x.type === "remboursement" ? " ok" : ""),
+                        children: (x.type === "remboursement" ? "−" : "") + euros(x.montant)
                     })]
                 }, x.id)) : h.jsx("div", {
                     className: "detail",
@@ -21027,6 +21028,18 @@ function BudgetMensuel({
                         date_depense: dateDefaut
                     }),
                     children: "+ Ajouter une dépense"
+                }), !readOnly && rembOk(ligneModal) && h.jsx("button", {
+                    className: "btn-outline",
+                    style: {
+                        width: "100%",
+                        marginTop: 8
+                    },
+                    onClick: () => onNewTx({
+                        budget_line_id: ligneModal.lid,
+                        date_depense: dateDefaut,
+                        type: "remboursement"
+                    }),
+                    children: "↩︎ + Ajouter un remboursement"
                 })]
             })
         })]
@@ -22486,6 +22499,7 @@ function sk() {
                 montant: Number(ligne.montant) || 0,
                 note: ligne.note || null,
                 date_depense: ligne.date_depense,
+                type: ligne.type === "remboursement" ? "remboursement" : "depense",
                 mois_index: moisDeDate(ligne.date_depense)
             },
             {
@@ -23216,6 +23230,7 @@ function SaisieRapide({
     initial
 }) {
     const edition = !!(initial && initial.id),
+        remb = !!(initial && initial.type === "remboursement"),
         categories = (() => {
             const toutes = budgetDuMois(budgetMois, budget, moisNow()),
                 liste = toutes.filter(w => w.kind === "charge" && w.budget_line_id && w.line_key !== "c_sport"),
@@ -23275,7 +23290,7 @@ function SaisieRapide({
 
     const auj = isoAujourdhui(),
         duJour = (transactions || []).filter(t => t.date_depense === auj),
-        totalJour = duJour.reduce((s, t) => s + gr(t.montant), 0),
+        totalJour = duJour.reduce((s, t) => s + (t.type === "remboursement" ? -gr(t.montant) : gr(t.montant)), 0),
         valeur = Number(String(montant).replace(",", ".")),
         pret = ligneId && valeur > 0;
 
@@ -23295,7 +23310,8 @@ function SaisieRapide({
                 budget_line_id: ligneId,
                 montant: valeur,
                 note: note.trim() || null,
-                date_depense: dateDep
+                date_depense: dateDep,
+                type: remb ? "remboursement" : "depense"
             });
             setEtat("✓ " + euros(valeur) + " · " + (categories.find(c => c.id === ligneId) || {}).poste);
             if (enchainer && !edition) setMontant(""), setNote(""), champMontant.current && champMontant.current.focus(), setTimeout(() => setEtat(""), 2500);
@@ -23306,7 +23322,7 @@ function SaisieRapide({
     }
 
     async function supprimer() {
-        if (!window.confirm("Supprimer cette dépense ?")) return;
+        if (!window.confirm(remb ? "Supprimer ce remboursement ?" : "Supprimer cette dépense ?")) return;
         setEtat("Suppression…"), setErreur("");
         try {
             await onDelete(initial.id), onClose()
@@ -23325,7 +23341,7 @@ function SaisieRapide({
             children: [h.jsxs("div", {
                 className: "sheethead",
                 children: [h.jsx("h3", {
-                    children: edition ? "Modifier la dépense" : "Nouvelle dépense"
+                    children: remb ? (edition ? "Modifier le remboursement" : "Nouveau remboursement") : edition ? "Modifier la dépense" : "Nouvelle dépense"
                 }), h.jsx("button", {
                     className: "sheetclose",
                     onClick: onClose,
@@ -23464,7 +23480,7 @@ function SaisieRapide({
                     color: "var(--alert)"
                 },
                 onClick: supprimer,
-                children: "Supprimer cette dépense"
+                children: remb ? "Supprimer ce remboursement" : "Supprimer cette dépense"
             })]
         })
     })
