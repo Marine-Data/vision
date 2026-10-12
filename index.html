@@ -17279,6 +17279,82 @@ function pocketCalc(items, pocket, monthlyRate, r = ve.length, totalMode) {
 // + épargne programmée versée) dépasse le salaire réel, la différence est retirée
 // de la provision vacances. Rien n'est ajouté quand on reste en dessous. Comme l'Excel.
 let VISION_DEFICITS = [];
+// Alerte salaire : même calcul que le tableau Excel (salaire − dépenses − épargne).
+// Salaire réel s'il est saisi, sinon salaire prévu. Seuil d'alerte orange : 50 €.
+const ALERTE_SEUIL = 50;
+
+function alerteSalaire(modele, bmRows, tx, m) {
+    const lignes = budgetDuMois(bmRows, modele, m),
+        idsDe = k => lignes.filter(w => w.kind === k).map(ligneBudgetId),
+        txi = (tx || []).filter(x => gr(x.mois_index) === m),
+        somme = ids => txi.filter(x => ids.includes(x.budget_line_id)).reduce((s, x) => s + (x.type === "remboursement" ? -gr(x.montant) : gr(x.montant)), 0),
+        budgetDe = k => lignes.filter(w => w.kind === k).reduce((s, w) => s + gr(w.montant), 0),
+        idsRev = idsDe("revenu"),
+        aSalaire = txi.some(x => idsRev.includes(x.budget_line_id)),
+        salairePrevu = budgetDe("revenu"),
+        salaireReel = aSalaire ? somme(idsRev) : null,
+        salaire = salaireReel != null ? salaireReel : salairePrevu,
+        engage = somme(idsDe("charge")) + somme(idsDe("epargne")),
+        reste = salaire - engage,
+        budgetSorties = budgetDe("charge") + budgetDe("epargne"),
+        ecartPrevu = salairePrevu - budgetSorties;
+    return {
+        salaire, salaireReel, salairePrevu, engage, reste, budgetSorties, ecartPrevu,
+        niveau: salaire <= 0 ? null : reste < 0 ? "rouge" : reste < ALERTE_SEUIL ? "orange" : null,
+        prevu: ecartPrevu < 0 ? "orange" : null
+    }
+}
+
+// Bandeau d'alerte (Budget mois) : un chiffre, une jauge, presque pas de mots.
+function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
+    if (!a || (!a.niveau && !a.prevu)) return null;
+    const pct = a.salaire > 0 ? Math.min(100, Math.round(a.engage / a.salaire * 100)) : 0,
+        triangle = "M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17h.01",
+        cal = "M4 6.8A1.8 1.8 0 015.8 5h12.4A1.8 1.8 0 0120 6.8v11.4a1.8 1.8 0 01-1.8 1.8H5.8A1.8 1.8 0 014 18.2zM4 9.6h16M8.4 3.4v3.2M15.6 3.4v3.2",
+        rond = n => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(n)) + " €",
+        rouge = a.niveau === "rouge",
+        blocs = [];
+    if (a.niveau) {
+        const sous = rouge ? "rgba(255,255,255,.85)" : "#7a3a12";
+        blocs.push(h.jsxs("div", {
+            role: "status",
+            "aria-label": (rouge ? "Salaire dépassé de " + euros(-a.reste) : "Plus que " + euros(a.reste) + " avant le salaire") + ". Dépensé et épargné " + euros(a.engage) + " sur " + euros(a.salaire) + (rouge && vacSolde != null ? ". Pris sur la provision vacances, il reste " + euros(vacSolde) : ""),
+            style: { borderRadius: 20, padding: "14px 16px", marginBottom: 10, background: rouge ? "#a63a24" : "#fff3e6", border: rouge ? "0" : "2px solid #e9b27f", color: rouge ? "#ffffff" : "var(--ink)", boxShadow: rouge ? "0 10px 24px rgba(166,58,36,.28)" : "none" },
+            children: [h.jsxs("div", {
+                "aria-hidden": "true",
+                style: { display: "flex", alignItems: "center", gap: 12 },
+                children: [h.jsx("span", {
+                    style: { flex: "none", width: 42, height: 42, borderRadius: 14, background: rouge ? "rgba(255,255,255,.16)" : "#fbe0c6", color: rouge ? "#ffffff" : "#9a4515", display: "flex", alignItems: "center", justifyContent: "center" },
+                    children: accIcone(triangle, 22, 2.2)
+                }), h.jsx("span", { style: { flex: 1, fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums" }, children: rouge ? euros(a.reste) : "Encore " + rond(a.reste) }),
+                rouge && vacSolde != null ? h.jsxs("span", {
+                    style: { flex: "none", display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 12, background: "rgba(255,255,255,.16)", fontSize: 14, fontWeight: 800, fontVariantNumeric: "tabular-nums" },
+                    children: [accIcone("M3 20h18M5 20l4-11 3 5 3-3 4 9M15 6a2 2 0 1 0 0-.01", 16, 2.2), rond(vacSolde)]
+                }) : null]
+            }), h.jsxs("div", {
+                "aria-hidden": "true",
+                style: { marginTop: 12 },
+                children: [h.jsx("div", {
+                    style: { height: 10, borderRadius: 99, background: rouge ? "rgba(255,255,255,.25)" : "#f6dcc3", overflow: "hidden" },
+                    children: h.jsx("div", { style: { width: pct + "%", height: "100%", borderRadius: 99, background: rouge ? "repeating-linear-gradient(135deg,#ffffff 0 6px,#ffd9cf 6px 10px)" : "#c2702f" } })
+                }), h.jsx("div", {
+                    style: { textAlign: "right", marginTop: 5, fontSize: 13, fontWeight: 700, color: sous, fontVariantNumeric: "tabular-nums" },
+                    children: rond(a.engage) + " / " + rond(a.salaire)
+                })]
+            })]
+        }, "reel"))
+    }
+    if (a.prevu) blocs.push(h.jsxs("div", {
+        style: { borderRadius: 16, padding: "8px 8px 8px 12px", marginBottom: 10, background: "#fff8f0", border: "1px solid #f0cfa9", display: "flex", alignItems: "center", gap: 10 },
+        children: [h.jsx("span", { "aria-hidden": "true", style: { flex: "none", color: "#9a4515", display: "flex" }, children: accIcone(cal, 18, 2.2) }),
+            h.jsxs("span", {
+                style: { flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 800, color: "#7a3a12", fontVariantNumeric: "tabular-nums" },
+                children: ["Budget ", h.jsx("span", { "aria-hidden": "true", children: "> " }), h.jsx("span", { style: KB_SR, children: "au-dessus du " }), "salaire · ", euros(a.ecartPrevu)]
+            }), onAjuster ? h.jsx("button", { type: "button", className: "btn-outline btn-sm", onClick: onAjuster, style: { flex: "none", minHeight: 44, borderColor: "#c2702f", color: "#7a3a12" }, children: "Ajuster" }) : null]
+    }, "prevu"));
+    return h.jsx("div", { children: blocs })
+}
+
 // Épargne programmée automatique : jour du virement et premier mois concerné
 // (index 3 = novembre 2026 ; septembre et octobre sont déjà saisis à la main).
 const EP_AUTO_JOUR = 3,
@@ -20518,6 +20594,11 @@ function BudgetMensuel({
                 title: "Exporter ce mois (Excel)",
                 children: "↓"
             })]
+        }), h.jsx(AlerteSalaire, {
+            a: alerteSalaire(budget, budgetMois, transactions, moisSel),
+            moisLabel: mois[moisSel],
+            vacSolde,
+            onAjuster: readOnly || ferme ? null : () => setAjusterOuvert(!0)
         }), h.jsxs("div", {
             className: "sumrow",
             style: {
@@ -22444,11 +22525,14 @@ function Accueil({
             lignes = budgetDuMois(budgetMois, budget, M).filter(w => catDe(w) === "courantes" && w.line_key !== "c_sport"),
             ids = lignes.map(ligneBudgetId),
             reel = (transactions || []).filter(x => gr(x.mois_index) === M && ids.includes(x.budget_line_id)).reduce((s, x) => s + (x.type === "remboursement" ? -gr(x.montant) : gr(x.montant)), 0),
-            reste = lignes.reduce((s, w) => s + gr(w.montant), 0) - reel;
+            reste = lignes.reduce((s, w) => s + gr(w.montant), 0) - reel,
+            al = alerteSalaire(budget, budgetMois, transactions, M);
         kpis = [
             { l: "Objectif 6 mois", v: (cible ? Math.round(epargne / cible * 100) : 0) + " %", c: "#086b78", i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01" },
             { l: "Vacances", v: ot(vac), c: "#9a4515", i: "M3 20h18M5 20l4-11 3 5 3-3 4 9M15 6a2 2 0 1 0 0-.01" },
-            { l: "Reste du mois", v: ot(reste), c: reste < 0 ? "#b8432a" : "#0b7a5c", alerte: reste < 0, i: ACC_THEMES.budget.i }
+            al.niveau === "rouge" ? { l: "Salaire dépassé", v: ot(al.reste), c: "#b8432a", alerte: "rouge", i: "M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17h.01" } :
+            al.niveau === "orange" ? { l: "Avant le salaire", v: ot(al.reste), c: "#9a4515", alerte: "orange", i: "M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17h.01" } :
+            { l: "Reste du mois", v: ot(reste), c: reste < 0 ? "#b8432a" : "#0b7a5c", alerte: reste < 0 ? "rouge" : null, i: ACC_THEMES.budget.i }
         ]
     }
 
@@ -22555,10 +22639,10 @@ function Accueil({
             type: "button", onClick: () => goTab("tresorerie"), "aria-label": kpis.map(k => k.l + " " + k.v).join(", ") + ". Ouvrir Budget mois",
             style: { border: 0, background: "none", padding: 0, width: "100%", display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 6, marginBottom: 12, fontFamily: "inherit", cursor: "pointer", color: "var(--ink)" },
             children: kpis.map(k => h.jsxs("span", {
-                style: { background: "#ffffff", borderRadius: 16, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, boxShadow: "var(--shadow)", border: k.alerte ? "2px solid #b8432a" : "2px solid transparent" },
+                style: { background: k.alerte === "rouge" ? "#fdeeea" : k.alerte === "orange" ? "#fff3e6" : "#ffffff", borderRadius: 16, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, boxShadow: "var(--shadow)", border: "2px solid " + (k.alerte === "rouge" ? "#b8432a" : k.alerte === "orange" ? "#c2702f" : "transparent") },
                 children: [h.jsx("span", { style: { color: k.c, display: "flex" }, children: accIcone(k.i, 18, 2.2) }),
                     h.jsx("span", { style: { fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: k.alerte ? k.c : "var(--ink)" }, children: k.v }),
-                    h.jsx("span", { style: { fontSize: 12.5, fontWeight: 700, color: "var(--slate)", textAlign: "center", lineHeight: 1.2 }, children: k.l })]
+                    h.jsx("span", { style: { fontSize: 12.5, fontWeight: 700, color: k.alerte ? k.c : "var(--slate)", textAlign: "center", lineHeight: 1.2 }, children: k.l })]
             }, k.l))
         }), prochaine && h.jsxs("button", {
             type: "button", onClick: () => ouvrir(prochaine.c),
@@ -23066,6 +23150,8 @@ function sk() {
     const [taches, setTaches] = re.useState([]);
     const [pe, setPe] = re.useState({});
     const [txOk, setTxOk] = re.useState(!1);
+    const [tachesOk, setTachesOk] = re.useState(!1);
+    const alerteRef = re.useRef({});
     const epAutoRef = re.useRef(!1);
     const ctRef = re.useRef([]);
     ctRef.current = ct;
@@ -23197,7 +23283,7 @@ function sk() {
             const {
                 data: K
             } = await J.from("vision_taches").select("*").order("sort").order("created_at");
-            setTaches(K || [])
+            setTaches(K || []), K && setTachesOk(!0)
         })(), (async () => {
             const {
                 data: K
@@ -23537,6 +23623,16 @@ function sk() {
             stx(p => [...(K || []), ...p]), await relireSpend()
         })()
     }, [t, l, bm, c, txOk]);
+    // Dépassement du salaire sur le mois en cours : une tâche « Revoir le budget »
+    // apparaît dans la ligne Budget de l'Accueil (une seule par mois).
+    re.useEffect(() => {
+        if (at || !t || !l || !txOk || !tachesOk) return;
+        const M = moisNow(), a = alerteSalaire(l, bm, tx, M), ref = "salaire:" + M;
+        if (a.niveau !== "rouge" || alerteRef.current[ref] || taches.some(x => x.source === "alerte" && x.source_ref === ref)) return;
+        alerteRef.current[ref] = !0;
+        const { annee, mois } = anneeMoisDe(M), fin = new Date(annee, mois + 1, 0);
+        tacheAdd({ titre: "Revoir le budget de " + ve[M], theme: "budget", etape: "afaire", echeance: annee + "-" + String(mois + 1).padStart(2, "0") + "-" + String(fin.getDate()).padStart(2, "0"), source: "alerte", source_ref: ref }).catch(e => console.warn("tâche alerte :", e.message))
+    }, [t, l, bm, tx, txOk, tachesOk, taches]);
     // « Pas versé » : on retire la saisie automatique et on note de ne pas la recréer.
     async function epargnePasVersee(x) {
         const cle = epAutoCle(x.budget_line_id, gr(x.mois_index));
