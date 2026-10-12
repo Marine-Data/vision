@@ -16946,6 +16946,10 @@ const Av = [{
         label: "Planning",
         icon: "calendrier"
     }, {
+        id: "suivi",
+        label: "Suivi",
+        icon: "checklist"
+    }, {
         id: "budget",
         label: "Budget",
         icon: "portefeuille"
@@ -16961,6 +16965,10 @@ const Av = [{
         id: "sport",
         label: "Sport",
         icon: "haltere"
+    }, {
+        id: "pieces",
+        label: "Pièces",
+        icon: "document"
     }, {
         id: "homework",
         label: "Devoirs",
@@ -22001,29 +22009,70 @@ function nk({
     })
 }
 
-// Accueil — kanban de mes tâches par thème. Les devoirs, pièces et étapes du
-// suivi viennent de leurs onglets (lecture seule ici : un toucher ouvre l'onglet).
-// Les tâches ajoutées à la main vivent dans vision_taches.
+// ============================================================
+// Kanban : Accueil, Devoirs, Pièces — composants partagés.
+// Toutes les couleurs de texte ont un contraste ≥ 4,5:1, les
+// icônes ≥ 3:1, les zones à toucher ≥ 44 px.
+// ============================================================
 const ACC_THEMES = {
     devoirs: { l: "Devoirs", short: "Devoirs", c: "#3b5fc4", soft: "#e8eefb", tab: "homework", page: "Devoirs", i: "M12 6.6C10.4 5.1 7.9 4.6 4.6 5.1v12.2c3.3-.5 5.8 0 7.4 1.5 1.6-1.5 4.1-2 7.4-1.5V5.1c-3.3-.5-5.8 0-7.4 1.5zM12 6.6v12.2" },
-    budget: { l: "Budget", short: "Budget", c: "#0f8a68", soft: "#e3f4ed", tab: "tresorerie", page: "Budget mois", i: "M4 8.4A1.8 1.8 0 0 1 5.8 6.6h12.4A1.8 1.8 0 0 1 20 8.4v9.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 17.6zM20 11.4h-3.1a1.6 1.6 0 0 0 0 3.2H20" },
-    reco: { l: "Reconversion", short: "Reconv.", c: "#0a7b8a", soft: "#dff2f4", tab: "suivi", page: "Suivi", i: "M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5M22 9v6" },
+    budget: { l: "Budget", short: "Budget", c: "#0b7a5c", soft: "#e3f4ed", tab: "tresorerie", page: "Budget mois", i: "M4 8.4A1.8 1.8 0 0 1 5.8 6.6h12.4A1.8 1.8 0 0 1 20 8.4v9.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 17.6zM20 11.4h-3.1a1.6 1.6 0 0 0 0 3.2H20" },
+    reco: { l: "Reconversion", short: "Reconv.", c: "#086b78", soft: "#dff2f4", tab: "suivi", page: "Suivi", i: "M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5M22 9v6" },
     sport: { l: "Sport", short: "Sport", c: "#b03a6e", soft: "#f8e6ef", tab: "sport", page: "Sport", i: "M6.8 8.2v7.6M3.8 9.8v4.4M17.2 8.2v7.6M20.2 9.8v4.4M6.8 12h10.4" },
     pieces: { l: "Pièces", short: "Pièces", c: "#8a5a12", soft: "#f6ecd9", tab: "pieces", page: "Pièces", i: "M6.2 3.6h6.6l5 5v11.8a1 1 0 0 1-1 1H6.2a1 1 0 0 1-1-1V4.6a1 1 0 0 1 1-1zM12.8 3.6V8.6h5" }
 };
+const KB_I = {
+    rond: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
+    play: "M8 5v14l11-7z",
+    sablier: "M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9",
+    check: "M5 12l5 5L20 7",
+    etoile: "M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z",
+    doc: "M6.2 3.6h6.6l5 5v11.8a1 1 0 0 1-1 1H6.2a1 1 0 0 1-1-1V4.6a1 1 0 0 1 1-1zM12.8 3.6V8.6h5",
+    envoi: "M4 12l16-8-6 16-3-6zM11 14l9-10",
+    plus: "M12 5v14M5 12h14",
+    chevron: "M9 6l6 6-6 6",
+    croix: "M6 6l12 12M18 6L6 18",
+    haut: "M12 19V5M6 11l6-6 6 6",
+    bas: "M12 5v14M6 13l6 6 6-6",
+    dossier: "M3.6 7.2A1.8 1.8 0 0 1 5.4 5.4h4l2 2.2h7.2a1.8 1.8 0 0 1 1.8 1.8v8.4a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8zM12 10.8v4.8M9.6 13.2h4.8",
+    liste: "M4 6h10M4 12h16M4 18h12M18 4v4M16 6h4"
+};
+// Étapes du kanban (Accueil, tâches libres)
 const ACC_ETAPES = [
-    { k: "afaire", l: "À faire", i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", c: "#3d545c", soft: "#e4edef" },
-    { k: "encours", l: "En cours", i: "M8 5v14l11-7z", c: "#0a7b8a", soft: "#dff2f4" },
-    { k: "attente", l: "En attente", i: "M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9", c: "#b5561f", soft: "#fbeee4" },
-    { k: "fait", l: "Fait", i: "M5 12l5 5L20 7", c: "#0f8a68", soft: "#e3f4ed" }
+    { k: "afaire", l: "À faire", i: KB_I.rond, c: "#3d545c", soft: "#e4edef" },
+    { k: "encours", l: "En cours", i: KB_I.play, c: "#086b78", soft: "#dff2f4", fill: !0 },
+    { k: "attente", l: "En attente", i: KB_I.sablier, c: "#9a4515", soft: "#fbeee4" },
+    { k: "fait", l: "Fait", i: KB_I.check, c: "#0b6e53", soft: "#e3f4ed" }
+];
+// Étapes d'un devoir : la valeur stockée reste celle de la base (« Fait »),
+// seul le libellé affiché change (« Rendu »).
+const HW_ETAPES = [
+    { k: "À faire", l: "À faire", i: KB_I.rond, c: "#3d545c", soft: "#e4edef", kan: "afaire" },
+    { k: "En cours", l: "En cours", i: KB_I.play, c: "#3b5fc4", soft: "#e8eefb", fill: !0, kan: "encours" },
+    { k: "Fait", l: "Rendu", i: KB_I.check, c: "#0b6e53", soft: "#e3f4ed", kan: "fait" },
+    { k: "Corrigé", l: "Corrigé", i: KB_I.etoile, c: "#5a4fa8", soft: "#ecebf8", kan: "fait" }
+];
+const PIECE_ETAPES = [
+    { k: "afournir", l: "À fournir", i: KB_I.doc, c: "#8a5a12", soft: "#f6ecd9", kan: "afaire" },
+    { k: "envoyee", l: "Envoyée", i: KB_I.envoi, c: "#9a4515", soft: "#fbeee4", kan: "attente" },
+    { k: "validee", l: "Validée", i: KB_I.check, c: "#0b6e53", soft: "#e3f4ed", kan: "fait" }
+];
+const SUIVI_ETAPES = [
+    { k: "afaire", l: "À faire", i: KB_I.rond, c: "#3d545c", soft: "#e4edef", kan: "afaire" },
+    { k: "fait", l: "Fait", i: KB_I.check, c: "#0b6e53", soft: "#e3f4ed", kan: "fait" }
 ];
 const ACC_ORDRE = { encours: 0, afaire: 1, attente: 2, fait: 3 };
 const ACC_MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const KB_PALETTE = [
+    { c: "#3b5fc4", soft: "#e8eefb" }, { c: "#086b78", soft: "#dff2f4" }, { c: "#8a5a12", soft: "#f6ecd9" },
+    { c: "#b03a6e", soft: "#f8e6ef" }, { c: "#5a4fa8", soft: "#ecebf8" }, { c: "#0b7a5c", soft: "#e3f4ed" }
+];
+const KB_SR = { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" };
 
 function accIcone(d, size, sw, fill) {
     return h.jsx("svg", {
         width: size, height: size, viewBox: "0 0 24 24", fill: fill || "none", stroke: "currentColor",
-        strokeWidth: sw || 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true",
+        strokeWidth: sw || 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", focusable: "false",
         children: h.jsx("path", { d })
     })
 }
@@ -22032,23 +22081,239 @@ function accIso(d) {
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
 }
 
+// Échéance → libellé court à l'écran + phrase complète pour la lecture vocale.
 function accEcheance(iso) {
     if (!iso) return null;
     const p = String(iso).slice(0, 10).split("-"),
         d = new Date(+p[0], +p[1] - 1, +p[2]),
         t = new Date, auj = new Date(t.getFullYear(), t.getMonth(), t.getDate()),
-        j = Math.round((d - auj) / 864e5);
-    if (j < 0) return { l: "En retard", urgent: !0, j };
-    if (j === 0) return { l: "Aujourd'hui", urgent: !0, j };
-    if (j <= 3) return { l: "J-" + j, urgent: !0, j };
-    return { l: d.getDate() + " " + ACC_MOIS[d.getMonth()], urgent: !1, j }
+        j = Math.round((d - auj) / 864e5),
+        date = d.getDate() + " " + ACC_MOIS[d.getMonth()];
+    if (j < 0) return { l: "En retard", aria: "en retard de " + -j + " jour" + (j < -1 ? "s" : "") + ", prévu le " + date, urgent: !0, late: !0, j };
+    if (j === 0) return { l: "Aujourd'hui", aria: "pour aujourd'hui", urgent: !0, j };
+    if (j === 1) return { l: "Demain", aria: "pour demain", urgent: !0, j };
+    if (j <= 3) return { l: "J-" + j, aria: "dans " + j + " jours, le " + date, urgent: !0, j };
+    return { l: date, aria: "pour le " + date, urgent: !1, j }
 }
 
+function kbRaccourcis() {
+    const a = new Date;
+    return [
+        { k: accIso(new Date(a.getFullYear(), a.getMonth(), a.getDate() + 1)), l: "Demain" },
+        { k: accIso(new Date(a.getFullYear(), a.getMonth(), a.getDate() + 6)), l: "Semaine" },
+        { k: accIso(new Date(a.getFullYear(), a.getMonth() + 1, 0)), l: "Fin du mois" }
+    ]
+}
+
+function kbFlash(set) {
+    return m => {
+        set(m), clearTimeout(window.__kbT), window.__kbT = setTimeout(() => set(""), 1800)
+    }
+}
+
+function KbToast({ texte }) {
+    return h.jsx("div", {
+        role: "status", "aria-live": "polite",
+        style: { position: "fixed", left: 20, right: 20, bottom: "calc(96px + env(safe-area-inset-bottom))", zIndex: 60, padding: texte ? "12px 16px" : 0, borderRadius: 14, background: texte ? "var(--ink)" : "transparent", color: "#ffffff", fontSize: 15, fontWeight: 600, textAlign: "center", maxWidth: 520, margin: "0 auto", pointerEvents: "none" },
+        children: texte
+    })
+}
+
+// Fenêtre du bas accessible : Échap et le bouton retour du téléphone la ferment,
+// le focus reste dedans, et revient sur l'élément touché à la fermeture.
+function KbSheet({ label, onClose, children, form, onSubmit }) {
+    const ref = re.useRef(null), fermer = re.useRef(onClose);
+    fermer.current = onClose;
+    re.useEffect(() => {
+        const avant = document.activeElement, el = ref.current,
+            focusables = () => el ? [...el.querySelectorAll('button:not([disabled]),input:not([disabled]),textarea,select,a[href]')] : [];
+        const premier = el && (el.querySelector("[data-autofocus]") || focusables()[0]);
+        premier ? premier.focus({ preventScroll: !0 }) : el && el.focus();
+        let parRetour = !1;
+        try { history.pushState({ kbSheet: Date.now() }, "") } catch (e) {}
+        const onPop = () => {
+            if (window.__kbIgnorePop) { window.__kbIgnorePop = !1; return }
+            parRetour = !0, fermer.current()
+        };
+        const onKey = ev => {
+            if (ev.key === "Escape") { ev.preventDefault(), fermer.current(); return }
+            if (ev.key !== "Tab") return;
+            const l = focusables();
+            if (!l.length) return;
+            const a = l[0], z = l[l.length - 1];
+            if (ev.shiftKey && document.activeElement === a) ev.preventDefault(), z.focus();
+            else if (!ev.shiftKey && document.activeElement === z) ev.preventDefault(), a.focus()
+        };
+        window.addEventListener("popstate", onPop), document.addEventListener("keydown", onKey);
+        return () => {
+            window.removeEventListener("popstate", onPop), document.removeEventListener("keydown", onKey);
+            if (!parRetour) try { history.state && history.state.kbSheet && (window.__kbIgnorePop = !0, history.back()) } catch (e) {}
+            avant && avant.focus && document.contains(avant) && avant.focus({ preventScroll: !0 })
+        }
+    }, []);
+    const props = {
+        ref, className: "sheet", role: "dialog", "aria-modal": "true", "aria-label": label, tabIndex: -1,
+        children: [h.jsxs("div", {
+            className: "sheethead",
+            children: [h.jsx("h3", { style: { margin: 0, fontSize: "1.2rem", lineHeight: 1.25 }, children: label }),
+                h.jsx("button", { type: "button", className: "sheetclose", onClick: onClose, "aria-label": "Fermer", children: accIcone(KB_I.croix, 20, 2.4) })]
+        }), children]
+    };
+    return h.jsx("div", {
+        className: "sheetbg", onClick: ev => { ev.target === ev.currentTarget && onClose() },
+        children: form ? h.jsxs("form", { ...props, onSubmit: ev => { ev.preventDefault(), onSubmit && onSubmit() } }) : h.jsxs("div", props)
+    })
+}
+
+// Grille de gros boutons d'étape (même fenêtre partout).
+function KbEtapes({ etapes, actuelle, onPick }) {
+    return h.jsx("div", {
+        role: "group", "aria-label": "Étape",
+        style: { display: "grid", gridTemplateColumns: "repeat(" + etapes.length + ",minmax(0,1fr))", gap: 8, marginBottom: 18 },
+        children: etapes.map(et => {
+            const on = actuelle === et.k;
+            return h.jsxs("button", {
+                type: "button", onClick: () => onPick(et.k), "aria-pressed": on ? "true" : "false",
+                style: { border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 7, color: et.c, fontFamily: "inherit", cursor: "pointer" },
+                children: [h.jsx("span", {
+                    style: { width: 60, height: 60, borderRadius: 20, background: on ? et.c : "#ffffff", color: on ? "#ffffff" : et.c, border: "2px solid " + et.c, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
+                    children: accIcone(et.i, 26, 2.2)
+                }), h.jsx("span", { style: { fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }, children: et.l })]
+            }, et.k)
+        })
+    })
+}
+
+// Pastille : titre sur 2 lignes max, échéance, contour rouge si en retard,
+// appui long optionnel.
+function KbPill({ titre, etape, couleur, soft, due, fini, onClick, onLong, sousTitre }) {
+    const e = !fini && due ? accEcheance(due) : null,
+        late = !!(e && e.late),
+        look = fini ? { bg: "#f3f8f9", bd: "#f3f8f9", fg: "var(--ink-soft)", dbg: etape.soft, dfg: etape.c, fill: "none" } :
+        etape.fill ? { bg: soft, bd: couleur, fg: "var(--ink)", dbg: couleur, dfg: "#ffffff", fill: "currentColor" } :
+        etape.kan === "attente" || etape.k === "attente" ? { bg: "#fbeee4", bd: "#fbeee4", fg: "var(--ink)", dbg: "#ffffff", dfg: etape.c, fill: "none" } :
+        { bg: "#ffffff", bd: "#c9d8db", fg: "var(--ink)", dbg: etape.soft, dfg: etape.c, fill: "none" },
+        lp = re.useRef({ t: 0, fired: !1 });
+    const longProps = onLong ? {
+        onPointerDown: () => {
+            lp.current.fired = !1, clearTimeout(lp.current.t), lp.current.t = setTimeout(() => {
+                lp.current.fired = !0;
+                try { navigator.vibrate && navigator.vibrate(30) } catch (x) {}
+                onLong()
+            }, 550)
+        },
+        onPointerUp: () => clearTimeout(lp.current.t),
+        onPointerLeave: () => clearTimeout(lp.current.t),
+        onPointerCancel: () => clearTimeout(lp.current.t),
+        onContextMenu: ev => ev.preventDefault()
+    } : {};
+    return h.jsxs("button", {
+        type: "button",
+        onClick: () => { if (lp.current.fired) { lp.current.fired = !1; return } onClick && onClick() },
+        ...longProps,
+        "aria-label": titre + (sousTitre ? ", " + sousTitre : "") + ", " + etape.l + (e ? ", " + e.aria : "") + (onLong ? ". Appui long pour valider" : ""),
+        style: { minHeight: 44, maxWidth: "100%", display: "flex", alignItems: "center", gap: 8, padding: "6px 12px 6px 6px", borderRadius: 22, border: "2px solid " + (late ? "#b8432a" : look.bd), background: late ? "#fff4f1" : look.bg, color: look.fg, fontSize: 14.5, fontWeight: 600, textAlign: "left", fontFamily: "inherit", cursor: "pointer", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" },
+        children: [h.jsx("span", {
+            style: { flex: "none", width: 28, height: 28, borderRadius: "50%", background: look.dbg, color: look.dfg, display: "flex", alignItems: "center", justifyContent: "center" },
+            children: accIcone(etape.i, 14, 2.6, look.fill)
+        }), h.jsx("span", {
+            style: { minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textDecoration: fini && etape.k === "Corrigé" ? "line-through" : "none" },
+            children: titre
+        }), e ? h.jsx("span", { "aria-hidden": "true", style: { flex: "none", fontSize: 12.5, fontWeight: 800, color: e.urgent ? "#b8432a" : "var(--slate)" }, children: e.l }) : null]
+    })
+}
+
+// Ligne (couloir) : en-tête, barre de progression, contenu, état vide utile.
+function KbLane({ titre, sous, icone, abrev, c, soft, ratio, pct, onHeader, headerAria, onAdd, addAria, badge, barre, children, vide, onVide, videLabel }) {
+    const tete = [h.jsx("span", {
+        style: { flex: "none", width: 36, height: 36, borderRadius: 11, background: soft, color: c, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900 },
+        children: icone ? accIcone(icone, 18, 2.2) : abrev
+    }), h.jsxs("span", {
+        style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
+        children: [h.jsx("span", { style: { fontSize: 16, fontWeight: 800, lineHeight: 1.25 }, children: titre }), sous ? h.jsx("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--slate)", lineHeight: 1.3 }, children: sous }) : null]
+    }), badge || (ratio != null ? h.jsxs("span", {
+        style: { flex: "none", display: "flex", alignItems: "center", gap: 8 },
+        children: [barre ? null : h.jsx("span", {
+            "aria-hidden": "true", style: { width: 54, height: 7, borderRadius: 99, background: soft, overflow: "hidden" },
+            children: h.jsx("span", { style: { display: "block", height: 7, borderRadius: 99, width: pct + "%", background: c } })
+        }), h.jsx("span", { style: { fontSize: 13, fontWeight: 800, color: c, fontVariantNumeric: "tabular-nums" }, children: ratio })]
+    }) : null), onHeader ? h.jsx("span", { "aria-hidden": "true", style: { flex: "none", color: "var(--slate-light)", display: "flex" }, children: accIcone(KB_I.chevron, 18, 2.4) }) : null];
+    return h.jsxs("section", {
+        "aria-label": titre,
+        style: { background: "#ffffff", borderRadius: 22, padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: "var(--shadow)" },
+        children: [h.jsxs("div", {
+            style: { display: "flex", alignItems: "center", gap: 6 },
+            children: [onHeader ? h.jsx("button", {
+                type: "button", onClick: onHeader, "aria-label": headerAria,
+                style: { flex: 1, minWidth: 0, border: 0, background: "none", padding: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 10, color: "var(--ink)", textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
+                children: tete
+            }) : h.jsx("div", { style: { flex: 1, minWidth: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 10 }, children: tete }),
+            onAdd ? h.jsx("button", {
+                type: "button", onClick: onAdd, "aria-label": addAria,
+                style: { flex: "none", width: 44, height: 44, marginRight: -6, border: 0, borderRadius: "50%", background: "none", color: "var(--slate-light)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+                children: accIcone(KB_I.plus, 20, 2.4)
+            }) : null]
+        }), barre || null, vide ? h.jsxs("button", {
+            type: "button", onClick: onVide,
+            style: { alignSelf: "flex-start", minHeight: 44, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 22, border: "2px dashed #b9cfd3", background: "#ffffff", color: c, fontSize: 14, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
+            children: [accIcone(KB_I.plus, 16, 2.6), videLabel || "Ajouter"]
+        }) : h.jsx("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children })]
+    })
+}
+
+function kbToggleBtn(label, aria, onClick, couleur) {
+    return h.jsx("button", {
+        type: "button", onClick, "aria-label": aria,
+        style: { minHeight: 44, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 22, border: "2px dashed #b9cfd3", background: "#ffffff", color: couleur || "#0b6e53", fontSize: 14, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
+        children: label
+    })
+}
+
+function kbCompteurs(liste, etapes, actif, onPick, nbDe) {
+    return h.jsx("div", {
+        role: "group", "aria-label": onPick ? "Filtrer par étape" : "Résumé par étape",
+        style: { display: "grid", gridTemplateColumns: "repeat(" + etapes.length + ",minmax(0,1fr))", gap: 6, marginBottom: 12 },
+        children: etapes.map(et => {
+            const nb = nbDe(et.k), on = actif === et.k,
+                st = { minHeight: 52, borderRadius: 14, padding: "6px 4px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, background: on ? et.c : et.soft, color: on ? "#ffffff" : et.c, border: "2px solid " + (on ? et.c : et.soft), fontFamily: "inherit" },
+                inner = [h.jsxs("span", { style: { display: "flex", alignItems: "center", gap: 5 }, children: [accIcone(et.i, 15, 2.4), h.jsx("span", { style: { fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums" }, children: nb })] }),
+                    h.jsx("span", { style: { fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap" }, children: et.l })];
+            return onPick ? h.jsx("button", {
+                type: "button", onClick: () => onPick(on ? "" : et.k), "aria-pressed": on ? "true" : "false", "aria-label": et.l + " : " + nb + (on ? ", filtre actif" : ", filtrer"),
+                style: { ...st, cursor: "pointer" }, children: inner
+            }, et.k) : h.jsx("span", { role: "img", "aria-label": et.l + " : " + nb, style: st, children: inner }, et.k)
+        })
+    })
+}
+
+function kbChip(label, on, onClick, extra) {
+    return h.jsx("button", {
+        type: "button", onClick, "aria-pressed": on ? "true" : "false",
+        style: { flex: 1, minHeight: 44, borderRadius: 14, border: "2px solid " + (on ? "var(--ink)" : "#c9d8db"), background: on ? "var(--ink)" : "#ffffff", color: on ? "#ffffff" : "var(--ink-soft)", fontSize: 14, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", padding: "0 8px", ...(extra || {}) },
+        children: label
+    }, label)
+}
+
+const KB_INPUT = { width: "100%", minHeight: 48, border: "2px solid var(--line-strong)", borderRadius: 14, padding: "10px 14px", fontSize: 16, fontFamily: "inherit", color: "var(--ink)", background: "#ffffff", boxSizing: "border-box" };
+const KB_LABEL = { display: "block", fontSize: 14, fontWeight: 800, color: "var(--ink-soft)", margin: "0 0 6px" };
+
+function kbBouton(label, onClick, opts) {
+    const o = opts || {};
+    return h.jsxs("button", {
+        type: o.type || "button", onClick, disabled: o.disabled,
+        style: { width: o.width || "100%", minHeight: o.h || 52, border: o.outline ? "2px solid " + (o.bd || "var(--line-strong)") : 0, borderRadius: 16, background: o.outline ? "#ffffff" : (o.bg || "var(--teal-dark)"), color: o.outline ? (o.fg || "var(--ink)") : "#ffffff", fontSize: 15.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "inherit", cursor: "pointer", opacity: o.disabled ? .55 : 1, padding: "0 14px" },
+        children: [o.icone ? accIcone(o.icone, 18, 2.6) : null, label]
+    })
+}
+
+// ============================================================
+// ACCUEIL
+// ============================================================
 function Accueil({
-    budget, budgetMois, transactions, items, params, poches, progress, contenu, hw, taches,
-    readOnly, goTab, onAdd, onUpdate, onDelete
+    budget, budgetMois, transactions, items, params, poches, progress, pieceEtapes, contenu, hw, taches,
+    readOnly, goTab, onAdd, onUpdate, onDelete, onHwStatus, onPieceEtape, onSuiviToggle
 }) {
-    const [selId, setSelId] = re.useState(null),
+    const [selKey, setSelKey] = re.useState(null),
         [ajout, setAjout] = re.useState(!1),
         [titre, setTitre] = re.useState(""),
         [theme, setTheme] = re.useState("budget"),
@@ -22056,9 +22321,7 @@ function Accueil({
         [voirTout, setVoirTout] = re.useState({}),
         [confSuppr, setConfSuppr] = re.useState(!1),
         [toast, setToast] = re.useState("");
-    const flash = m => {
-        setToast(m), clearTimeout(window.__accT), window.__accT = setTimeout(() => setToast(""), 1600)
-    };
+    const flash = kbFlash(setToast);
 
     // ---- chiffres du haut (masqués en mode partage) ----
     const n = ve.length, M = moisNow();
@@ -22077,129 +22340,103 @@ function Accueil({
             reel = (transactions || []).filter(x => gr(x.mois_index) === M && ids.includes(x.budget_line_id)).reduce((s, x) => s + (x.type === "remboursement" ? -gr(x.montant) : gr(x.montant)), 0),
             reste = lignes.reduce((s, w) => s + gr(w.montant), 0) - reel;
         kpis = [
-            { l: "Objectif 6 mois", v: (cible ? Math.round(epargne / cible * 100) : 0) + " %", c: "#0a7b8a", i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01" },
-            { l: "Vacances", v: ot(vac), c: "#b5561f", i: "M3 20h18M5 20l4-11 3 5 3-3 4 9M15 6a2 2 0 1 0 0-.01" },
-            { l: "Reste du mois", v: ot(reste), c: reste < 0 ? "#b8432a" : "#0f8a68", i: "M4 8.4A1.8 1.8 0 0 1 5.8 6.6h12.4A1.8 1.8 0 0 1 20 8.4v9.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 17.6zM20 11.4h-3.1a1.6 1.6 0 0 0 0 3.2H20" }
+            { l: "Objectif 6 mois", v: (cible ? Math.round(epargne / cible * 100) : 0) + " %", c: "#086b78", i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01" },
+            { l: "Vacances", v: ot(vac), c: "#9a4515", i: "M3 20h18M5 20l4-11 3 5 3-3 4 9M15 6a2 2 0 1 0 0-.01" },
+            { l: "Reste du mois", v: ot(reste), c: reste < 0 ? "#b8432a" : "#0b7a5c", alerte: reste < 0, i: ACC_THEMES.budget.i }
         ]
     }
 
     // ---- toutes les tâches, quelle que soit leur origine ----
-    const hwEtape = s => s === "En cours" ? "encours" : (s === "Fait" || s === "Corrigé") ? "fait" : "afaire",
+    const hwEt = s => HW_ETAPES.find(x => x.k === s) || HW_ETAPES[0],
+        pieceEt = k => (pieceEtapes && pieceEtapes[k]) || (progress && progress[k] ? "validee" : "afournir"),
         cartes = [];
-    (hw || []).forEach(r => cartes.push({
-        key: "hw:" + r.id, t: r.title || r.subject || "Devoir", theme: "devoirs", etape: hwEtape(r.status),
-        due: r.deadline, faitLe: r.corrected_at || r.submitted_at || r.updated_at, lie: !0
-    }));
-    (contenu || []).filter(x => x.type === "piece" || x.type === "suivi").forEach(x => cartes.push({
-        key: x.item_key, t: x.titre, theme: x.type === "piece" ? "pieces" : "reco",
-        etape: progress && progress[x.item_key] ? "fait" : "afaire", due: x.date_iso, faitLe: null, lie: !0
-    }));
-    (taches || []).forEach(x => cartes.push({
-        key: "t:" + x.id, id: x.id, t: x.titre, theme: ACC_THEMES[x.theme] ? x.theme : "budget", etape: x.etape,
-        due: x.echeance, faitLe: x.fait_le, lie: !1
-    }));
+    (hw || []).forEach(r => {
+        const et = hwEt(r.status);
+        cartes.push({ key: "hw:" + r.id, src: "hw", id: r.id, t: r.title || r.subject || "Devoir", sous: r.subject, theme: "devoirs", etape: et.kan, sEt: et, val: et.k, due: r.deadline, faitLe: r.corrected_at || r.submitted_at || r.updated_at })
+    });
+    (contenu || []).filter(x => x.type === "piece" || x.type === "suivi").forEach(x => {
+        if (x.type === "piece") {
+            const v = pieceEt(x.item_key), et = PIECE_ETAPES.find(e => e.k === v);
+            cartes.push({ key: x.item_key, src: "piece", t: x.titre, sous: (x.groupe || "").split(" — ")[0], theme: "pieces", etape: et.kan, sEt: et, val: v, due: x.date_iso, faitLe: null })
+        } else {
+            const v = progress && progress[x.item_key] ? "fait" : "afaire", et = SUIVI_ETAPES.find(e => e.k === v);
+            cartes.push({ key: x.item_key, src: "suivi", t: x.titre, theme: "reco", etape: v, sEt: et, val: v, due: x.date_iso, faitLe: null })
+        }
+    });
+    (taches || []).forEach(x => {
+        const et = ACC_ETAPES.find(e => e.k === x.etape) || ACC_ETAPES[0];
+        cartes.push({ key: "t:" + x.id, src: "tache", id: x.id, t: x.titre, theme: ACC_THEMES[x.theme] ? x.theme : "budget", etape: et.k, sEt: et, val: et.k, due: x.echeance, faitLe: x.fait_le })
+    });
     const septJours = 7 * 864e5,
         ancien = c => c.etape === "fait" && (!c.faitLe || Date.now() - new Date(c.faitLe).getTime() > septJours),
+        enRetard = c => c.etape !== "fait" && !!(c.due && (accEcheance(c.due) || {}).late),
         enCours = cartes.filter(c => c.etape === "encours").length;
 
     const prochaine = cartes.filter(c => c.etape !== "fait" && c.due).map(c => ({ c, e: accEcheance(c.due) })).sort((a, b) => a.e.j - b.e.j)[0];
-    const sel = cartes.find(c => c.key === selId);
+    const sel = cartes.find(c => c.key === selKey);
 
     function ouvrir(c) {
-        if (c.lie) { goTab(ACC_THEMES[c.theme].tab); return }
-        if (readOnly) return;
-        setConfSuppr(!1), setSelId(c.key)
+        if (readOnly) { c.src !== "tache" && goTab(ACC_THEMES[c.theme].tab); return }
+        setConfSuppr(!1), setSelKey(c.key)
     }
 
-    async function changerEtape(c, k) {
-        if (c.etape === k) { setSelId(null); return }
-        if (k === "encours" && enCours >= 3) { flash("3 tâches en cours maximum"); return }
+    const erreur = err => flash("Échec : " + (err && err.message ? err.message : "connexion"));
+
+    async function choisir(c, k) {
+        if (c.val === k) { setSelKey(null); return }
+        const et = c.src === "hw" ? HW_ETAPES : c.src === "piece" ? PIECE_ETAPES : c.src === "suivi" ? SUIVI_ETAPES : ACC_ETAPES,
+            cible = et.find(x => x.k === k),
+            kan = cible.kan || cible.k;
+        if (kan === "encours" && c.etape !== "encours" && enCours >= 3) { flash("3 tâches en cours maximum"); return }
         try {
-            await onUpdate(c.id, { etape: k, fait_le: k === "fait" ? new Date().toISOString() : null });
-            setSelId(null), flash("→ " + ACC_ETAPES.find(e => e.k === k).l)
-        } catch (err) { flash("Échec : " + (err && err.message ? err.message : "connexion")) }
+            if (c.src === "tache") await onUpdate(c.id, { etape: k, fait_le: k === "fait" ? new Date().toISOString() : null });
+            else if (c.src === "hw") await onHwStatus(c.id, k);
+            else if (c.src === "piece") await onPieceEtape(c.key, k);
+            else await onSuiviToggle(c.key);
+            setSelKey(null), flash(c.t + " → " + cible.l)
+        } catch (err) { erreur(err) }
     }
 
     async function supprimer(c) {
         if (!confSuppr) { setConfSuppr(!0); return }
-        try { await onDelete(c.id), setSelId(null), flash("Tâche supprimée") } catch (err) { flash("Échec : " + (err && err.message ? err.message : "connexion")) }
+        try { await onDelete(c.id), setSelKey(null), flash("Tâche supprimée") } catch (err) { erreur(err) }
     }
 
-    async function ajouter(ev) {
-        ev && ev.preventDefault && ev.preventDefault();
+    async function ajouter() {
         const tt = titre.trim();
         if (!tt) { flash("Écris un titre"); return }
         try {
             await onAdd({ titre: tt, theme, etape: "afaire", echeance: quand || null });
-            setAjout(!1), setTitre(""), setQuand(""), flash("+ " + ACC_THEMES[theme].l)
-        } catch (err) { flash("Échec : " + (err && err.message ? err.message : "connexion")) }
+            setAjout(!1), setTitre(""), setQuand(""), flash("Ajoutée dans " + ACC_THEMES[theme].l)
+        } catch (err) { erreur(err) }
     }
+    const ouvrirAjout = th => { setTheme(th || "budget"), setTitre(""), setQuand(""), setAjout(!0) };
 
     const aujD = new Date(),
-        choixQuand = [
-            { k: "", l: "Sans date" },
-            { k: accIso(aujD), l: "Aujourd'hui" },
-            { k: accIso(new Date(aujD.getFullYear(), aujD.getMonth(), aujD.getDate() + 6)), l: "Semaine" },
-            { k: accIso(new Date(aujD.getFullYear(), aujD.getMonth() + 1, 0)), l: "Fin du mois" }
-        ],
-        dateDuJour = new Intl.DateTimeFormat(VISION_CONFIG.locale, { weekday: "short", day: "numeric", month: "short" }).format(aujD);
-
-    const pastille = c => {
-        const th = ACC_THEMES[c.theme], e = accEcheance(c.due), et = ACC_ETAPES.find(x => x.k === c.etape) || ACC_ETAPES[0],
-            look = {
-                afaire: { bg: "#ffffff", bd: "#d6e3e5", fg: "var(--ink)", dbg: "#e4edef", dfg: "#3d545c", fill: "none" },
-                encours: { bg: th.soft, bd: th.c, fg: "var(--ink)", dbg: th.c, dfg: "#ffffff", fill: "currentColor" },
-                attente: { bg: "#fbeee4", bd: "#fbeee4", fg: "var(--ink)", dbg: "#ffffff", dfg: "#b5561f", fill: "none" },
-                fait: { bg: "#f3f8f9", bd: "#f3f8f9", fg: "var(--slate)", dbg: "#e3f4ed", dfg: "#0f8a68", fill: "none" }
-            }[c.etape] || {};
-        return h.jsxs("button", {
-            onClick: () => ouvrir(c),
-            "aria-label": c.t + ", " + et.l + (c.lie ? ", ouvrir l'onglet " + th.page : ""),
-            style: { minHeight: 44, maxWidth: "100%", display: "flex", alignItems: "center", gap: 8, padding: "6px 12px 6px 6px", borderRadius: 22, border: "2px solid " + look.bd, background: look.bg, color: look.fg, fontSize: 14, fontWeight: 600, textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
-            children: [h.jsx("span", {
-                style: { flex: "none", width: 28, height: 28, borderRadius: "50%", background: look.dbg, color: look.dfg, display: "flex", alignItems: "center", justifyContent: "center" },
-                children: accIcone(et.i, 14, 2.6, look.fill)
-            }), h.jsx("span", { style: { textDecoration: c.etape === "fait" ? "line-through" : "none", minWidth: 0 }, children: c.t }),
-            e && c.etape !== "fait" ? h.jsx("span", { style: { flex: "none", fontSize: 11.5, fontWeight: 800, color: e.urgent ? "#b8432a" : "var(--slate)" }, children: e.l }) : null]
-        }, c.key)
-    };
+        choixQuand = [{ k: "", l: "Sans date" }, { k: accIso(aujD), l: "Aujourd'hui" }].concat(kbRaccourcis().slice(1)),
+        dateDuJour = new Intl.DateTimeFormat(VISION_CONFIG.locale, { weekday: "long", day: "numeric", month: "long" }).format(aujD);
 
     const couloirs = Object.keys(ACC_THEMES).map(key => {
         const th = ACC_THEMES[key],
-            liste = cartes.filter(c => c.theme === key).sort((a, b) => ACC_ORDRE[a.etape] - ACC_ORDRE[b.etape] || ((accEcheance(a.due) || { j: 9999 }).j - (accEcheance(b.due) || { j: 9999 }).j)),
+            liste = cartes.filter(c => c.theme === key).sort((a, b) => (enRetard(b) ? 1 : 0) - (enRetard(a) ? 1 : 0) || ACC_ORDRE[a.etape] - ACC_ORDRE[b.etape] || ((accEcheance(a.due) || { j: 9999 }).j - (accEcheance(b.due) || { j: 9999 }).j)),
             faits = liste.filter(c => c.etape === "fait").length,
             caches = liste.filter(ancien).length,
             ouvert = !!voirTout[key],
             visibles = ouvert ? liste : liste.filter(c => !ancien(c)),
-            pct = liste.length ? Math.round(faits / liste.length * 100) : 0;
-        return h.jsxs("section", {
-            "aria-label": th.l,
-            style: { background: "#ffffff", borderRadius: 22, padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: "var(--shadow)" },
-            children: [h.jsxs("button", {
-                onClick: () => goTab(th.tab),
-                "aria-label": "Ouvrir l'onglet " + th.page,
-                style: { border: 0, background: "none", padding: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 10, color: "var(--ink)", textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
-                children: [h.jsx("span", {
-                    style: { width: 34, height: 34, borderRadius: 11, background: th.soft, color: th.c, display: "flex", alignItems: "center", justifyContent: "center" },
-                    children: accIcone(th.i, 18, 2.2)
-                }), h.jsx("span", { style: { fontSize: 15.5, fontWeight: 800 }, children: th.l }),
-                h.jsx("span", {
-                    role: "img", "aria-label": th.l + " : " + faits + " sur " + liste.length + " faites",
-                    style: { marginLeft: "auto", width: 60, height: 7, borderRadius: 99, background: th.soft, overflow: "hidden" },
-                    children: h.jsx("span", { style: { display: "block", height: 7, borderRadius: 99, width: pct + "%", background: th.c } })
-                }), h.jsx("span", { style: { fontSize: 12.5, fontWeight: 800, color: th.c, fontVariantNumeric: "tabular-nums" }, children: faits + "/" + liste.length }),
-                h.jsx("span", { style: { color: "#8fa6ab", display: "flex" }, children: accIcone("M9 6l6 6-6 6", 18, 2.4) })]
-            }), h.jsxs("div", {
-                style: { display: "flex", flexWrap: "wrap", gap: 8 },
-                children: [visibles.map(pastille), caches ? h.jsxs("button", {
-                    onClick: () => setVoirTout(Object.assign({}, voirTout, { [key]: !ouvert })),
-                    "aria-label": ouvert ? "Masquer les tâches faites anciennes" : "Voir " + caches + " tâche(s) faite(s) de plus de 7 jours",
-                    style: { minHeight: 44, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 22, border: "2px dashed #b9cfd3", background: "#ffffff", color: "#0f8a68", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
-                    children: [accIcone("M5 12l5 5L20 7", 14, 2.8), ouvert ? "Masquer" : "+" + caches]
-                }) : null, !liste.length ? h.jsx("span", { className: "detail", children: "Rien pour l'instant" }) : null]
-            })]
+            libre = key === "budget" || key === "sport";
+        return h.jsxs(KbLane, {
+            titre: th.l, icone: th.i, c: th.c, soft: th.soft,
+            ratio: faits + "/" + liste.length, pct: liste.length ? Math.round(faits / liste.length * 100) : 0,
+            onHeader: () => goTab(th.tab), headerAria: th.l + " : " + faits + " faites sur " + liste.length + ". Ouvrir l'onglet " + th.page,
+            onAdd: !readOnly && libre ? () => ouvrirAjout(key) : null, addAria: "Ajouter une tâche " + th.l,
+            vide: !liste.length && !readOnly, onVide: () => libre ? ouvrirAjout(key) : goTab(th.tab), videLabel: libre ? "Ajouter une tâche" : "Ajouter dans " + th.page,
+            children: [visibles.map(c => h.jsx(KbPill, { titre: c.t, etape: c.sEt, couleur: th.c, soft: th.soft, due: c.due, fini: c.etape === "fait", onClick: () => ouvrir(c) }, c.key)),
+                caches ? kbToggleBtn(ouvert ? "Masquer" : "+" + caches + " faite" + (caches > 1 ? "s" : ""), ouvert ? "Masquer les tâches faites anciennes" : "Voir " + caches + " tâche(s) faite(s) de plus de 7 jours", () => setVoirTout(Object.assign({}, voirTout, { [key]: !ouvert }))) : null,
+                !liste.length && readOnly ? h.jsx("span", { className: "detail", children: "Rien pour l'instant" }, "vide") : null]
         }, key)
     });
+
+    const selEtapes = sel ? (sel.src === "hw" ? HW_ETAPES : sel.src === "piece" ? PIECE_ETAPES : sel.src === "suivi" ? SUIVI_ETAPES : ACC_ETAPES) : [];
 
     return h.jsxs("section", {
         className: "sec",
@@ -22207,122 +22444,512 @@ function Accueil({
             style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 },
             children: [h.jsxs("div", {
                 children: [h.jsx("h2", { style: { margin: 0 }, children: "Accueil" }), h.jsx("div", { className: "detail", children: dateDuJour.charAt(0).toUpperCase() + dateDuJour.slice(1) })]
-            }), !readOnly && h.jsxs("button", {
-                className: "btn btn-sm", onClick: () => setAjout(!0),
-                style: { display: "flex", alignItems: "center", gap: 6, minHeight: 44, width: "auto", flex: "none", padding: "0 18px" },
-                children: [accIcone("M12 5v14M5 12h14", 18, 2.6), "Tâche"]
-            })]
+            }), !readOnly && h.jsx("div", { style: { flex: "none" }, children: kbBouton("Tâche", () => ouvrirAjout("budget"), { icone: KB_I.plus, h: 46, width: "auto" }) })]
         }), kpis && h.jsx("button", {
-            onClick: () => goTab("tresorerie"), "aria-label": "Ouvrir Budget mois",
+            type: "button", onClick: () => goTab("tresorerie"), "aria-label": kpis.map(k => k.l + " " + k.v).join(", ") + ". Ouvrir Budget mois",
             style: { border: 0, background: "none", padding: 0, width: "100%", display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 6, marginBottom: 12, fontFamily: "inherit", cursor: "pointer", color: "var(--ink)" },
             children: kpis.map(k => h.jsxs("span", {
-                style: { background: "#ffffff", borderRadius: 16, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, boxShadow: "var(--shadow)" },
+                style: { background: "#ffffff", borderRadius: 16, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, boxShadow: "var(--shadow)", border: k.alerte ? "2px solid #b8432a" : "2px solid transparent" },
                 children: [h.jsx("span", { style: { color: k.c, display: "flex" }, children: accIcone(k.i, 18, 2.2) }),
-                    h.jsx("span", { style: { fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: k.c === "#b8432a" ? k.c : "var(--ink)" }, children: k.v }),
-                    h.jsx("span", { style: { fontSize: 10.5, fontWeight: 700, color: "var(--slate)", textAlign: "center", lineHeight: 1.2 }, children: k.l })]
+                    h.jsx("span", { style: { fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: k.alerte ? k.c : "var(--ink)" }, children: k.v }),
+                    h.jsx("span", { style: { fontSize: 12.5, fontWeight: 700, color: "var(--slate)", textAlign: "center", lineHeight: 1.2 }, children: k.l })]
             }, k.l))
         }), prochaine && h.jsxs("button", {
-            onClick: () => ouvrir(prochaine.c),
-            "aria-label": "Prochaine échéance : " + prochaine.c.t + ", " + prochaine.e.l,
-            style: { width: "100%", border: 0, borderRadius: 22, background: "var(--teal-dark)", color: "#ffffff", padding: 14, display: "flex", alignItems: "center", gap: 12, textAlign: "left", marginBottom: 12, boxShadow: "0 10px 24px rgba(10,123,138,.25)", fontFamily: "inherit", cursor: "pointer" },
+            type: "button", onClick: () => ouvrir(prochaine.c),
+            "aria-label": "Prochaine échéance : " + prochaine.c.t + ", " + prochaine.e.aria,
+            style: { width: "100%", border: prochaine.e.late ? "3px solid #ffd2c7" : 0, borderRadius: 22, background: prochaine.e.late ? "#a63a24" : "var(--teal-dark)", color: "#ffffff", padding: 14, display: "flex", alignItems: "center", gap: 12, textAlign: "left", marginBottom: 12, boxShadow: "0 10px 24px rgba(10,123,138,.25)", fontFamily: "inherit", cursor: "pointer" },
             children: [h.jsx("span", {
                 style: { flex: "none", width: 50, height: 50, borderRadius: 16, background: "rgba(255,255,255,.16)", display: "flex", alignItems: "center", justifyContent: "center" },
                 children: accIcone(ACC_THEMES[prochaine.c.theme].i, 24, 2)
-            }), h.jsx("span", { style: { flex: 1, minWidth: 0, fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.2 }, children: prochaine.c.t }),
+            }), h.jsx("span", { style: { flex: 1, minWidth: 0, fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }, children: prochaine.c.t }),
             h.jsx("span", { style: { flex: "none", padding: "6px 10px", borderRadius: 12, background: "#ffffff", color: prochaine.e.urgent ? "#b8432a" : "var(--teal-dark)", fontSize: 15, fontWeight: 900 }, children: prochaine.e.l })]
-        }), h.jsx("div", {
-            role: "group", "aria-label": "Résumé par étape",
-            style: { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 6, marginBottom: 12 },
-            children: ACC_ETAPES.map(et => {
-                const nb = cartes.filter(c => c.etape === et.k).length;
-                return h.jsxs("span", {
-                    role: "img", "aria-label": et.l + " " + nb,
-                    style: { borderRadius: 14, padding: "7px 4px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: et.soft, color: et.c },
-                    children: [accIcone(et.i, 15, 2.4), h.jsx("span", { style: { fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }, children: nb })]
-                }, et.k)
-            })
-        }), h.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: couloirs }),
-        sel && h.jsx("div", {
-            className: "sheetbg", onClick: ev => { ev.target === ev.currentTarget && setSelId(null) },
-            children: h.jsxs("div", {
-                className: "sheet", role: "dialog", "aria-label": sel.t,
-                children: [h.jsxs("div", {
-                    className: "sheethead",
-                    children: [h.jsxs("div", {
-                        style: { display: "flex", alignItems: "center", gap: 12, minWidth: 0 },
-                        children: [h.jsx("span", {
-                            style: { flex: "none", width: 52, height: 52, borderRadius: 16, background: ACC_THEMES[sel.theme].soft, color: ACC_THEMES[sel.theme].c, display: "flex", alignItems: "center", justifyContent: "center" },
-                            children: accIcone(ACC_THEMES[sel.theme].i, 26, 2)
-                        }), h.jsxs("div", {
-                            style: { minWidth: 0 },
-                            children: [h.jsx("h3", { children: sel.t }), accEcheance(sel.due) ? h.jsx("div", { className: "detail", children: accEcheance(sel.due).l }) : null]
-                        })]
-                    }), h.jsx("button", { className: "sheetclose", onClick: () => setSelId(null), "aria-label": "Fermer", children: "×" })]
-                }), h.jsx("div", {
-                    style: { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8, marginBottom: 18 },
-                    children: ACC_ETAPES.map(et => {
-                        const on = sel.etape === et.k;
-                        return h.jsxs("button", {
-                            onClick: () => changerEtape(sel, et.k), "aria-pressed": on ? "true" : "false", "aria-label": et.l,
-                            style: { border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 7, color: et.c, fontFamily: "inherit", cursor: "pointer" },
-                            children: [h.jsx("span", {
-                                style: { width: 60, height: 60, borderRadius: 20, background: on ? et.c : "#ffffff", color: on ? "#ffffff" : et.c, border: "2px solid " + et.c, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
-                                children: accIcone(et.i, 26, 2.2)
-                            }), h.jsx("span", { style: { fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }, children: et.l })]
-                        }, et.k)
-                    })
-                }), h.jsx("button", {
-                    className: "btn-outline btn-sm", onClick: () => supprimer(sel),
-                    style: { width: "100%", minHeight: 44, color: confSuppr ? "var(--red)" : void 0, borderColor: confSuppr ? "var(--red)" : void 0 },
-                    children: confSuppr ? "Confirmer la suppression" : "Supprimer la tâche"
-                })]
-            })
-        }), ajout && h.jsx("div", {
-            className: "sheetbg", onClick: ev => { ev.target === ev.currentTarget && setAjout(!1) },
-            children: h.jsxs("form", {
-                className: "sheet", role: "dialog", "aria-label": "Nouvelle tâche", onSubmit: ajouter,
-                children: [h.jsxs("div", {
-                    className: "sheethead",
-                    children: [h.jsx("h3", { children: "Nouvelle tâche" }), h.jsx("button", { type: "button", className: "sheetclose", onClick: () => setAjout(!1), "aria-label": "Fermer", children: "×" })]
-                }), h.jsx("label", { htmlFor: "acc-titre", style: { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }, children: "Titre de la tâche" }),
-                h.jsx("input", {
-                    id: "acc-titre", value: titre, onChange: ev => setTitre(ev.target.value), placeholder: "Ex. Envoyer l'attestation", autoComplete: "off", autoFocus: !0,
-                    style: { width: "100%", height: 52, border: "2px solid var(--line-strong)", borderRadius: 16, padding: "0 16px", fontSize: 16, fontFamily: "inherit", marginBottom: 14, boxSizing: "border-box" }
-                }), h.jsx("div", {
+        }), kbCompteurs(cartes, ACC_ETAPES, "", null, k => cartes.filter(c => c.etape === k).length),
+        h.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: couloirs }),
+        sel && h.jsxs(KbSheet, {
+            label: sel.t, onClose: () => setSelKey(null),
+            children: [h.jsxs("div", {
+                style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+                children: [h.jsx("span", { style: { padding: "3px 10px", borderRadius: 99, background: ACC_THEMES[sel.theme].soft, color: ACC_THEMES[sel.theme].c, fontSize: 13, fontWeight: 800 }, children: ACC_THEMES[sel.theme].l + (sel.sous ? " · " + sel.sous : "") }),
+                    accEcheance(sel.due) && sel.etape !== "fait" ? h.jsx("span", { style: { padding: "3px 10px", borderRadius: 99, background: accEcheance(sel.due).urgent ? "#fbe9e4" : "#eef3f4", color: accEcheance(sel.due).urgent ? "#b8432a" : "var(--ink-soft)", fontSize: 13, fontWeight: 800 }, children: accEcheance(sel.due).l }) : null]
+            }), h.jsx(KbEtapes, { etapes: selEtapes, actuelle: sel.val, onPick: k => choisir(sel, k) }),
+            sel.src === "tache" ? kbBouton(confSuppr ? "Confirmer la suppression" : "Supprimer la tâche", () => supprimer(sel), { outline: !0, fg: "#b8432a", bd: confSuppr ? "#b8432a" : "#f0d5ce", h: 48 }) :
+                kbBouton("Ouvrir l'onglet " + ACC_THEMES[sel.theme].page, () => { setSelKey(null), goTab(ACC_THEMES[sel.theme].tab) }, { outline: !0, icone: KB_I.chevron, h: 48 })]
+        }), ajout && h.jsxs(KbSheet, {
+            label: "Nouvelle tâche", onClose: () => setAjout(!1), form: !0, onSubmit: ajouter,
+            children: [h.jsx("label", { htmlFor: "acc-titre", style: KB_SR, children: "Titre de la tâche" }),
+                h.jsx("input", { id: "acc-titre", "data-autofocus": "1", value: titre, onChange: ev => setTitre(ev.target.value), placeholder: "Ex. Envoyer l'attestation", autoComplete: "off", style: { ...KB_INPUT, height: 52, marginBottom: 14 } }),
+                h.jsx("div", {
                     role: "group", "aria-label": "Thème",
                     style: { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 6, marginBottom: 14 },
                     children: Object.keys(ACC_THEMES).map(key => {
                         const th = ACC_THEMES[key], on = key === theme;
                         return h.jsxs("button", {
-                            type: "button", onClick: () => setTheme(key), "aria-pressed": on ? "true" : "false", "aria-label": th.l,
+                            type: "button", onClick: () => setTheme(key), "aria-pressed": on ? "true" : "false",
                             style: { border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, color: th.c, fontFamily: "inherit", cursor: "pointer" },
                             children: [h.jsx("span", {
                                 style: { width: 52, height: 52, borderRadius: 16, border: "2px solid " + th.c, background: on ? th.c : "#ffffff", color: on ? "#ffffff" : th.c, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
                                 children: accIcone(th.i, 22, 2)
-                            }), h.jsx("span", { style: { fontSize: 10.5, fontWeight: 800, whiteSpace: "nowrap" }, children: th.short })]
+                            }), h.jsx("span", { style: { fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }, children: th.short })]
                         }, key)
                     })
-                }), h.jsx("div", {
-                    role: "group", "aria-label": "Échéance",
-                    style: { display: "flex", gap: 8, marginBottom: 16 },
-                    children: choixQuand.map(w => {
-                        const on = w.k === quand;
-                        return h.jsx("button", {
-                            type: "button", onClick: () => setQuand(w.k), "aria-pressed": on ? "true" : "false",
-                            style: { flex: 1, minHeight: 44, borderRadius: 14, border: "2px solid " + (on ? "var(--ink)" : "#d6e3e5"), background: on ? "var(--ink)" : "#ffffff", color: on ? "#ffffff" : "var(--ink-soft)", fontSize: 13, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
-                            children: w.l
-                        }, w.l)
+                }), h.jsx("div", { role: "group", "aria-label": "Échéance", style: { display: "flex", gap: 6, marginBottom: 16 }, children: choixQuand.map(w => kbChip(w.l, w.k === quand, () => setQuand(w.k), { fontSize: 13 })) }),
+                kbBouton("Ajouter", null, { type: "submit", icone: KB_I.plus, disabled: !titre.trim(), h: 54 })]
+        }), h.jsx(KbToast, { texte: toast })]
+    })
+}
+
+// ============================================================
+// PIÈCES
+// ============================================================
+function kbDossierIcone(nom) {
+    return /scap/i.test(nom) ? ACC_THEMES.reco.i : /sport|avant/i.test(nom) ? ACC_THEMES.sport.i : /\bdu\b|paris 1|univ/i.test(nom) ? ACC_THEMES.devoirs.i : KB_I.doc
+}
+
+function PiecesPage({ rows, progress, pieceEtapes, readOnly, onEtape, onEdit, onSave, onAdd, onDel, onMove, onRenameGroupe }) {
+    const [selKey, setSelKey] = re.useState(null),
+        [ajoutGroupe, setAjoutGroupe] = re.useState(null),
+        [nom, setNom] = re.useState(""),
+        [voir, setVoir] = re.useState({}),
+        [editG, setEditG] = re.useState(null),
+        [nomG, setNomG] = re.useState(""),
+        [nouveauxG, setNouveauxG] = re.useState([]),
+        [creerG, setCreerG] = re.useState(!1),
+        [nomNouveauG, setNomNouveauG] = re.useState(""),
+        [conf, setConf] = re.useState(!1),
+        [toast, setToast] = re.useState("");
+    const flash = kbFlash(setToast),
+        erreur = err => flash("Échec : " + (err && err.message ? err.message : "connexion")),
+        pieces = contenuDe(rows, "piece"),
+        etapeDe = k => (pieceEtapes && pieceEtapes[k]) || (progress && progress[k] ? "validee" : "afournir"),
+        etDe = k => PIECE_ETAPES.find(e => e.k === etapeDe(k)),
+        groupes = [];
+    pieces.forEach(p => {
+        const g = p.groupe || "Autres";
+        let x = groupes.find(y => y.nom === g);
+        x || (x = { nom: g, items: [] }, groupes.push(x)), x.items.push(p)
+    });
+    nouveauxG.filter(g => !groupes.some(y => y.nom === g)).forEach(g => groupes.push({ nom: g, items: [] }));
+    groupes.forEach((g, i) => {
+        const pal = KB_PALETTE[i % KB_PALETTE.length];
+        g.c = pal.c, g.soft = pal.soft;
+        g.ok = g.items.filter(p => etapeDe(p.item_key) === "validee").length;
+        g.complet = g.items.length > 0 && g.ok === g.items.length
+    });
+    groupes.sort((a, b) => (a.complet ? 1 : 0) - (b.complet ? 1 : 0));
+    const total = pieces.length,
+        valides = pieces.filter(p => etapeDe(p.item_key) === "validee").length,
+        aFournir = pieces.filter(p => etapeDe(p.item_key) === "afournir"),
+        sel = pieces.find(p => p.item_key === selKey),
+        titreG = g => g.split(" — ")[0],
+        sousG = g => g.split(" — ").slice(1).join(" — ");
+
+    async function changer(p, k, viaAppuiLong) {
+        if (etapeDe(p.item_key) === k) { viaAppuiLong ? flash("Déjà validée") : setSelKey(null); return }
+        try { await onEtape(p.item_key, k), setSelKey(null), flash((p.titre || "Pièce") + " → " + PIECE_ETAPES.find(e => e.k === k).l) } catch (err) { erreur(err) }
+    }
+    async function ajouter() {
+        const t = nom.trim();
+        if (!t) { flash("Écris le nom de la pièce"); return }
+        try {
+            await onAdd(t, ajoutGroupe === "Autres" ? null : ajoutGroupe);
+            setNouveauxG(l => l.filter(g => g !== ajoutGroupe)), setAjoutGroupe(null), setNom(""), flash("Ajoutée : " + t)
+        } catch (err) { erreur(err) }
+    }
+    async function renommerG(ancien) {
+        const t = nomG.trim();
+        setEditG(null);
+        if (!t || t === ancien) return;
+        if (groupes.some(g => g.nom === t)) { flash("Ce dossier existe déjà"); return }
+        if (nouveauxG.includes(ancien)) { setNouveauxG(l => l.map(g => g === ancien ? t : g)); return }
+        try { await onRenameGroupe(ancien === "Autres" ? null : ancien, t), flash("Dossier renommé") } catch (err) { erreur(err) }
+    }
+    function creerDossier() {
+        const t = nomNouveauG.trim();
+        if (!t) { setCreerG(!1); return }
+        if (groupes.some(g => g.nom === t)) { flash("Ce dossier existe déjà"); return }
+        setNouveauxG(l => [...l, t]), setCreerG(!1), setNomNouveauG(""), setNom(""), setAjoutGroupe(t)
+    }
+    async function supprimer(p) {
+        if (!conf) { setConf(!0); return }
+        try { await onDel(p.id), setSelKey(null), flash("Pièce supprimée") } catch (err) { erreur(err) }
+    }
+
+    const ouvrir = p => { readOnly || (setConf(!1), setSelKey(p.item_key)) };
+
+    return h.jsxs("section", {
+        className: "sec",
+        children: [h.jsxs("div", {
+            style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 },
+            children: [h.jsx("h2", { style: { margin: 0 }, children: "Pièces à fournir" }), h.jsxs("span", {
+                role: "img", "aria-label": valides + " pièces validées sur " + total,
+                style: { display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 800, color: "#8a5a12", fontVariantNumeric: "tabular-nums" },
+                children: [h.jsx("span", { style: { width: 64, height: 8, borderRadius: 99, background: "#f6ecd9", overflow: "hidden" }, children: h.jsx("span", { style: { display: "block", height: 8, borderRadius: 99, width: (total ? Math.round(valides / total * 100) : 0) + "%", background: "#8a5a12" } }) }), valides + "/" + total]
+            })]
+        }), aFournir.length > 0 && h.jsxs("div", {
+            style: { borderRadius: 22, background: "#7a4f0f", color: "#ffffff", padding: 14, display: "flex", flexDirection: "column", gap: 10, marginBottom: 12, boxShadow: "0 10px 24px rgba(138,90,18,.25)" },
+            children: [h.jsxs("span", {
+                style: { display: "flex", alignItems: "baseline", gap: 8 },
+                children: [h.jsx("span", { style: { fontFamily: "Georgia,serif", fontSize: 30, fontWeight: 700, lineHeight: 1 }, children: aFournir.length }), h.jsx("span", { style: { fontSize: 16, fontWeight: 800 }, children: aFournir.length > 1 ? "pièces à fournir" : "pièce à fournir" })]
+            }), aFournir.map(p => h.jsxs("button", {
+                type: "button", onClick: () => ouvrir(p),
+                style: { minHeight: 44, border: 0, borderRadius: 14, background: "rgba(255,255,255,.14)", color: "#ffffff", padding: "8px 12px", display: "flex", alignItems: "center", gap: 10, textAlign: "left", fontSize: 15, fontWeight: 700, fontFamily: "inherit", cursor: readOnly ? "default" : "pointer" },
+                children: [h.jsx("span", { style: { flex: "none", padding: "2px 8px", borderRadius: 99, background: "#ffffff", color: "#7a4f0f", fontSize: 12.5, fontWeight: 900 }, children: titreG(p.groupe || "Autres") }),
+                    h.jsx("span", { style: { flex: 1, minWidth: 0 }, children: p.titre }), readOnly ? null : accIcone(KB_I.chevron, 16, 2.4)]
+            }, p.item_key))]
+        }), kbCompteurs(pieces, PIECE_ETAPES, "", null, k => pieces.filter(p => etapeDe(p.item_key) === k).length),
+        h.jsxs("div", {
+            style: { display: "flex", flexDirection: "column", gap: 12 },
+            children: [groupes.map(g => {
+                const ouvert = !!voir[g.nom],
+                    liste = [...g.items].sort((a, b) => ({ afournir: 0, envoyee: 1, validee: 2 })[etapeDe(a.item_key)] - ({ afournir: 0, envoyee: 1, validee: 2 })[etapeDe(b.item_key)] || (a.sort || 0) - (b.sort || 0)),
+                    visibles = ouvert ? liste : liste.filter(p => etapeDe(p.item_key) !== "validee"),
+                    edition = editG === g.nom;
+                const barre = g.items.length ? h.jsx("div", {
+                    role: "img", "aria-label": g.ok + " validées sur " + g.items.length,
+                    style: { display: "flex", gap: 4 },
+                    children: liste.map(p => {
+                        const v = etapeDe(p.item_key);
+                        return h.jsx("span", { style: { flex: 1, height: 7, borderRadius: 99, background: v === "validee" ? "#0f8a68" : v === "envoyee" ? "repeating-linear-gradient(135deg,#b5561f 0 4px,#e0a074 4px 7px)" : "#e3d3b6" } }, p.item_key)
                     })
-                }), h.jsxs("button", {
-                    type: "submit", className: "btn",
-                    style: { width: "100%", minHeight: 54, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: titre.trim() ? 1 : .55 },
-                    children: [accIcone("M12 5v14M5 12h14", 20, 2.6), "Ajouter"]
-                })]
+                }) : null;
+                return h.jsxs("section", {
+                    "aria-label": g.nom,
+                    style: { background: "#ffffff", borderRadius: 22, padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: "var(--shadow)" },
+                    children: [h.jsxs("div", {
+                        style: { display: "flex", alignItems: "center", gap: 8 },
+                        children: [h.jsx("span", { style: { flex: "none", width: 36, height: 36, borderRadius: 11, background: g.soft, color: g.c, display: "flex", alignItems: "center", justifyContent: "center" }, children: accIcone(kbDossierIcone(g.nom), 18, 2.2) }),
+                            edition ? h.jsxs("form", {
+                                onSubmit: ev => { ev.preventDefault(), renommerG(g.nom) }, style: { flex: 1, minWidth: 0, display: "flex" },
+                                children: [h.jsx("label", { htmlFor: "kbg-" + g.nom, style: KB_SR, children: "Nom du dossier" }),
+                                    h.jsx("input", { id: "kbg-" + g.nom, autoFocus: !0, value: nomG, onChange: ev => setNomG(ev.target.value), onBlur: () => renommerG(g.nom), onKeyDown: ev => { ev.key === "Escape" && setEditG(null) }, style: { ...KB_INPUT, minHeight: 44, fontWeight: 800, borderColor: g.c } })]
+                            }) : h.jsxs("button", {
+                                type: "button", disabled: readOnly, onClick: () => { setEditG(g.nom), setNomG(g.nom) }, "aria-label": "Renommer le dossier " + g.nom,
+                                style: { flex: 1, minWidth: 0, minHeight: 44, border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center", textAlign: "left", color: "var(--ink)", fontFamily: "inherit", cursor: readOnly ? "default" : "text" },
+                                children: [h.jsx("span", { style: { fontSize: 16, fontWeight: 800, lineHeight: 1.25 }, children: titreG(g.nom) }), sousG(g.nom) ? h.jsx("span", { style: { fontSize: 13, color: "var(--slate)", fontWeight: 600, lineHeight: 1.3 }, children: sousG(g.nom) }) : null]
+                            }), g.complet ? h.jsxs("span", { style: { flex: "none", padding: "4px 10px", borderRadius: 99, background: "#e3f4ed", color: "#0b6e53", fontSize: 13, fontWeight: 900, display: "flex", alignItems: "center", gap: 4 }, children: [accIcone(KB_I.check, 13, 3), "Complet"] }) :
+                            h.jsx("span", { style: { flex: "none", fontSize: 13, fontWeight: 800, color: g.c, fontVariantNumeric: "tabular-nums" }, children: g.ok + "/" + g.items.length }),
+                            !readOnly && h.jsx("button", {
+                                type: "button", onClick: () => { setNom(""), setAjoutGroupe(g.nom) }, "aria-label": "Ajouter une pièce au dossier " + titreG(g.nom),
+                                style: { flex: "none", width: 44, height: 44, marginRight: -6, border: 0, borderRadius: "50%", background: "none", color: "var(--slate-light)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+                                children: accIcone(KB_I.plus, 20, 2.4)
+                            })]
+                    }), barre, !g.items.length ? (readOnly ? null : h.jsxs("button", {
+                        type: "button", onClick: () => { setNom(""), setAjoutGroupe(g.nom) },
+                        style: { alignSelf: "flex-start", minHeight: 44, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 22, border: "2px dashed #b9cfd3", background: "#ffffff", color: g.c, fontSize: 14, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
+                        children: [accIcone(KB_I.plus, 16, 2.6), "Ajouter une pièce"]
+                    })) : h.jsxs("div", {
+                        style: { display: "flex", flexWrap: "wrap", gap: 8 },
+                        children: [visibles.map(p => h.jsx(KbPill, {
+                            titre: p.titre || "Sans nom", etape: etDe(p.item_key), couleur: g.c, soft: g.soft, due: p.date_iso, fini: etapeDe(p.item_key) === "validee",
+                            onClick: () => ouvrir(p), onLong: readOnly ? null : () => changer(p, "validee", !0)
+                        }, p.item_key)), g.ok ? kbToggleBtn(ouvert ? "Masquer" : g.ok + " validée" + (g.ok > 1 ? "s" : ""), ouvert ? "Masquer les pièces validées" : "Voir les " + g.ok + " pièces validées", () => setVoir(Object.assign({}, voir, { [g.nom]: !ouvert }))) : null]
+                    })]
+                }, g.nom)
+            }), !readOnly && (creerG ? h.jsxs("form", {
+                onSubmit: ev => { ev.preventDefault(), creerDossier() },
+                style: { background: "#ffffff", borderRadius: 22, padding: 12, display: "flex", gap: 8, boxShadow: "var(--shadow)" },
+                children: [h.jsx("label", { htmlFor: "kb-nouveau-dossier", style: KB_SR, children: "Nom du nouveau dossier" }),
+                    h.jsx("input", { id: "kb-nouveau-dossier", autoFocus: !0, value: nomNouveauG, onChange: ev => setNomNouveauG(ev.target.value), onKeyDown: ev => { ev.key === "Escape" && setCreerG(!1) }, placeholder: "Ex. Mutuelle, France Travail…", autoComplete: "off", style: { ...KB_INPUT, flex: 1 } }),
+                    h.jsx("button", { type: "submit", "aria-label": "Créer le dossier", style: { flex: "none", width: 48, height: 48, border: 0, borderRadius: 14, background: "#8a5a12", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }, children: accIcone(KB_I.check, 20, 2.6) })]
+            }) : h.jsxs("button", {
+                type: "button", onClick: () => { setNomNouveauG(""), setCreerG(!0) },
+                style: { minHeight: 52, border: "2px dashed #c9ab78", borderRadius: 22, background: "transparent", color: "#7a4f0f", fontSize: 15.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "inherit", cursor: "pointer" },
+                children: [accIcone(KB_I.dossier, 18, 2.4), "Nouveau dossier"]
+            })), !readOnly && pieces.length > 0 && h.jsx("p", { className: "detail", style: { textAlign: "center", margin: 0 }, children: "Appui long sur une pièce : elle passe en « Validée »." })]
+        }), sel && h.jsxs(KbSheet, {
+            label: titreG(sel.groupe || "Autres"), onClose: () => setSelKey(null),
+            children: [h.jsx("label", { htmlFor: "kb-piece-nom", style: KB_LABEL, children: "Nom de la pièce" }),
+                h.jsx("input", { id: "kb-piece-nom", value: sel.titre || "", onChange: ev => onEdit(sel.id, { titre: ev.target.value }), onBlur: () => onSave(sel.id), autoComplete: "off", style: { ...KB_INPUT, marginBottom: 16, fontWeight: 700 } }),
+                h.jsx(KbEtapes, { etapes: PIECE_ETAPES, actuelle: etapeDe(sel.item_key), onPick: k => changer(sel, k) }),
+                h.jsxs("div", {
+                    style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 },
+                    children: [kbBouton("Monter", () => onMove(sel.id, -1), { outline: !0, icone: KB_I.haut, h: 46 }), kbBouton("Descendre", () => onMove(sel.id, 1), { outline: !0, icone: KB_I.bas, h: 46 })]
+                }), kbBouton(conf ? "Confirmer la suppression" : "Supprimer la pièce", () => supprimer(sel), { outline: !0, fg: "#b8432a", bd: conf ? "#b8432a" : "#f0d5ce", h: 46 })]
+        }), ajoutGroupe && h.jsxs(KbSheet, {
+            label: "Nouvelle pièce · " + titreG(ajoutGroupe), onClose: () => setAjoutGroupe(null), form: !0, onSubmit: ajouter,
+            children: [h.jsx("label", { htmlFor: "kb-piece-ajout", style: KB_SR, children: "Nom de la pièce" }),
+                h.jsx("input", { id: "kb-piece-ajout", "data-autofocus": "1", value: nom, onChange: ev => setNom(ev.target.value), placeholder: "Ex. Attestation employeur", autoComplete: "off", style: { ...KB_INPUT, height: 52, marginBottom: 14 } }),
+                kbBouton("Ajouter", null, { type: "submit", icone: KB_I.plus, disabled: !nom.trim(), h: 54, bg: "#7a4f0f" })]
+        }), h.jsx(KbToast, { texte: toast })]
+    })
+}
+
+// ============================================================
+// DEVOIRS
+// ============================================================
+function DevoirsPage({ rows, setRows, loading, err, contenu, onEditCt, onSaveCt, onStatus, onMatAdd, onMatDel, readOnly }) {
+    const [selId, setSelId] = re.useState(null),
+        [ajout, setAjout] = re.useState(!1),
+        [nTitre, setNTitre] = re.useState(""),
+        [nMat, setNMat] = re.useState(""),
+        [nDate, setNDate] = re.useState(""),
+        [fEtape, setFEtape] = re.useState(""),
+        [fMat, setFMat] = re.useState(""),
+        [fDate, setFDate] = re.useState(""),
+        [voir, setVoir] = re.useState({}),
+        [conf, setConf] = re.useState(!1),
+        [enreg, setEnreg] = re.useState(""),
+        [matOuvert, setMatOuvert] = re.useState(!1),
+        [matNom, setMatNom] = re.useState(""),
+        [matSuppr, setMatSuppr] = re.useState(null),
+        [matDest, setMatDest] = re.useState(""),
+        [matAncien, setMatAncien] = re.useState({}),
+        [toast, setToast] = re.useState("");
+    const flash = kbFlash(setToast),
+        erreur = e => flash("Échec : " + (e && e.message ? e.message : "connexion")),
+        lignesMat = contenuDe(contenu, "matiere"),
+        matieres = [...new Set([...lignesMat.map(x => x.titre), ...(rows || []).map(x => x.subject)])].filter(Boolean),
+        couleurMat = m => KB_PALETTE[Math.max(0, matieres.indexOf(m)) % KB_PALETTE.length],
+        abrev = m => (m || "?").replace(/[^A-Za-zÀ-ÿ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase().padEnd(2, (m || "?").charAt(1).toUpperCase()),
+        etDe = s => HW_ETAPES.find(x => x.k === s) || HW_ETAPES[0],
+        sel = (rows || []).find(r => r.id === selId),
+        auj = new Date;
+    auj.setHours(0, 0, 0, 0);
+    const dansSemaine = d => { if (!d) return !1; const x = new Date(d + "T00:00:00"); return x >= auj && x <= new Date(auj.getTime() + 6048e5) },
+        filtre = r => (!fEtape || r.status === fEtape) && (!fMat || r.subject === fMat) && (!fDate || (fDate === "semaine" ? dansSemaine(r.deadline) : hwkLate(r.deadline, r.status))),
+        actif = !!(fEtape || fMat || fDate),
+        aRendre = (rows || []).filter(r => (r.status === "À faire" || r.status === "En cours") && r.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline)),
+        prochain = aRendre[0],
+        eProchain = prochain ? accEcheance(prochain.deadline) : null;
+
+    async function patch(id, p, msg) {
+        setRows(l => l.map(r => r.id === id ? { ...r, ...p } : r));
+        const { error: E } = await J.from("vision_homework").update({ ...p, updated_at: new Date().toISOString() }).eq("id", id);
+        E ? erreur(E) : (setEnreg("ok"), msg && flash(msg))
+    }
+    async function changer(r, k) {
+        if (r.status === k) { setSelId(null); return }
+        try { await onStatus(r.id, k), setSelId(null), flash((r.title || "Devoir") + " → " + etDe(k).l) } catch (e) { erreur(e) }
+    }
+    async function ajouter() {
+        const t = nTitre.trim();
+        if (!nMat) { flash("Choisis une matière"); return }
+        if (!t) { flash("Écris un titre"); return }
+        if (!nDate) { flash("Choisis la date de rendu"); return }
+        const { data: u } = await J.auth.getUser(), uid = u && u.user ? u.user.id : null,
+            { data: d, error: E } = await J.from("vision_homework").insert({ user_id: uid, subject: nMat, title: t, deadline: nDate, status: "À faire" }).select().single();
+        if (E) { erreur(E); return }
+        setRows(l => [...l, d].sort((a, b) => (a.deadline || "").localeCompare(b.deadline || ""))), setAjout(!1), setNTitre(""), setNDate(""), flash("Ajouté en " + nMat)
+    }
+    async function supprimer(r) {
+        if (!conf) { setConf(!0); return }
+        setRows(l => l.filter(x => x.id !== r.id)), setSelId(null);
+        const { error: E } = await J.from("vision_homework").delete().eq("id", r.id);
+        E ? erreur(E) : flash("Devoir supprimé")
+    }
+    async function ajouterMatiere() {
+        const t = matNom.trim();
+        if (!t) return;
+        if (matieres.some(m => m.toLowerCase() === t.toLowerCase())) { flash("Cette matière existe déjà"); return }
+        try { await onMatAdd(t), setMatNom(""), flash("Matière ajoutée : " + t) } catch (e) { erreur(e) }
+    }
+    async function renommerMatiere(o) {
+        const ancien = o.titre || "", brouillon = matAncien[o.id], nouveau = (brouillon == null ? ancien : brouillon).trim();
+        setMatAncien(m => { const c = { ...m }; delete c[o.id]; return c });
+        if (!nouveau || nouveau === ancien) return;
+        if (matieres.some(m => m !== ancien && m.toLowerCase() === nouveau.toLowerCase())) { flash("Cette matière existe déjà"); return }
+        onEditCt(o.id, { titre: nouveau }), onSaveCt(o.id);
+        if ((rows || []).some(r => r.subject === ancien)) {
+            setRows(l => l.map(r => r.subject === ancien ? { ...r, subject: nouveau } : r));
+            const { error: E } = await J.from("vision_homework").update({ subject: nouveau }).eq("subject", ancien);
+            if (E) { erreur(E); return }
+        }
+        flash("Matière renommée")
+    }
+    async function supprimerMatiere(m) {
+        const utilises = (rows || []).filter(r => r.subject === m).length;
+        if (matSuppr !== m) { setMatSuppr(m), setMatDest(matieres.find(x => x !== m) || ""); return }
+        if (utilises && !matDest) { flash("Choisis où rattacher les devoirs"); return }
+        try {
+            if (utilises) {
+                setRows(l => l.map(r => r.subject === m ? { ...r, subject: matDest } : r));
+                const { error: E } = await J.from("vision_homework").update({ subject: matDest }).eq("subject", m);
+                if (E) throw E
+            }
+            const ligne = lignesMat.find(x => x.titre === m);
+            ligne && await onMatDel(ligne.id);
+            setMatSuppr(null), fMat === m && setFMat(""), flash("Matière supprimée")
+        } catch (e) { erreur(e) }
+    }
+
+    if (loading) return h.jsx("section", { className: "sec", children: h.jsx("p", { className: "detail", children: "Chargement…" }) });
+
+    const couloirs = matieres.filter(m => !fMat || m === fMat).map(m => {
+        const col = couleurMat(m),
+            toutes = (rows || []).filter(r => r.subject === m),
+            liste = toutes.filter(filtre).sort((a, b) => (hwkLate(b.deadline, b.status) ? 1 : 0) - (hwkLate(a.deadline, a.status) ? 1 : 0) || HW_ETAPES.findIndex(x => x.k === a.status) - HW_ETAPES.findIndex(x => x.k === b.status) || (a.deadline || "9").localeCompare(b.deadline || "9")),
+            rendus = toutes.filter(r => r.status === "Fait" || r.status === "Corrigé").length,
+            ouvert = !!voir[m] || fEtape === "Corrigé",
+            corriges = fEtape ? 0 : liste.filter(r => r.status === "Corrigé").length,
+            visibles = ouvert || fEtape ? liste : liste.filter(r => r.status !== "Corrigé");
+        if (actif && !liste.length && !fMat) return null;
+        return h.jsxs(KbLane, {
+            titre: m, abrev: abrev(m), c: col.c, soft: col.soft,
+            ratio: rendus + "/" + toutes.length, pct: toutes.length ? Math.round(rendus / toutes.length * 100) : 0,
+            onHeader: () => setFMat(fMat === m ? "" : m), headerAria: m + " : " + rendus + " rendus sur " + toutes.length + (fMat === m ? ". Afficher toutes les matières" : ". Afficher seulement cette matière"),
+            onAdd: readOnly ? null : () => { setNMat(m), setNTitre(""), setNDate(""), setAjout(!0) }, addAria: "Ajouter un devoir en " + m,
+            vide: !toutes.length && !readOnly, onVide: () => { setNMat(m), setNTitre(""), setNDate(""), setAjout(!0) }, videLabel: "Ajouter un devoir",
+            children: [visibles.map(r => h.jsx(KbPill, { titre: r.title || "Devoir", etape: etDe(r.status), couleur: col.c, soft: col.soft, due: r.deadline, fini: r.status === "Fait" || r.status === "Corrigé", onClick: () => { readOnly || (setConf(!1), setEnreg(""), setSelId(r.id)) } }, r.id)),
+                corriges ? kbToggleBtn(ouvert ? "Masquer" : "+" + corriges + " corrigé" + (corriges > 1 ? "s" : ""), ouvert ? "Masquer les devoirs corrigés" : "Voir " + corriges + " devoir(s) corrigé(s)", () => setVoir(Object.assign({}, voir, { [m]: !ouvert })), "#5a4fa8") : null,
+                actif && !liste.length ? h.jsx("span", { className: "detail", children: "Aucun devoir pour ce filtre" }, "vide") : null]
+        }, m)
+    }).filter(Boolean);
+
+    return h.jsxs("section", {
+        className: "sec",
+        children: [h.jsxs("div", {
+            style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12 },
+            children: [h.jsx("h2", { style: { margin: 0 }, children: "Devoirs" }), !readOnly && h.jsxs("div", {
+                style: { display: "flex", gap: 8, flex: "none" },
+                children: [h.jsx("button", {
+                    type: "button", onClick: () => { setMatSuppr(null), setMatNom(""), setMatOuvert(!0) }, "aria-label": "Gérer les matières",
+                    style: { width: 46, height: 46, border: "2px solid #c9d4f2", borderRadius: 14, background: "#ffffff", color: "#3b5fc4", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+                    children: accIcone(KB_I.liste, 20, 2.2)
+                }), kbBouton("Devoir", () => { setNMat(fMat || matieres[0] || ""), setNTitre(""), setNDate(""), setAjout(!0) }, { icone: KB_I.plus, h: 46, width: "auto", bg: "#3b5fc4" })]
+            })]
+        }), err ? h.jsx("p", { className: "detail", style: { color: "#b8432a" }, children: "Erreur : " + err }) : null,
+        prochain && h.jsxs("button", {
+            type: "button", onClick: () => { readOnly || (setConf(!1), setEnreg(""), setSelId(prochain.id)) },
+            "aria-label": "Prochain rendu : " + prochain.title + ", " + prochain.subject + ", " + eProchain.aria,
+            style: { width: "100%", border: 0, borderRadius: 22, background: eProchain.late ? "#a63a24" : "#3b5fc4", color: "#ffffff", padding: 14, display: "flex", alignItems: "center", gap: 12, textAlign: "left", marginBottom: 12, boxShadow: "0 10px 24px rgba(59,95,196,.25)", fontFamily: "inherit", cursor: "pointer" },
+            children: [h.jsx("span", { style: { flex: "none", width: 50, height: 50, borderRadius: 16, background: "rgba(255,255,255,.16)", display: "flex", alignItems: "center", justifyContent: "center" }, children: accIcone(ACC_THEMES.devoirs.i, 22, 2) }),
+                h.jsxs("span", {
+                    style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 },
+                    children: [h.jsx("span", { style: { fontSize: 12.5, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase" }, children: prochain.subject }),
+                        h.jsx("span", { style: { fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 700, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }, children: prochain.title })]
+                }), h.jsx("span", { style: { flex: "none", padding: "6px 10px", borderRadius: 12, background: "#ffffff", color: eProchain.urgent ? "#b8432a" : "#3b5fc4", fontSize: 15, fontWeight: 900 }, children: eProchain.l })]
+        }), kbCompteurs(rows, HW_ETAPES, fEtape, setFEtape, k => (rows || []).filter(r => r.status === k).length),
+        h.jsxs("div", {
+            role: "group", "aria-label": "Filtrer par date",
+            style: { display: "flex", gap: 6, marginBottom: 12 },
+            children: [kbChip("Toutes dates", !fDate, () => setFDate(""), { fontSize: 13.5 }), kbChip("7 prochains jours", fDate === "semaine", () => setFDate(fDate === "semaine" ? "" : "semaine"), { fontSize: 13.5 }), kbChip("En retard", fDate === "retard", () => setFDate(fDate === "retard" ? "" : "retard"), { fontSize: 13.5 })]
+        }), actif && h.jsxs("button", {
+            type: "button", onClick: () => { setFEtape(""), setFMat(""), setFDate("") },
+            style: { minHeight: 44, marginBottom: 12, padding: "0 14px", border: 0, borderRadius: 99, background: "var(--ink)", color: "#ffffff", fontSize: 14, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit", cursor: "pointer" },
+            children: ["Effacer les filtres", accIcone(KB_I.croix, 14, 2.8)]
+        }), !matieres.length ? h.jsxs("div", {
+            style: { background: "#ffffff", borderRadius: 22, padding: 16, boxShadow: "var(--shadow)", display: "flex", flexDirection: "column", gap: 10 },
+            children: [h.jsx("p", { style: { margin: 0, fontWeight: 700 }, children: "Ajoute d'abord une matière." }), !readOnly && kbBouton("Ajouter une matière", () => setMatOuvert(!0), { icone: KB_I.plus, bg: "#3b5fc4" })]
+        }) : h.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: couloirs }),
+        sel && h.jsxs(KbSheet, {
+            label: sel.title || "Devoir", onClose: () => setSelId(null),
+            children: [h.jsxs("div", {
+                style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+                children: [h.jsx("span", { style: { padding: "3px 10px", borderRadius: 99, background: couleurMat(sel.subject).soft, color: couleurMat(sel.subject).c, fontSize: 13, fontWeight: 800 }, children: sel.subject }),
+                    accEcheance(sel.deadline) ? h.jsx("span", { style: { padding: "3px 10px", borderRadius: 99, background: accEcheance(sel.deadline).urgent ? "#fbe9e4" : "#eef3f4", color: accEcheance(sel.deadline).urgent ? "#b8432a" : "var(--ink-soft)", fontSize: 13, fontWeight: 800 }, children: "À rendre · " + accEcheance(sel.deadline).l }) : null]
+            }), h.jsx(KbEtapes, { etapes: HW_ETAPES, actuelle: sel.status, onPick: k => changer(sel, k) }),
+            h.jsx("label", { htmlFor: "kb-hw-date", style: KB_LABEL, children: "À rendre le" }),
+            h.jsx("div", { style: { display: "flex", gap: 6, marginBottom: 8 }, children: kbRaccourcis().map(w => kbChip(w.l, sel.deadline === w.k, () => patch(sel.id, { deadline: w.k }, "Date enregistrée"), { fontSize: 13.5 })) }),
+            h.jsx("input", { id: "kb-hw-date", type: "date", value: sel.deadline || "", onChange: ev => ev.target.value && patch(sel.id, { deadline: ev.target.value }, "Date enregistrée"), style: { ...KB_INPUT, marginBottom: 16 } }),
+            h.jsx("label", { htmlFor: "kb-hw-desc", style: KB_LABEL, children: "Consignes" }),
+            h.jsx("textarea", { id: "kb-hw-desc", key: "d" + sel.id, defaultValue: sel.description || "", rows: 3, placeholder: "Ajouter les consignes", onFocus: () => setEnreg(""), onBlur: ev => (ev.target.value || null) !== (sel.description || null) && patch(sel.id, { description: ev.target.value || null }), style: { ...KB_INPUT, resize: "vertical", marginBottom: 14 } }),
+            h.jsx("label", { htmlFor: "kb-hw-notes", style: KB_LABEL, children: "Notes" }),
+            h.jsx("textarea", { id: "kb-hw-notes", key: "n" + sel.id, defaultValue: sel.notes || "", rows: 4, placeholder: "Notes prises pendant / après le cours…", onFocus: () => setEnreg(""), onBlur: ev => (ev.target.value || "") !== (sel.notes || "") && patch(sel.id, { notes: ev.target.value }), style: { ...KB_INPUT, resize: "vertical" } }),
+            h.jsxs("p", {
+                role: "status", style: { display: "flex", alignItems: "center", gap: 6, margin: "6px 0 16px", fontSize: 13.5, fontWeight: 700, color: enreg ? "#0b6e53" : "var(--slate)" },
+                children: [enreg ? accIcone(KB_I.check, 14, 2.8) : null, enreg ? "Enregistré" : "Enregistré automatiquement en quittant le champ"]
+            }), kbBouton(conf ? "Confirmer la suppression" : "Supprimer le devoir", () => supprimer(sel), { outline: !0, fg: "#b8432a", bd: conf ? "#b8432a" : "#f0d5ce", h: 48 })]
+        }), ajout && h.jsxs(KbSheet, {
+            label: "Nouveau devoir", onClose: () => setAjout(!1), form: !0, onSubmit: ajouter,
+            children: [h.jsx("span", { style: KB_LABEL, children: "Matière" }), h.jsx("div", {
+                role: "group", "aria-label": "Matière", style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 },
+                children: matieres.map(m => {
+                    const on = m === nMat, col = couleurMat(m);
+                    return h.jsxs("button", {
+                        type: "button", onClick: () => setNMat(m), "aria-pressed": on ? "true" : "false",
+                        style: { minHeight: 46, borderRadius: 14, border: "2px solid " + (on ? col.c : "#c9d8db"), background: on ? col.soft : "#ffffff", color: "var(--ink)", fontSize: 14, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, padding: "0 10px", textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
+                        children: [h.jsx("span", { style: { flex: "none", width: 26, height: 26, borderRadius: 8, background: col.c, color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }, children: abrev(m) }), m]
+                    }, m)
+                })
+            }), h.jsx("label", { htmlFor: "kb-hw-titre", style: KB_LABEL, children: "Titre" }),
+            h.jsx("input", { id: "kb-hw-titre", "data-autofocus": "1", value: nTitre, onChange: ev => setNTitre(ev.target.value), placeholder: "Ex. Exercices chapitre 3", autoComplete: "off", style: { ...KB_INPUT, marginBottom: 14 } }),
+            h.jsx("label", { htmlFor: "kb-hw-ndate", style: KB_LABEL, children: "À rendre le" }),
+            h.jsx("div", { style: { display: "flex", gap: 6, marginBottom: 8 }, children: kbRaccourcis().map(w => kbChip(w.l, nDate === w.k, () => setNDate(w.k), { fontSize: 13.5 })) }),
+            h.jsx("input", { id: "kb-hw-ndate", type: "date", value: nDate, onChange: ev => setNDate(ev.target.value), style: { ...KB_INPUT, marginBottom: 16 } }),
+            kbBouton("Ajouter", null, { type: "submit", icone: KB_I.plus, disabled: !(nTitre.trim() && nMat && nDate), h: 54, bg: "#3b5fc4" })]
+        }), matOuvert && h.jsxs(KbSheet, {
+            label: "Matières", onClose: () => setMatOuvert(!1), form: !0, onSubmit: ajouterMatiere,
+            children: [matieres.map(m => {
+                const ligne = lignesMat.find(x => x.titre === m),
+                    nb = (rows || []).filter(r => r.subject === m).length,
+                    col = couleurMat(m),
+                    enSuppr = matSuppr === m;
+                return h.jsxs("div", {
+                    style: { borderBottom: "1px solid var(--line)", padding: "8px 0", display: "flex", flexDirection: "column", gap: 8 },
+                    children: [h.jsxs("div", {
+                        style: { display: "flex", alignItems: "center", gap: 8 },
+                        children: [h.jsx("span", { style: { flex: "none", width: 30, height: 30, borderRadius: 9, background: col.c, color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }, children: abrev(m) }),
+                            ligne ? [h.jsx("label", { htmlFor: "kb-mat-" + ligne.id, style: KB_SR, children: "Nom de la matière" }, "l"), h.jsx("input", {
+                                id: "kb-mat-" + ligne.id, value: matAncien[ligne.id] != null ? matAncien[ligne.id] : ligne.titre || "",
+                                onChange: ev => { const v = ev.target.value; setMatAncien(a => ({ ...a, [ligne.id]: v })) },
+                                onBlur: () => renommerMatiere(ligne),
+                                onKeyDown: ev => { ev.key === "Enter" && (ev.preventDefault(), ev.currentTarget.blur()) },
+                                style: { ...KB_INPUT, minHeight: 44, flex: 1, fontWeight: 700 }
+                            }, "i")] : h.jsx("span", { style: { flex: 1, fontWeight: 700 }, children: m }),
+                            h.jsx("span", { style: { flex: "none", fontSize: 13, fontWeight: 700, color: "var(--slate)", fontVariantNumeric: "tabular-nums" }, children: nb + " devoir" + (nb > 1 ? "s" : "") }),
+                            h.jsx("button", {
+                                type: "button", onClick: () => supprimerMatiere(m), "aria-label": (enSuppr ? "Confirmer la suppression de " : "Supprimer la matière ") + m,
+                                style: { flex: "none", minWidth: 44, minHeight: 44, padding: "0 10px", border: "2px solid " + (enSuppr ? "#b8432a" : "#f0d5ce"), borderRadius: 12, background: "#ffffff", color: "#b8432a", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
+                                children: enSuppr ? "Confirmer" : accIcone(KB_I.croix, 16, 2.6)
+                            })]
+                    }), enSuppr && nb > 0 ? h.jsxs("div", {
+                        style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
+                        children: [h.jsx("label", { htmlFor: "kb-mat-dest", style: { fontSize: 14, fontWeight: 700 }, children: "Rattacher ses " + nb + " devoir" + (nb > 1 ? "s" : "") + " à" }),
+                            h.jsxs("select", {
+                                id: "kb-mat-dest", value: matDest, onChange: ev => setMatDest(ev.target.value), style: { ...KB_INPUT, width: "auto", flex: 1, minHeight: 44 },
+                                children: [h.jsx("option", { value: "", children: "Choisir…" }), matieres.filter(x => x !== m).map(x => h.jsx("option", { value: x, children: x }, x))]
+                            }), h.jsx("button", { type: "button", onClick: () => setMatSuppr(null), style: { minHeight: 44, border: 0, background: "none", color: "var(--ink-soft)", fontWeight: 800, fontFamily: "inherit", cursor: "pointer" }, children: "Annuler" })]
+                    }) : enSuppr ? h.jsx("button", { type: "button", onClick: () => setMatSuppr(null), style: { alignSelf: "flex-start", minHeight: 40, border: 0, background: "none", color: "var(--ink-soft)", fontWeight: 800, fontFamily: "inherit", cursor: "pointer" }, children: "Annuler" }) : null]
+                }, m)
+            }), h.jsx("p", { className: "detail", style: { margin: "10px 0" }, children: "Renommer une matière renomme aussi ses devoirs." }),
+            h.jsxs("div", {
+                style: { display: "flex", gap: 8 },
+                children: [h.jsx("label", { htmlFor: "kb-mat-new", style: KB_SR, children: "Nouvelle matière" }),
+                    h.jsx("input", { id: "kb-mat-new", value: matNom, onChange: ev => setMatNom(ev.target.value), placeholder: "Nouvelle matière", autoComplete: "off", style: { ...KB_INPUT, flex: 1 } }),
+                    h.jsx("button", { type: "submit", "aria-label": "Ajouter la matière", disabled: !matNom.trim(), style: { flex: "none", width: 48, height: 48, border: 0, borderRadius: 14, background: "#3b5fc4", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", opacity: matNom.trim() ? 1 : .55 }, children: accIcone(KB_I.plus, 20, 2.6) })]
+            })]
+        }), h.jsx(KbToast, { texte: toast })]
+    })
+}
+
+async function hwkSetStatus(setRows, id, st) {
+    const now = new Date().toISOString(), patch = { status: st, updated_at: now };
+    if (st === "Fait") patch.submitted_at = now;
+    if (st === "Corrigé") patch.corrected_at = now;
+    if (st === "À faire" || st === "En cours") patch.submitted_at = null, patch.corrected_at = null;
+    setRows(p => p.map(r => r.id === id ? { ...r, ...patch } : r));
+    const { error: E } = await J.from("vision_homework").update(patch).eq("id", id);
+    if (E) throw E
+}
+
+// Barre du bas : 5 onglets fixes + « Plus ».
+const NAV_PRINCIPAUX = ["apercu", "tresorerie", "homework", "planning", "sport"];
+
+function NavBas({ onglets, actif, aller, verrou }) {
+    const [plus, setPlus] = re.useState(!1),
+        principaux = NAV_PRINCIPAUX.map(id => onglets.find(o => o.id === id)).filter(Boolean),
+        autres = onglets.filter(o => !NAV_PRINCIPAUX.includes(o.id)),
+        dansPlus = autres.some(o => o.id === actif);
+    return h.jsxs(h.Fragment, {
+        children: [h.jsxs("nav", {
+            className: "nav", "aria-label": "Navigation principale",
+            children: [principaux.map(N => h.jsxs("button", {
+                type: "button", className: actif === N.id ? "on" : "", onClick: () => aller(N.id), "aria-current": actif === N.id ? "page" : void 0,
+                children: [h.jsx("span", { className: "ico", "aria-hidden": "true", children: navIcon(N.icon) }), h.jsx("span", { children: N.label + (verrou(N.id) ? " 🔒" : "") })]
+            }, N.id)), h.jsxs("button", {
+                type: "button", className: dansPlus ? "on" : "", onClick: () => setPlus(!0), "aria-haspopup": "dialog", "aria-label": "Plus d'onglets" + (dansPlus ? ", onglet actuel : " + autres.find(o => o.id === actif).label : ""),
+                children: [h.jsx("span", { className: "ico", "aria-hidden": "true", children: accIcone("M5 12h.01M12 12h.01M19 12h.01", 22, 3) }), h.jsx("span", { children: dansPlus ? autres.find(o => o.id === actif).label : "Plus" })]
+            })]
+        }), plus && h.jsx(KbSheet, {
+            label: "Autres onglets", onClose: () => setPlus(!1),
+            children: h.jsx("div", {
+                style: { display: "flex", flexDirection: "column", gap: 6 },
+                children: autres.map(N => h.jsxs("button", {
+                    type: "button", onClick: () => { setPlus(!1), aller(N.id) }, "aria-current": actif === N.id ? "page" : void 0,
+                    style: { minHeight: 54, display: "flex", alignItems: "center", gap: 14, padding: "0 14px", borderRadius: 16, border: 0, background: actif === N.id ? "var(--teal-soft)" : "var(--surface-alt)", color: actif === N.id ? "var(--teal-dark)" : "var(--ink)", fontSize: 16, fontWeight: 700, textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
+                    children: [h.jsx("span", { "aria-hidden": "true", style: { display: "flex" }, children: navIcon(N.icon) }), h.jsx("span", { style: { flex: 1 }, children: N.label }), verrou(N.id) ? h.jsx("span", { children: "🔒" }) : accIcone(KB_I.chevron, 18, 2.4)]
+                }, N.id))
             })
-        }), toast && h.jsx("div", {
-            role: "status",
-            style: { position: "fixed", left: 20, right: 20, bottom: 150, zIndex: 50, padding: "12px 16px", borderRadius: 14, background: "var(--ink)", color: "#ffffff", fontSize: 14.5, fontWeight: 600, textAlign: "center", maxWidth: 520, margin: "0 auto" },
-            children: toast
         })]
     })
 }
@@ -22331,6 +22958,7 @@ function Accueil({
 function sk() {
     const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]), [tx, stx] = re.useState([]), [bm, sbm] = re.useState([]), [poches, setPoches] = re.useState([]), [saisieOuverte, setSaisieOuverte] = re.useState(!1), [txEdit, setTxEdit] = re.useState(null);
     const [taches, setTaches] = re.useState([]);
+    const [pe, setPe] = re.useState({});
     const ctRef = re.useRef([]);
     ctRef.current = ct;
     const pochesRef = re.useRef([]);
@@ -22362,13 +22990,13 @@ function sk() {
         }
         if (!t) return;
         const N = t.user.id;
-        J.from("vision_progress").select("item_key, done").then(({
+        J.from("vision_progress").select("item_key, done, etape").then(({
             data: K
         }) => {
-            const H = {};
+            const H = {}, P = {};
             (K || []).forEach(A => {
-                H[A.item_key] = A.done
-            }), a(H)
+                H[A.item_key] = A.done, A.etape && (P[A.item_key] = A.etape)
+            }), a(H), setPe(P)
         }), (async () => {
             let {
                 data: K
@@ -22771,6 +23399,51 @@ function sk() {
             } = await J.from("vision_items").insert(K).select().single();
         H && mi(A => [...A, H])
     }
+    async function pieceEtape(key, et) {
+        if (at) return;
+        const avantDone = o[key], avantEt = pe[key], done = et === "validee";
+        a(A => ({ ...A, [key]: done })), setPe(A => ({ ...A, [key]: et }));
+        const { error: E } = await J.from("vision_progress").upsert({ item_key: key, done, etape: et, updated_at: new Date().toISOString() }, { onConflict: "user_id,item_key" });
+        if (E) { a(A => ({ ...A, [key]: avantDone })), setPe(A => ({ ...A, [key]: avantEt })); throw E }
+    }
+    async function pieceAdd(titre, groupe) {
+        const { data: u2 } = await J.auth.getUser(), uid = u2 && u2.user ? u2.user.id : null,
+            memes = ctRef.current.filter(x => x.type === "piece" && (x.groupe || null) === (groupe || null)),
+            base = { user_id: uid, type: "piece", groupe: groupe || null, titre };
+        let rang = memes.length ? Math.max(...memes.map(x => x.sort || 0)) + 1 : 0, E = null;
+        for (let essai = 0; essai < 3; essai++) {
+            const r2 = await J.from("vision_contenu").insert({ ...base, item_key: "piece:" + Date.now() + (essai ? "-" + essai : ""), sort: rang }).select().single();
+            if (r2.data) { sct(p => [...p, r2.data]); return }
+            E = r2.error;
+            if (!E || E.code !== "23505") break;
+            rang += 1
+        }
+        throw E || new Error("ajout impossible")
+    }
+    async function pieceDel(id) {
+        const { error: E } = await J.from("vision_contenu").delete().eq("id", id);
+        if (E) throw E;
+        sct(p => p.filter(x => x.id !== id))
+    }
+    async function groupeRename(ancien, nouveau) {
+        let q = J.from("vision_contenu").update({ groupe: nouveau, updated_at: new Date().toISOString() }).eq("type", "piece");
+        q = ancien == null ? q.is("groupe", null) : q.eq("groupe", ancien);
+        const { error: E } = await q;
+        if (E) throw E;
+        sct(p => p.map(x => x.type === "piece" && (x.groupe || null) === (ancien || null) ? { ...x, groupe: nouveau } : x))
+    }
+    async function matAdd(titre) {
+        const { data: u2 } = await J.auth.getUser(), uid = u2 && u2.user ? u2.user.id : null,
+            l = ctRef.current.filter(x => x.type === "matiere"),
+            { data: d, error: E } = await J.from("vision_contenu").insert({ user_id: uid, type: "matiere", item_key: "matiere:" + Date.now(), titre, sort: l.length ? Math.max(...l.map(x => x.sort || 0)) + 1 : 0 }).select().single();
+        if (E) throw E;
+        sct(p => [...p, d])
+    }
+    async function matDel(id) {
+        const { error: E } = await J.from("vision_contenu").delete().eq("id", id);
+        if (E) throw E;
+        sct(p => p.filter(x => x.id !== id))
+    }
     async function tacheAdd(v) {
         const K = Object.assign({ user_id: t.user.id, sort: Math.max(0, ...taches.map(A => A.sort || 0)) + 1 }, v),
             { data: H, error: E } = await J.from("vision_taches").insert(K).select().single();
@@ -23073,9 +23746,13 @@ function sk() {
                 params: c,
                 poches: poches,
                 progress: o,
+                pieceEtapes: pe,
                 contenu: ct,
                 hw: hwRows,
                 taches: at ? [] : taches,
+                onHwStatus: (id, st) => hwkSetStatus(setHwRows, id, st),
+                onPieceEtape: pieceEtape,
+                onSuiviToggle: async key => x(key),
                 readOnly: at,
                 goTab: N => { i(N), window.scrollTo(0, 0) },
                 onAdd: at ? lt : tacheAdd,
@@ -23146,30 +23823,34 @@ function sk() {
                 poches: poches
             })), s === "sport" && h.jsx(Zv, {
                 rows: ct
-            }), s === "pieces" && h.jsx(Yv, {
-                progress: o,
-                toggle: x,
-                readOnly: at,
+            }), s === "pieces" && h.jsx(PiecesPage, {
                 rows: ct,
-                edit: ctEdit,
-                save: ctSave,
-                add: ctAdd,
-                del: ctDel,
-                move: ctMove
+                progress: o,
+                pieceEtapes: pe,
+                readOnly: at,
+                onEtape: pieceEtape,
+                onEdit: ctEdit,
+                onSave: ctSave,
+                onAdd: pieceAdd,
+                onDel: pieceDel,
+                onMove: (id, sens) => ctMove(id, "piece", sens),
+                onRenameGroupe: groupeRename
             }), s === "historique" && gt(h.jsx(Historique, {
                 audit: aud,
                 items: vi,
                 params: c
-            })), s === "homework" && h.jsx(HWK, {
+            })), s === "homework" && h.jsx(DevoirsPage, {
                 rows: hwRows,
                 setRows: setHwRows,
                 loading: hwLoading,
                 err: hwErr,
                 contenu: ct,
-                edit: ctEdit,
-                save: ctSave,
-                add: ctAdd,
-                del: ctDel
+                readOnly: at,
+                onEditCt: ctEdit,
+                onSaveCt: ctSave,
+                onStatus: (id, st) => hwkSetStatus(setHwRows, id, st),
+                onMatAdd: matAdd,
+                onMatDel: matDel
             })]
         }), !at && h.jsx("button", {
             className: "fab",
@@ -23189,20 +23870,11 @@ function sk() {
             onClose: () => {
                 setSaisieOuverte(!1), setTxEdit(null)
             }
-        }), h.jsx("nav", {
-            className: "nav",
-            children: Ov.map(N => h.jsxs("button", {
-                className: s === N.id ? "on" : "",
-                onClick: () => i(N.id),
-                "aria-current": s === N.id ? "page" : void 0,
-                children: [h.jsx("span", {
-                    className: "ico",
-                    "aria-hidden": "true",
-                    children: navIcon(N.icon)
-                }), h.jsx("span", {
-                    children: [N.label, at && tk.includes(N.id) && !v ? " 🔒" : ""].join("")
-                })]
-            }, N.id))
+        }), h.jsx(NavBas, {
+            onglets: Ov,
+            actif: s,
+            aller: N => { i(N), window.scrollTo(0, 0) },
+            verrou: N => !!(at && tk.includes(N) && !v)
         })]
     })
 }
@@ -24386,8 +25058,8 @@ tf(document.getElementById("root")).render(ai.createElement(ik, null, ai.createE
   --surface-alt:#eef5f6;
   --ink:#0e3a42;
   --ink-soft:#3d545c;
-  --slate:#647d84;
-  --slate-light:#8fa6ab;
+  --slate:#536b72;
+  --slate-light:#6f888e;
   --line:#dbeaec;
   --line-strong:#bcd9dc;
   --teal:#0e9fb2;
@@ -24624,7 +25296,7 @@ input::placeholder,textarea::placeholder{color:var(--slate-light)}
 .nav{
   position:fixed;bottom:0;left:0;right:0;
   background:var(--surface);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(5,1fr);z-index:20;
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));z-index:20;
   padding-bottom:env(safe-area-inset-bottom);
   box-shadow:0 -2px 12px rgba(14,58,66,.06);
 }
@@ -24632,7 +25304,7 @@ input::placeholder,textarea::placeholder{color:var(--slate-light)}
   min-width:0;
   background:none;border:0;
   padding:9px 3px 10px;
-  font-size:10px;font-weight:600;line-height:1.2;
+  font-size:11.5px;font-weight:700;line-height:1.2;
   color:var(--slate);white-space:normal;text-align:center;
   display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;
   cursor:pointer;font-family:inherit;
@@ -24655,7 +25327,7 @@ input::placeholder,textarea::placeholder{color:var(--slate-light)}
 /* ---------- FAB ---------- */
 .fab{
   position:fixed;right:18px;
-  bottom:calc(136px + env(safe-area-inset-bottom));
+  bottom:calc(84px + env(safe-area-inset-bottom));
   width:58px;height:58px;border-radius:50%;
   background:var(--teal);color:#fff;border:0;
   font-size:30px;line-height:1;font-weight:300;
@@ -24873,7 +25545,7 @@ details.collapsible > .inner{padding:0 16px 16px;border-top:1px solid var(--line
 /* Sur petit écran, on resserre un peu plus */
 @media (max-width:380px){
   .wrap{padding:0 12px}
-  .nav button{font-size:9.5px;padding:8px 2px 9px}
+  .nav button{font-size:11px;padding:8px 2px 9px}
   .top h1{font-size:1.35rem}
   .sec h2{font-size:1.2rem}
   .catgrid{grid-template-columns:1fr}
@@ -24895,7 +25567,7 @@ details.collapsible > .inner{padding:0 16px 16px;border-top:1px solid var(--line
 .tl .det{color:var(--slate);font-size:13px;margin-top:3px;line-height:1.45}
 
 /* Texte secondaire en ligne */
-.detail{color:var(--slate);font-size:12.5px;line-height:1.45}
+.detail{color:var(--slate);font-size:13.5px;line-height:1.45}
 
 /* Pastille de jour (Sport) */
 .di{
