@@ -16939,16 +16939,12 @@ const Av = [{
     }],
     Ov = [{
         id: "apercu",
-        label: "Aperçu",
-        icon: "boussole"
+        label: "Accueil",
+        icon: "kanban"
     }, {
         id: "planning",
         label: "Planning",
         icon: "calendrier"
-    }, {
-        id: "suivi",
-        label: "Suivi",
-        icon: "checklist"
     }, {
         id: "budget",
         label: "Budget",
@@ -16966,10 +16962,6 @@ const Av = [{
         label: "Sport",
         icon: "haltere"
     }, {
-        id: "pieces",
-        label: "Pièces",
-        icon: "document"
-    }, {
         id: "homework",
         label: "Devoirs",
         icon: "livre"
@@ -16979,6 +16971,7 @@ const Av = [{
         icon: "horloge"
     }],
     NAV_ICONS = {
+        kanban: ["M4 5.8A1.8 1.8 0 015.8 4h12.4A1.8 1.8 0 0120 5.8v12.4a1.8 1.8 0 01-1.8 1.8H5.8A1.8 1.8 0 014 18.2z", "M9.4 4v16", "M14.6 4v16", "M6.2 7.4h1.4", "M11.3 7.4h1.4", "M11.3 10.6h1.4", "M16.4 7.4h1.4"],
         boussole: ["M12 3a9 9 0 110 18 9 9 0 010-18", "M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"],
         calendrier: ["M4 6.8A1.8 1.8 0 015.8 5h12.4A1.8 1.8 0 0120 6.8v11.4a1.8 1.8 0 01-1.8 1.8H5.8A1.8 1.8 0 014 18.2z", "M4 9.6h16", "M8.4 3.4v3.2", "M15.6 3.4v3.2"],
         checklist: ["M4 7.6l1.9 1.9L9.4 6", "M4 16.4l1.9 1.9L9.4 14.8", "M12.6 8h7.4", "M12.6 16.8h7.4"],
@@ -17263,6 +17256,7 @@ function pocketCalc(items, pocket, monthlyRate, r = ve.length, totalMode) {
                 if (monthlyRate === 0 && !totalMode) pc += gr(it.montant_prevu);
                 if (it.paid) rc += it.montant_reel != null ? gr(it.montant_reel) : gr(it.montant_prevu)
             }
+        pocket === "vacances" && (rc -= gr(VISION_DEFICITS[i]));
         pc += monthlyRate;
         prevu.push(totalMode ? totalPrevu : pc), reel.push(rc), solde.push((totalMode ? totalPrevu : pc) - rc)
     }
@@ -17271,6 +17265,25 @@ function pocketCalc(items, pocket, monthlyRate, r = ve.length, totalMode) {
         reel,
         solde
     }
+}
+
+// Dépassement du salaire, mois par mois : si le SOLDE réalisé (dépenses courantes
+// + épargne programmée versée) dépasse le salaire réel, la différence est retirée
+// de la provision vacances. Rien n'est ajouté quand on reste en dessous. Comme l'Excel.
+let VISION_DEFICITS = [];
+
+function deficitsParMois(modele, bmRows, tx, n = ve.length) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+        const lignes = budgetDuMois(bmRows, modele, i),
+            idsDe = k => lignes.filter(w => w.kind === k).map(ligneBudgetId),
+            txi = (tx || []).filter(x => gr(x.mois_index) === i),
+            somme = ids => txi.filter(x => ids.includes(x.budget_line_id)).reduce((s, x) => s + (x.type === "remboursement" ? -gr(x.montant) : gr(x.montant)), 0),
+            idsRev = idsDe("revenu"),
+            aSalaire = txi.some(x => idsRev.includes(x.budget_line_id));
+        out.push(aSalaire ? Math.min(0, somme(idsRev) - somme(idsDe("charge")) - somme(idsDe("epargne"))) : 0)
+    }
+    return out
 }
 
 function planEpargne(items, e, r = ve.length) {
@@ -20770,9 +20783,24 @@ function BudgetMensuel({
                             children: "×"
                         })]
                     })]
-                }, it.id)) : h.jsx("div", {
+                }, it.id)) : gr(VISION_DEFICITS[moisSel]) < 0 ? null : h.jsx("div", {
                     className: "detail",
                     children: "Aucune dépense vacances en " + mois[moisSel] + "."
+                }), gr(VISION_DEFICITS[moisSel]) < 0 && h.jsxs("div", {
+                    className: "txrow",
+                    style: {
+                        cursor: "default"
+                    },
+                    children: [h.jsx("span", {
+                        style: {
+                            minWidth: 0,
+                            flex: 1
+                        },
+                        children: "Dépassement du salaire (SOLDE réalisé > salaire réel)"
+                    }), h.jsx("span", {
+                        className: "m low",
+                        children: euros(VISION_DEFICITS[moisSel])
+                    })]
                 }), !readOnly && h.jsxs("div", {
                     className: "brow",
                     style: {
@@ -21973,8 +22001,336 @@ function nk({
     })
 }
 
+// Accueil — kanban de mes tâches par thème. Les devoirs, pièces et étapes du
+// suivi viennent de leurs onglets (lecture seule ici : un toucher ouvre l'onglet).
+// Les tâches ajoutées à la main vivent dans vision_taches.
+const ACC_THEMES = {
+    devoirs: { l: "Devoirs", short: "Devoirs", c: "#3b5fc4", soft: "#e8eefb", tab: "homework", page: "Devoirs", i: "M12 6.6C10.4 5.1 7.9 4.6 4.6 5.1v12.2c3.3-.5 5.8 0 7.4 1.5 1.6-1.5 4.1-2 7.4-1.5V5.1c-3.3-.5-5.8 0-7.4 1.5zM12 6.6v12.2" },
+    budget: { l: "Budget", short: "Budget", c: "#0f8a68", soft: "#e3f4ed", tab: "tresorerie", page: "Budget mois", i: "M4 8.4A1.8 1.8 0 0 1 5.8 6.6h12.4A1.8 1.8 0 0 1 20 8.4v9.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 17.6zM20 11.4h-3.1a1.6 1.6 0 0 0 0 3.2H20" },
+    reco: { l: "Reconversion", short: "Reconv.", c: "#0a7b8a", soft: "#dff2f4", tab: "suivi", page: "Suivi", i: "M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5M22 9v6" },
+    sport: { l: "Sport", short: "Sport", c: "#b03a6e", soft: "#f8e6ef", tab: "sport", page: "Sport", i: "M6.8 8.2v7.6M3.8 9.8v4.4M17.2 8.2v7.6M20.2 9.8v4.4M6.8 12h10.4" },
+    pieces: { l: "Pièces", short: "Pièces", c: "#8a5a12", soft: "#f6ecd9", tab: "pieces", page: "Pièces", i: "M6.2 3.6h6.6l5 5v11.8a1 1 0 0 1-1 1H6.2a1 1 0 0 1-1-1V4.6a1 1 0 0 1 1-1zM12.8 3.6V8.6h5" }
+};
+const ACC_ETAPES = [
+    { k: "afaire", l: "À faire", i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", c: "#3d545c", soft: "#e4edef" },
+    { k: "encours", l: "En cours", i: "M8 5v14l11-7z", c: "#0a7b8a", soft: "#dff2f4" },
+    { k: "attente", l: "En attente", i: "M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9", c: "#b5561f", soft: "#fbeee4" },
+    { k: "fait", l: "Fait", i: "M5 12l5 5L20 7", c: "#0f8a68", soft: "#e3f4ed" }
+];
+const ACC_ORDRE = { encours: 0, afaire: 1, attente: 2, fait: 3 };
+const ACC_MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+function accIcone(d, size, sw, fill) {
+    return h.jsx("svg", {
+        width: size, height: size, viewBox: "0 0 24 24", fill: fill || "none", stroke: "currentColor",
+        strokeWidth: sw || 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true",
+        children: h.jsx("path", { d })
+    })
+}
+
+function accIso(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
+}
+
+function accEcheance(iso) {
+    if (!iso) return null;
+    const p = String(iso).slice(0, 10).split("-"),
+        d = new Date(+p[0], +p[1] - 1, +p[2]),
+        t = new Date, auj = new Date(t.getFullYear(), t.getMonth(), t.getDate()),
+        j = Math.round((d - auj) / 864e5);
+    if (j < 0) return { l: "En retard", urgent: !0, j };
+    if (j === 0) return { l: "Aujourd'hui", urgent: !0, j };
+    if (j <= 3) return { l: "J-" + j, urgent: !0, j };
+    return { l: d.getDate() + " " + ACC_MOIS[d.getMonth()], urgent: !1, j }
+}
+
+function Accueil({
+    budget, budgetMois, transactions, items, params, poches, progress, contenu, hw, taches,
+    readOnly, goTab, onAdd, onUpdate, onDelete
+}) {
+    const [selId, setSelId] = re.useState(null),
+        [ajout, setAjout] = re.useState(!1),
+        [titre, setTitre] = re.useState(""),
+        [theme, setTheme] = re.useState("budget"),
+        [quand, setQuand] = re.useState(""),
+        [voirTout, setVoirTout] = re.useState({}),
+        [confSuppr, setConfSuppr] = re.useState(!1),
+        [toast, setToast] = re.useState("");
+    const flash = m => {
+        setToast(m), clearTimeout(window.__accT), window.__accT = setTimeout(() => setToast(""), 1600)
+    };
+
+    // ---- chiffres du haut (masqués en mode partage) ----
+    const n = ve.length, M = moisNow();
+    let kpis = null;
+    if (!readOnly && budget) {
+        const calcs = calcsDesPoches(poches, items, params, n),
+            epargne = planDisponible(planEpargne(items, params, n), calcs, M),
+            cible = getCible(params, budget),
+            vac = pocketCalc(items, "vacances", mt(params, "provision_vacances_mensuelle"), n).solde[M],
+            catDe = w => {
+                const m = budget.find(b => b.id === ligneBudgetId(w)), c = m ? m.categorie : null;
+                return c != null ? c : w.kind === "charge" ? "courantes" : w.kind === "epargne" ? "epargne" : null
+            },
+            lignes = budgetDuMois(budgetMois, budget, M).filter(w => catDe(w) === "courantes" && w.line_key !== "c_sport"),
+            ids = lignes.map(ligneBudgetId),
+            reel = (transactions || []).filter(x => gr(x.mois_index) === M && ids.includes(x.budget_line_id)).reduce((s, x) => s + (x.type === "remboursement" ? -gr(x.montant) : gr(x.montant)), 0),
+            reste = lignes.reduce((s, w) => s + gr(w.montant), 0) - reel;
+        kpis = [
+            { l: "Objectif 6 mois", v: (cible ? Math.round(epargne / cible * 100) : 0) + " %", c: "#0a7b8a", i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01" },
+            { l: "Vacances", v: ot(vac), c: "#b5561f", i: "M3 20h18M5 20l4-11 3 5 3-3 4 9M15 6a2 2 0 1 0 0-.01" },
+            { l: "Reste du mois", v: ot(reste), c: reste < 0 ? "#b8432a" : "#0f8a68", i: "M4 8.4A1.8 1.8 0 0 1 5.8 6.6h12.4A1.8 1.8 0 0 1 20 8.4v9.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 17.6zM20 11.4h-3.1a1.6 1.6 0 0 0 0 3.2H20" }
+        ]
+    }
+
+    // ---- toutes les tâches, quelle que soit leur origine ----
+    const hwEtape = s => s === "En cours" ? "encours" : (s === "Fait" || s === "Corrigé") ? "fait" : "afaire",
+        cartes = [];
+    (hw || []).forEach(r => cartes.push({
+        key: "hw:" + r.id, t: r.title || r.subject || "Devoir", theme: "devoirs", etape: hwEtape(r.status),
+        due: r.deadline, faitLe: r.corrected_at || r.submitted_at || r.updated_at, lie: !0
+    }));
+    (contenu || []).filter(x => x.type === "piece" || x.type === "suivi").forEach(x => cartes.push({
+        key: x.item_key, t: x.titre, theme: x.type === "piece" ? "pieces" : "reco",
+        etape: progress && progress[x.item_key] ? "fait" : "afaire", due: x.date_iso, faitLe: null, lie: !0
+    }));
+    (taches || []).forEach(x => cartes.push({
+        key: "t:" + x.id, id: x.id, t: x.titre, theme: ACC_THEMES[x.theme] ? x.theme : "budget", etape: x.etape,
+        due: x.echeance, faitLe: x.fait_le, lie: !1
+    }));
+    const septJours = 7 * 864e5,
+        ancien = c => c.etape === "fait" && (!c.faitLe || Date.now() - new Date(c.faitLe).getTime() > septJours),
+        enCours = cartes.filter(c => c.etape === "encours").length;
+
+    const prochaine = cartes.filter(c => c.etape !== "fait" && c.due).map(c => ({ c, e: accEcheance(c.due) })).sort((a, b) => a.e.j - b.e.j)[0];
+    const sel = cartes.find(c => c.key === selId);
+
+    function ouvrir(c) {
+        if (c.lie) { goTab(ACC_THEMES[c.theme].tab); return }
+        if (readOnly) return;
+        setConfSuppr(!1), setSelId(c.key)
+    }
+
+    async function changerEtape(c, k) {
+        if (c.etape === k) { setSelId(null); return }
+        if (k === "encours" && enCours >= 3) { flash("3 tâches en cours maximum"); return }
+        try {
+            await onUpdate(c.id, { etape: k, fait_le: k === "fait" ? new Date().toISOString() : null });
+            setSelId(null), flash("→ " + ACC_ETAPES.find(e => e.k === k).l)
+        } catch (err) { flash("Échec : " + (err && err.message ? err.message : "connexion")) }
+    }
+
+    async function supprimer(c) {
+        if (!confSuppr) { setConfSuppr(!0); return }
+        try { await onDelete(c.id), setSelId(null), flash("Tâche supprimée") } catch (err) { flash("Échec : " + (err && err.message ? err.message : "connexion")) }
+    }
+
+    async function ajouter(ev) {
+        ev && ev.preventDefault && ev.preventDefault();
+        const tt = titre.trim();
+        if (!tt) { flash("Écris un titre"); return }
+        try {
+            await onAdd({ titre: tt, theme, etape: "afaire", echeance: quand || null });
+            setAjout(!1), setTitre(""), setQuand(""), flash("+ " + ACC_THEMES[theme].l)
+        } catch (err) { flash("Échec : " + (err && err.message ? err.message : "connexion")) }
+    }
+
+    const aujD = new Date(),
+        choixQuand = [
+            { k: "", l: "Sans date" },
+            { k: accIso(aujD), l: "Aujourd'hui" },
+            { k: accIso(new Date(aujD.getFullYear(), aujD.getMonth(), aujD.getDate() + 6)), l: "Semaine" },
+            { k: accIso(new Date(aujD.getFullYear(), aujD.getMonth() + 1, 0)), l: "Fin du mois" }
+        ],
+        dateDuJour = new Intl.DateTimeFormat(VISION_CONFIG.locale, { weekday: "short", day: "numeric", month: "short" }).format(aujD);
+
+    const pastille = c => {
+        const th = ACC_THEMES[c.theme], e = accEcheance(c.due), et = ACC_ETAPES.find(x => x.k === c.etape) || ACC_ETAPES[0],
+            look = {
+                afaire: { bg: "#ffffff", bd: "#d6e3e5", fg: "var(--ink)", dbg: "#e4edef", dfg: "#3d545c", fill: "none" },
+                encours: { bg: th.soft, bd: th.c, fg: "var(--ink)", dbg: th.c, dfg: "#ffffff", fill: "currentColor" },
+                attente: { bg: "#fbeee4", bd: "#fbeee4", fg: "var(--ink)", dbg: "#ffffff", dfg: "#b5561f", fill: "none" },
+                fait: { bg: "#f3f8f9", bd: "#f3f8f9", fg: "var(--slate)", dbg: "#e3f4ed", dfg: "#0f8a68", fill: "none" }
+            }[c.etape] || {};
+        return h.jsxs("button", {
+            onClick: () => ouvrir(c),
+            "aria-label": c.t + ", " + et.l + (c.lie ? ", ouvrir l'onglet " + th.page : ""),
+            style: { minHeight: 44, maxWidth: "100%", display: "flex", alignItems: "center", gap: 8, padding: "6px 12px 6px 6px", borderRadius: 22, border: "2px solid " + look.bd, background: look.bg, color: look.fg, fontSize: 14, fontWeight: 600, textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
+            children: [h.jsx("span", {
+                style: { flex: "none", width: 28, height: 28, borderRadius: "50%", background: look.dbg, color: look.dfg, display: "flex", alignItems: "center", justifyContent: "center" },
+                children: accIcone(et.i, 14, 2.6, look.fill)
+            }), h.jsx("span", { style: { textDecoration: c.etape === "fait" ? "line-through" : "none", minWidth: 0 }, children: c.t }),
+            e && c.etape !== "fait" ? h.jsx("span", { style: { flex: "none", fontSize: 11.5, fontWeight: 800, color: e.urgent ? "#b8432a" : "var(--slate)" }, children: e.l }) : null]
+        }, c.key)
+    };
+
+    const couloirs = Object.keys(ACC_THEMES).map(key => {
+        const th = ACC_THEMES[key],
+            liste = cartes.filter(c => c.theme === key).sort((a, b) => ACC_ORDRE[a.etape] - ACC_ORDRE[b.etape] || ((accEcheance(a.due) || { j: 9999 }).j - (accEcheance(b.due) || { j: 9999 }).j)),
+            faits = liste.filter(c => c.etape === "fait").length,
+            caches = liste.filter(ancien).length,
+            ouvert = !!voirTout[key],
+            visibles = ouvert ? liste : liste.filter(c => !ancien(c)),
+            pct = liste.length ? Math.round(faits / liste.length * 100) : 0;
+        return h.jsxs("section", {
+            "aria-label": th.l,
+            style: { background: "#ffffff", borderRadius: 22, padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: "var(--shadow)" },
+            children: [h.jsxs("button", {
+                onClick: () => goTab(th.tab),
+                "aria-label": "Ouvrir l'onglet " + th.page,
+                style: { border: 0, background: "none", padding: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 10, color: "var(--ink)", textAlign: "left", fontFamily: "inherit", cursor: "pointer" },
+                children: [h.jsx("span", {
+                    style: { width: 34, height: 34, borderRadius: 11, background: th.soft, color: th.c, display: "flex", alignItems: "center", justifyContent: "center" },
+                    children: accIcone(th.i, 18, 2.2)
+                }), h.jsx("span", { style: { fontSize: 15.5, fontWeight: 800 }, children: th.l }),
+                h.jsx("span", {
+                    role: "img", "aria-label": th.l + " : " + faits + " sur " + liste.length + " faites",
+                    style: { marginLeft: "auto", width: 60, height: 7, borderRadius: 99, background: th.soft, overflow: "hidden" },
+                    children: h.jsx("span", { style: { display: "block", height: 7, borderRadius: 99, width: pct + "%", background: th.c } })
+                }), h.jsx("span", { style: { fontSize: 12.5, fontWeight: 800, color: th.c, fontVariantNumeric: "tabular-nums" }, children: faits + "/" + liste.length }),
+                h.jsx("span", { style: { color: "#8fa6ab", display: "flex" }, children: accIcone("M9 6l6 6-6 6", 18, 2.4) })]
+            }), h.jsxs("div", {
+                style: { display: "flex", flexWrap: "wrap", gap: 8 },
+                children: [visibles.map(pastille), caches ? h.jsxs("button", {
+                    onClick: () => setVoirTout(Object.assign({}, voirTout, { [key]: !ouvert })),
+                    "aria-label": ouvert ? "Masquer les tâches faites anciennes" : "Voir " + caches + " tâche(s) faite(s) de plus de 7 jours",
+                    style: { minHeight: 44, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 22, border: "2px dashed #b9cfd3", background: "#ffffff", color: "#0f8a68", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
+                    children: [accIcone("M5 12l5 5L20 7", 14, 2.8), ouvert ? "Masquer" : "+" + caches]
+                }) : null, !liste.length ? h.jsx("span", { className: "detail", children: "Rien pour l'instant" }) : null]
+            })]
+        }, key)
+    });
+
+    return h.jsxs("section", {
+        className: "sec",
+        children: [h.jsxs("div", {
+            style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 },
+            children: [h.jsxs("div", {
+                children: [h.jsx("h2", { style: { margin: 0 }, children: "Accueil" }), h.jsx("div", { className: "detail", children: dateDuJour.charAt(0).toUpperCase() + dateDuJour.slice(1) })]
+            }), !readOnly && h.jsxs("button", {
+                className: "btn btn-sm", onClick: () => setAjout(!0),
+                style: { display: "flex", alignItems: "center", gap: 6, minHeight: 44, width: "auto", flex: "none", padding: "0 18px" },
+                children: [accIcone("M12 5v14M5 12h14", 18, 2.6), "Tâche"]
+            })]
+        }), kpis && h.jsx("button", {
+            onClick: () => goTab("tresorerie"), "aria-label": "Ouvrir Budget mois",
+            style: { border: 0, background: "none", padding: 0, width: "100%", display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 6, marginBottom: 12, fontFamily: "inherit", cursor: "pointer", color: "var(--ink)" },
+            children: kpis.map(k => h.jsxs("span", {
+                style: { background: "#ffffff", borderRadius: 16, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, boxShadow: "var(--shadow)" },
+                children: [h.jsx("span", { style: { color: k.c, display: "flex" }, children: accIcone(k.i, 18, 2.2) }),
+                    h.jsx("span", { style: { fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: k.c === "#b8432a" ? k.c : "var(--ink)" }, children: k.v }),
+                    h.jsx("span", { style: { fontSize: 10.5, fontWeight: 700, color: "var(--slate)", textAlign: "center", lineHeight: 1.2 }, children: k.l })]
+            }, k.l))
+        }), prochaine && h.jsxs("button", {
+            onClick: () => ouvrir(prochaine.c),
+            "aria-label": "Prochaine échéance : " + prochaine.c.t + ", " + prochaine.e.l,
+            style: { width: "100%", border: 0, borderRadius: 22, background: "var(--teal-dark)", color: "#ffffff", padding: 14, display: "flex", alignItems: "center", gap: 12, textAlign: "left", marginBottom: 12, boxShadow: "0 10px 24px rgba(10,123,138,.25)", fontFamily: "inherit", cursor: "pointer" },
+            children: [h.jsx("span", {
+                style: { flex: "none", width: 50, height: 50, borderRadius: 16, background: "rgba(255,255,255,.16)", display: "flex", alignItems: "center", justifyContent: "center" },
+                children: accIcone(ACC_THEMES[prochaine.c.theme].i, 24, 2)
+            }), h.jsx("span", { style: { flex: 1, minWidth: 0, fontFamily: "Georgia,serif", fontSize: 19, fontWeight: 700, lineHeight: 1.2 }, children: prochaine.c.t }),
+            h.jsx("span", { style: { flex: "none", padding: "6px 10px", borderRadius: 12, background: "#ffffff", color: prochaine.e.urgent ? "#b8432a" : "var(--teal-dark)", fontSize: 15, fontWeight: 900 }, children: prochaine.e.l })]
+        }), h.jsx("div", {
+            role: "group", "aria-label": "Résumé par étape",
+            style: { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 6, marginBottom: 12 },
+            children: ACC_ETAPES.map(et => {
+                const nb = cartes.filter(c => c.etape === et.k).length;
+                return h.jsxs("span", {
+                    role: "img", "aria-label": et.l + " " + nb,
+                    style: { borderRadius: 14, padding: "7px 4px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: et.soft, color: et.c },
+                    children: [accIcone(et.i, 15, 2.4), h.jsx("span", { style: { fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }, children: nb })]
+                }, et.k)
+            })
+        }), h.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: couloirs }),
+        sel && h.jsx("div", {
+            className: "sheetbg", onClick: ev => { ev.target === ev.currentTarget && setSelId(null) },
+            children: h.jsxs("div", {
+                className: "sheet", role: "dialog", "aria-label": sel.t,
+                children: [h.jsxs("div", {
+                    className: "sheethead",
+                    children: [h.jsxs("div", {
+                        style: { display: "flex", alignItems: "center", gap: 12, minWidth: 0 },
+                        children: [h.jsx("span", {
+                            style: { flex: "none", width: 52, height: 52, borderRadius: 16, background: ACC_THEMES[sel.theme].soft, color: ACC_THEMES[sel.theme].c, display: "flex", alignItems: "center", justifyContent: "center" },
+                            children: accIcone(ACC_THEMES[sel.theme].i, 26, 2)
+                        }), h.jsxs("div", {
+                            style: { minWidth: 0 },
+                            children: [h.jsx("h3", { children: sel.t }), accEcheance(sel.due) ? h.jsx("div", { className: "detail", children: accEcheance(sel.due).l }) : null]
+                        })]
+                    }), h.jsx("button", { className: "sheetclose", onClick: () => setSelId(null), "aria-label": "Fermer", children: "×" })]
+                }), h.jsx("div", {
+                    style: { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8, marginBottom: 18 },
+                    children: ACC_ETAPES.map(et => {
+                        const on = sel.etape === et.k;
+                        return h.jsxs("button", {
+                            onClick: () => changerEtape(sel, et.k), "aria-pressed": on ? "true" : "false", "aria-label": et.l,
+                            style: { border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 7, color: et.c, fontFamily: "inherit", cursor: "pointer" },
+                            children: [h.jsx("span", {
+                                style: { width: 60, height: 60, borderRadius: 20, background: on ? et.c : "#ffffff", color: on ? "#ffffff" : et.c, border: "2px solid " + et.c, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
+                                children: accIcone(et.i, 26, 2.2)
+                            }), h.jsx("span", { style: { fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }, children: et.l })]
+                        }, et.k)
+                    })
+                }), h.jsx("button", {
+                    className: "btn-outline btn-sm", onClick: () => supprimer(sel),
+                    style: { width: "100%", minHeight: 44, color: confSuppr ? "var(--red)" : void 0, borderColor: confSuppr ? "var(--red)" : void 0 },
+                    children: confSuppr ? "Confirmer la suppression" : "Supprimer la tâche"
+                })]
+            })
+        }), ajout && h.jsx("div", {
+            className: "sheetbg", onClick: ev => { ev.target === ev.currentTarget && setAjout(!1) },
+            children: h.jsxs("form", {
+                className: "sheet", role: "dialog", "aria-label": "Nouvelle tâche", onSubmit: ajouter,
+                children: [h.jsxs("div", {
+                    className: "sheethead",
+                    children: [h.jsx("h3", { children: "Nouvelle tâche" }), h.jsx("button", { type: "button", className: "sheetclose", onClick: () => setAjout(!1), "aria-label": "Fermer", children: "×" })]
+                }), h.jsx("label", { htmlFor: "acc-titre", style: { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }, children: "Titre de la tâche" }),
+                h.jsx("input", {
+                    id: "acc-titre", value: titre, onChange: ev => setTitre(ev.target.value), placeholder: "Ex. Envoyer l'attestation", autoComplete: "off", autoFocus: !0,
+                    style: { width: "100%", height: 52, border: "2px solid var(--line-strong)", borderRadius: 16, padding: "0 16px", fontSize: 16, fontFamily: "inherit", marginBottom: 14, boxSizing: "border-box" }
+                }), h.jsx("div", {
+                    role: "group", "aria-label": "Thème",
+                    style: { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 6, marginBottom: 14 },
+                    children: Object.keys(ACC_THEMES).map(key => {
+                        const th = ACC_THEMES[key], on = key === theme;
+                        return h.jsxs("button", {
+                            type: "button", onClick: () => setTheme(key), "aria-pressed": on ? "true" : "false", "aria-label": th.l,
+                            style: { border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, color: th.c, fontFamily: "inherit", cursor: "pointer" },
+                            children: [h.jsx("span", {
+                                style: { width: 52, height: 52, borderRadius: 16, border: "2px solid " + th.c, background: on ? th.c : "#ffffff", color: on ? "#ffffff" : th.c, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
+                                children: accIcone(th.i, 22, 2)
+                            }), h.jsx("span", { style: { fontSize: 10.5, fontWeight: 800, whiteSpace: "nowrap" }, children: th.short })]
+                        }, key)
+                    })
+                }), h.jsx("div", {
+                    role: "group", "aria-label": "Échéance",
+                    style: { display: "flex", gap: 8, marginBottom: 16 },
+                    children: choixQuand.map(w => {
+                        const on = w.k === quand;
+                        return h.jsx("button", {
+                            type: "button", onClick: () => setQuand(w.k), "aria-pressed": on ? "true" : "false",
+                            style: { flex: 1, minHeight: 44, borderRadius: 14, border: "2px solid " + (on ? "var(--ink)" : "#d6e3e5"), background: on ? "var(--ink)" : "#ffffff", color: on ? "#ffffff" : "var(--ink-soft)", fontSize: 13, fontWeight: 800, fontFamily: "inherit", cursor: "pointer" },
+                            children: w.l
+                        }, w.l)
+                    })
+                }), h.jsxs("button", {
+                    type: "submit", className: "btn",
+                    style: { width: "100%", minHeight: 54, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: titre.trim() ? 1 : .55 },
+                    children: [accIcone("M12 5v14M5 12h14", 20, 2.6), "Ajouter"]
+                })]
+            })
+        }), toast && h.jsx("div", {
+            role: "status",
+            style: { position: "fixed", left: 20, right: 20, bottom: 150, zIndex: 50, padding: "12px 16px", borderRadius: 14, background: "var(--ink)", color: "#ffffff", fontSize: 14.5, fontWeight: 600, textAlign: "center", maxWidth: 520, margin: "0 auto" },
+            children: toast
+        })]
+    })
+}
+
+
 function sk() {
     const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]), [tx, stx] = re.useState([]), [bm, sbm] = re.useState([]), [poches, setPoches] = re.useState([]), [saisieOuverte, setSaisieOuverte] = re.useState(!1), [txEdit, setTxEdit] = re.useState(null);
+    const [taches, setTaches] = re.useState([]);
     const ctRef = re.useRef([]);
     ctRef.current = ct;
     const pochesRef = re.useRef([]);
@@ -22101,6 +22457,11 @@ function sk() {
                 data: K
             } = await J.from("vision_poches").select("*").order("sort");
             setPoches(K || [])
+        })(), (async () => {
+            const {
+                data: K
+            } = await J.from("vision_taches").select("*").order("sort").order("created_at");
+            setTaches(K || [])
         })(), (async () => {
             const {
                 data: K
@@ -22410,6 +22771,23 @@ function sk() {
             } = await J.from("vision_items").insert(K).select().single();
         H && mi(A => [...A, H])
     }
+    async function tacheAdd(v) {
+        const K = Object.assign({ user_id: t.user.id, sort: Math.max(0, ...taches.map(A => A.sort || 0)) + 1 }, v),
+            { data: H, error: E } = await J.from("vision_taches").insert(K).select().single();
+        if (E) throw E;
+        H && setTaches(A => [...A, H])
+    }
+    async function tacheUpdate(id, v) {
+        const K = Object.assign({}, v, { updated_at: new Date().toISOString() }),
+            { data: H, error: E } = await J.from("vision_taches").update(K).eq("id", id).select().single();
+        if (E) throw E;
+        H && setTaches(A => A.map(x => x.id === id ? H : x))
+    }
+    async function tacheDelete(id) {
+        const { error: E } = await J.from("vision_taches").delete().eq("id", id);
+        if (E) throw E;
+        setTaches(A => A.filter(x => x.id !== id))
+    }
     async function itemDel(N) {
         mi(K => K.filter(H => H.id !== N)), await J.from("vision_items").delete().eq("id", N)
     }
@@ -22582,6 +22960,7 @@ function sk() {
     });
     if (!r) return null;
     if (!at && !t) return h.jsx(Rv, {});
+    VISION_DEFICITS = l ? deficitsParMois(l, bm, tx, ve.length) : [];
     const Ge = {
             budget: l,
             params: c,
@@ -22686,20 +23065,22 @@ function sk() {
             })
         }), h.jsxs("main", {
             className: "wrap",
-            children: [s === "apercu" && h.jsx(Mv, {
-                progress: o,
+            children: [s === "apercu" && h.jsx(Accueil, {
                 budget: l,
-                params: c,
+                budgetMois: bm,
+                transactions: tx,
                 items: vi,
-                hw: hwRows,
-                setHw: setHwRows,
-                readOnly: at,
+                params: c,
+                poches: poches,
+                progress: o,
                 contenu: ct,
-                edit: ctEdit,
-                save: ctSave,
-                add: ctAdd,
-                del: ctDel,
-                poches: poches
+                hw: hwRows,
+                taches: at ? [] : taches,
+                readOnly: at,
+                goTab: N => { i(N), window.scrollTo(0, 0) },
+                onAdd: at ? lt : tacheAdd,
+                onUpdate: at ? lt : tacheUpdate,
+                onDelete: at ? lt : tacheDelete
             }), s === "planning" && h.jsx(Dv, {
                 rows: ct,
                 edit: ctEdit,
