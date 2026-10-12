@@ -17279,6 +17279,12 @@ function pocketCalc(items, pocket, monthlyRate, r = ve.length, totalMode) {
 // + épargne programmée versée) dépasse le salaire réel, la différence est retirée
 // de la provision vacances. Rien n'est ajouté quand on reste en dessous. Comme l'Excel.
 let VISION_DEFICITS = [];
+// Épargne programmée automatique : jour du virement et premier mois concerné
+// (index 3 = novembre 2026 ; septembre et octobre sont déjà saisis à la main).
+const EP_AUTO_JOUR = 3,
+    EP_AUTO_DEBUT = 3,
+    EP_AUTO_NOTE = "Virement automatique",
+    epAutoCle = (lid, m) => "ep_auto_off_" + lid + "_" + m;
 
 function deficitsParMois(modele, bmRows, tx, n = ve.length) {
     const out = [];
@@ -19675,12 +19681,10 @@ function Jv(t) {
                     onClick: enregistrer,
                     disabled: saving || v || selClosed,
                     children: saving ? "Enregistrement…" : "Enregistrer ce mois"
-                }), !selClosed && h.jsx("button", {
-                    className: "btn-outline",
-                    disabled: closing || v || !curHasReelSel(),
-                    title: !curHasReelSel() ? "Enregistre d'abord le relevé de ce mois" : "Fige les chiffres de ce mois — ils ne bougeront plus même si tu modifies un poste plus tard",
-                    onClick: cloturer,
-                    children: closing ? "Clôture…" : "🔒 Clôturer ce mois"
+                }), !selClosed && h.jsx("p", {
+                    className: "detail",
+                    style: { margin: 0, flex: "1 1 100%" },
+                    children: "La clôture du mois se fait maintenant en bas de Budget mois, sans relevé des livrets."
                 })]
             }), justClosed && h.jsxs("div", {
                 role: "status",
@@ -20212,8 +20216,14 @@ function BudgetMensuel({
     onAddFormation,
     onPatchItem,
     onAddTx,
-    onUpdateTx
+    onUpdateTx,
+    onPasVerse,
+    onCloturer,
+    onRouvrir
 }) {
+    const [clotEtape, setClotEtape] = re.useState(""),
+        [clotMsg, setClotMsg] = re.useState(""),
+        [pasVerseId, setPasVerseId] = re.useState(null);
     const [moisSel, setMoisSel] = re.useState(moisNow()),
         [fDesc, setFDesc] = re.useState(""),
         [fMontant, setFMontant] = re.useState(""),
@@ -20236,7 +20246,7 @@ function BudgetMensuel({
     });
     const n = mois.length,
         allerA = i => {
-            setMoisSel(Math.max(0, Math.min(n - 1, i))), setModalOuverte(null), setVacEdit(null), setVacEtat("")
+            setMoisSel(Math.max(0, Math.min(n - 1, i))), setModalOuverte(null), setVacEdit(null), setVacEtat(""), setClotEtape(""), setClotMsg("")
         },
         ferme = (clotures || []).some(x => x.mois_index === moisSel),
         lignes = budgetDuMois(budgetMois, budget, moisSel),
@@ -21000,7 +21010,88 @@ function BudgetMensuel({
                     children: "L'enveloppe ne se remplit jamais : chaque paiement la diminue. Un cours annulé laisse son montant dans l'enveloppe."
                 })]
             })]
-        }), ligneModal && h.jsx("div", {
+        }), (() => {
+            const cl = (clotures || []).find(x => x.mois_index === moisSel),
+                sn = cl && cl.snapshot || {},
+                passe = moisSel <= moisNow(),
+                form = formationCalc(items, params, n),
+                sport = pocketCalc(items, "sport", 0, n, !0),
+                deficit = (VISION_DEFICITS || [])[moisSel] || 0,
+                lignesC = cl ? [
+                    ["Dépenses courantes", sn.budgetCourantes, sn.realiseCourantes],
+                    ["Épargne programmée", sn.budgetEpargne, sn.epargneVersee],
+                    ["Salaire", sn.salaire, sn.salaireReel],
+                    ["Dépassement du salaire", null, sn.depassementSalaire],
+                    ["Provision vacances", null, sn.vacSolde],
+                    ["Épargne fin de mois", null, sn.plan]
+                ] : [];
+            async function clore() {
+                if (clotEtape !== "confirmer") { setClotEtape("confirmer"), setClotMsg(""); return }
+                setClotEtape("encours");
+                try {
+                    await onCloturer(moisSel, {
+                        mode: "excel",
+                        budgetCourantes: totC.b,
+                        realiseCourantes: totC.r,
+                        budgetEpargne: totE.b,
+                        epargneVersee: totE.r,
+                        salaire,
+                        salaireReel,
+                        depassementSalaire: deficit,
+                        plan: epDispo,
+                        reel: epDispo,
+                        ecart: null,
+                        vacPrevu: vacCalc.prevu[moisSel],
+                        vacReel: vacCalc.reel[moisSel],
+                        vacSolde,
+                        formPrevu: form.prevu[moisSel],
+                        formReel: form.reel[moisSel],
+                        formSolde: form.solde[moisSel],
+                        sportPrevu: sport.prevu[moisSel],
+                        sportReel: sport.reel[moisSel],
+                        sportSolde: sport.solde[moisSel],
+                        closedAtLabel: new Date().toISOString()
+                    });
+                    setClotEtape(""), setClotMsg(mois[moisSel] + " est clôturé.")
+                } catch (e) { setClotEtape(""), setClotMsg("Échec : " + (e && e.message ? e.message : "connexion")) }
+            }
+            async function rouvrir() {
+                if (clotEtape !== "rouvrir") { setClotEtape("rouvrir"), setClotMsg(""); return }
+                setClotEtape("encours");
+                try { await onRouvrir(moisSel), setClotEtape(""), setClotMsg(mois[moisSel] + " est rouvert. Pense à le clôturer de nouveau.") } catch (e) { setClotEtape(""), setClotMsg("Échec : " + (e && e.message ? e.message : "connexion")) }
+            }
+            if (!cl && !passe) return null;
+            const dateCl = sn.closedAtLabel ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" }).format(new Date(sn.closedAtLabel)) : "";
+            return h.jsxs(h.Fragment, {
+                children: [h.jsx("div", { className: "h3", style: { marginTop: 18 }, children: "CLÔTURE DU MOIS" }), h.jsxs("div", {
+                    className: "card",
+                    style: cl ? { borderColor: "#0b6e53", background: "#f2faf6" } : void 0,
+                    children: [cl ? h.jsxs(h.Fragment, {
+                        children: [h.jsxs("p", { style: { margin: "0 0 10px", fontWeight: 800, color: "#0b6e53", fontSize: 15 }, children: ["🔒 ", mois[moisSel], " est clôturé", dateCl ? " depuis le " + dateCl : "", ". Ses chiffres sont figés."] }),
+                            sn.mode === "excel" ? h.jsxs("table", {
+                                className: "tbl",
+                                children: [h.jsx("thead", { children: h.jsxs("tr", { children: [h.jsx("th", { children: "Poste" }), h.jsx("th", { style: { textAlign: "right" }, children: "Budget" }), h.jsx("th", { style: { textAlign: "right" }, children: "Réalisé" })] }) }), h.jsx("tbody", {
+                                    children: lignesC.map(([lib, bgt, rl]) => h.jsxs("tr", {
+                                        children: [h.jsx("td", { children: lib }), h.jsx("td", { className: "num", children: bgt == null ? "" : euros(bgt) }), h.jsx("td", { className: "num", style: { fontWeight: 700 }, children: rl == null ? "—" : euros(rl) })]
+                                    }, lib))
+                                })]
+                            }) : h.jsx("p", { className: "detail", style: { margin: 0 }, children: "Clôturé avec l'ancienne méthode : épargne " + euros(sn.plan) + ", provision vacances " + euros(sn.vacSolde) + (sn.depassementSalaire != null ? ", dépassement du salaire " + euros(sn.depassementSalaire) : "") + "." }),
+                            !readOnly && h.jsx("button", {
+                                type: "button", className: "btn-outline", onClick: rouvrir, disabled: clotEtape === "encours",
+                                style: { width: "100%", marginTop: 12, minHeight: 46, color: clotEtape === "rouvrir" ? "#b8432a" : void 0, borderColor: clotEtape === "rouvrir" ? "#b8432a" : void 0 },
+                                children: clotEtape === "rouvrir" ? "Confirmer : rouvrir " + mois[moisSel] : "Rouvrir ce mois"
+                            })]
+                    }) : h.jsxs(h.Fragment, {
+                        children: [h.jsx("p", { style: { margin: "0 0 10px", fontSize: 14.5 }, children: clotEtape === "confirmer" ? "Les chiffres du tableau ci-dessus seront figés pour " + mois[moisSel] + ". Tu pourras rouvrir le mois si besoin." : "Clôturer fige les chiffres de ce tableau : dépenses, épargne, salaire, provision vacances. Aucun relevé à saisir." }),
+                            !readOnly && h.jsx("button", {
+                                type: "button", className: "btn", onClick: clore, disabled: clotEtape === "encours",
+                                style: { width: "100%", minHeight: 50 },
+                                children: clotEtape === "encours" ? "Clôture…" : clotEtape === "confirmer" ? "Confirmer la clôture de " + mois[moisSel] : "🔒 Clôturer " + mois[moisSel]
+                            }), clotEtape === "confirmer" && h.jsx("button", { type: "button", onClick: () => setClotEtape(""), style: { width: "100%", minHeight: 44, marginTop: 6, border: 0, background: "none", color: "var(--ink-soft)", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }, children: "Annuler" })]
+                    }), clotMsg ? h.jsx("p", { role: "status", style: { margin: "10px 0 0", fontWeight: 700, color: clotMsg.startsWith("Échec") ? "#b8432a" : "#0b6e53" }, children: clotMsg }) : null]
+                })]
+            })
+        })(), ligneModal && h.jsx("div", {
             className: "sheetbg",
             onClick: g => {
                 g.target === g.currentTarget && setModalOuverte(null)
@@ -21026,7 +21117,22 @@ function BudgetMensuel({
                         className: ligneModal.b - ligneModal.r >= 0 ? "ok" : "low",
                         children: [" · Écart ", euros(ligneModal.b - ligneModal.r)]
                     }) : null]
-                }), txDe(ligneModal.lid).length ? txDe(ligneModal.lid).map(x => h.jsxs("button", {
+                }), txDe(ligneModal.lid).length ? txDe(ligneModal.lid).map(x => x.note === EP_AUTO_NOTE ? h.jsxs("div", {
+                    className: "txrow",
+                    style: { display: "flex", alignItems: "center", gap: 10 },
+                    children: [h.jsxs("span", {
+                        style: { minWidth: 0, flex: 1 },
+                        children: [h.jsx("span", { style: { fontWeight: 600 }, children: "Virement automatique · " + euros(x.montant) }), h.jsx("span", { className: "detail", style: { display: "block" }, children: "Le " + hwkFmt(x.date_depense) })]
+                    }), !readOnly && h.jsx("button", {
+                        type: "button", className: "btn-outline btn-sm",
+                        style: { flex: "none", minHeight: 44, color: pasVerseId === x.id ? "#b8432a" : void 0, borderColor: pasVerseId === x.id ? "#b8432a" : void 0 },
+                        onClick: async () => {
+                            if (pasVerseId !== x.id) { setPasVerseId(x.id); return }
+                            try { await onPasVerse(x), setPasVerseId(null) } catch (e) { window.alert("Échec : " + (e && e.message ? e.message : "connexion")) }
+                        },
+                        children: pasVerseId === x.id ? "Confirmer : pas versé" : "Pas versé"
+                    })]
+                }, x.id) : h.jsxs("button", {
                     className: "txrow",
                     disabled: readOnly,
                     onClick: () => onEditTx(x),
@@ -22959,6 +23065,8 @@ function sk() {
     const [t, e] = re.useState(null), [r, n] = re.useState(!1), [s, i] = re.useState("apercu"), [o, a] = re.useState({}), [l, u] = re.useState(null), [c, d] = re.useState([]), [p, m] = re.useState([]), [v, k] = re.useState(!1), [vi, mi] = re.useState([]), [cl, scl] = re.useState([]), [aud, saud] = re.useState([]), [sp, ssp] = re.useState([]), [sv, ssv] = re.useState([]), [hwRows, setHwRows] = re.useState([]), [hwLoading, setHwLoading] = re.useState(!0), [hwErr, setHwErr] = re.useState(""), [ct, sct] = re.useState([]), [tx, stx] = re.useState([]), [bm, sbm] = re.useState([]), [poches, setPoches] = re.useState([]), [saisieOuverte, setSaisieOuverte] = re.useState(!1), [txEdit, setTxEdit] = re.useState(null);
     const [taches, setTaches] = re.useState([]);
     const [pe, setPe] = re.useState({});
+    const [txOk, setTxOk] = re.useState(!1);
+    const epAutoRef = re.useRef(!1);
     const ctRef = re.useRef([]);
     ctRef.current = ct;
     const pochesRef = re.useRef([]);
@@ -23098,7 +23206,7 @@ function sk() {
             }).order("created_at", {
                 ascending: !1
             });
-            stx(K || [])
+            stx(K || []), K && setTxOk(!0)
         })(), (async () => {
             const {
                 data: K
@@ -23399,6 +23507,52 @@ function sk() {
             } = await J.from("vision_items").insert(K).select().single();
         H && mi(A => [...A, H])
     }
+    // Épargne programmée : le 3 de chaque mois (à partir de novembre 2026),
+    // chaque ligne d'épargne du budget du mois est marquée « versée » si rien
+    // n'est encore saisi pour elle ce mois-là. La base est relue juste avant
+    // d'écrire : jamais de doublon, même avec deux onglets ouverts.
+    re.useEffect(() => {
+        if (at || !t || !l || !txOk || !c.length || epAutoRef.current) return;
+        epAutoRef.current = !0;
+        (async () => {
+            const auj = new Date,
+                dernier = moisDepuisAncre(auj) - (auj.getDate() >= EP_AUTO_JOUR ? 0 : 1);
+            if (dernier < EP_AUTO_DEBUT) return;
+            const { data: deja, error: E0 } = await J.from("vision_transactions").select("budget_line_id, mois_index").gte("mois_index", EP_AUTO_DEBUT).lte("mois_index", dernier);
+            if (E0) { console.warn("épargne auto :", E0.message); return }
+            const nouveaux = [];
+            for (let m = EP_AUTO_DEBUT; m <= dernier; m++) {
+                const { annee, mois } = anneeMoisDe(m),
+                    date = annee + "-" + String(mois + 1).padStart(2, "0") + "-" + String(EP_AUTO_JOUR).padStart(2, "0");
+                budgetDuMois(bm, l, m).filter(w => w.kind === "epargne" && gr(w.montant) > 0).forEach(w => {
+                    const lid = ligneBudgetId(w);
+                    if ((deja || []).some(x => x.budget_line_id === lid && gr(x.mois_index) === m)) return;
+                    if (Vf(c, epAutoCle(lid, m), 0)) return;
+                    nouveaux.push({ user_id: t.user.id, budget_line_id: lid, montant: gr(w.montant), note: EP_AUTO_NOTE, date_depense: date, type: "depense", mois_index: m })
+                })
+            }
+            if (!nouveaux.length) return;
+            const { data: K, error: E } = await J.from("vision_transactions").insert(nouveaux).select();
+            if (E) { console.warn("épargne auto :", E.message); return }
+            stx(p => [...(K || []), ...p]), await relireSpend()
+        })()
+    }, [t, l, bm, c, txOk]);
+    // « Pas versé » : on retire la saisie automatique et on note de ne pas la recréer.
+    async function epargnePasVersee(x) {
+        const cle = epAutoCle(x.budget_line_id, gr(x.mois_index));
+        b(cle, 1), await w(cle, 1);
+        await txDelete(x.id)
+    }
+    async function clotureFixer(moisIdx, snapshot) {
+        const { data: K, error: E } = await J.from("vision_cloture").upsert({ user_id: t.user.id, mois_index: moisIdx, snapshot }, { onConflict: "user_id,mois_index" }).select().single();
+        if (E) throw E;
+        K && scl(H => [...H.filter(A => A.mois_index !== moisIdx), K])
+    }
+    async function clotureRouvrir(moisIdx) {
+        const { error: E } = await J.from("vision_cloture").delete().eq("mois_index", moisIdx);
+        if (E) throw E;
+        scl(H => H.filter(A => A.mois_index !== moisIdx))
+    }
     async function pieceEtape(key, et) {
         if (at) return;
         const avantDone = o[key], avantEt = pe[key], done = et === "validee";
@@ -23575,6 +23729,11 @@ function sk() {
     }
 
     async function txDelete(id) {
+        const avant = tx.find(x => x.id === id);
+        if (avant && avant.note === EP_AUTO_NOTE) {
+            const cle = epAutoCle(avant.budget_line_id, gr(avant.mois_index));
+            b(cle, 1), await w(cle, 1)
+        }
         const {
             error: E
         } = await J.from("vision_transactions").delete().eq("id", id);
@@ -23798,7 +23957,10 @@ function sk() {
                     onAddTx: at ? lt : txAdd,
                     onUpdateTx: at ? lt : txUpdate,
                     onAddFormation: at ? lt : formAdd,
-                    onPatchItem: at ? lt : vacSave
+                    onPatchItem: at ? lt : vacSave,
+                    onPasVerse: at ? lt : epargnePasVersee,
+                    onCloturer: at ? lt : clotureFixer,
+                    onRouvrir: at ? lt : clotureRouvrir
                 }), h.jsxs("details", {
                     className: "collapsible",
                     style: {
