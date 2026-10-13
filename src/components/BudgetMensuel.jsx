@@ -9,6 +9,8 @@ import {
   formationCalc,
   itemCompte,
   ligneBudgetId,
+  montantSigne,
+  tauxVacances,
   planDisponible,
   planEpargne,
   pocheAffichee,
@@ -91,7 +93,7 @@ export function BudgetMensuel({
         .filter((x) => x.budget_line_id === id)
         .sort((a, b) => (b.date_depense || "").localeCompare(a.date_depense || "")),
     reelDe = (id) =>
-      txDe(id).reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+      txDe(id).reduce((s, x) => s + montantSigne(x), 0),
     rembOk = (w) => /santé|sante|transport/i.test((w && w.poste) || ""),
     avecReel = (l) =>
       l.map((w) => ({
@@ -125,7 +127,7 @@ export function BudgetMensuel({
     reste = salaire - sorties.b,
     pocheVac = (poches || []).find((p) => p.cle === "vacances"),
     vacActive = pocheVac ? pocheAffichee(pocheVac) : !0,
-    vacCalc = pocketCalc(items, "vacances", paramOuDefaut(params, "provision_vacances_mensuelle"), n),
+    vacCalc = pocketCalc(items, "vacances", tauxVacances(params), n),
     vacSolde = vacCalc.solde[moisSel],
     vacPrec = moisSel > 0 ? vacCalc.solde[moisSel - 1] : null,
     vacPayes = (items || [])

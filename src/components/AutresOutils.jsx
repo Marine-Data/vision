@@ -18,6 +18,7 @@ import {
   seuilEpargne,
   seuilPoche,
   statutLibelle,
+  tauxVacances,
 } from "../lib/calculs.js";
 import {
   eurosCourt,
@@ -180,7 +181,7 @@ export function AutresOutils(t) {
     margeSecu = salaireMensuel(e) - k - totalParType(e, "epargne"),
     M = moisNow(),
     rawReel = relevesLivrets(r, MOIS.length),
-    vac = pocketCalc(items, "vacances", paramOuDefaut(r, "provision_vacances_mensuelle"), MOIS.length),
+    vac = pocketCalc(items, "vacances", tauxVacances(r), MOIS.length),
     form = formationCalc(items, r, MOIS.length),
     sport = pocketCalc(items, "sport", 0, MOIS.length, !0),
     epg = pocketCalc(items, "epargne", 0, MOIS.length),

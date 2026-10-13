@@ -1,5 +1,5 @@
 import React from "react";
-import { budgetDuMois } from "../lib/calculs.js";
+import { budgetDuMois, montantSigne } from "../lib/calculs.js";
 import { catIcone, euros, num } from "../lib/format.js";
 import { MOIS, isoAujourdhui, moisDepuisAncre, moisNow } from "../lib/mois.js";
 
@@ -82,7 +82,7 @@ export function SaisieRapide({
   const auj = isoAujourdhui(),
     duJour = (transactions || []).filter((t) => t.date_depense === auj),
     totalJour = duJour.reduce(
-      (s, t) => s + (t.type === "remboursement" ? -num(t.montant) : num(t.montant)),
+      (s, t) => s + montantSigne(t),
       0,
     ),
     valeur = Number(String(montant).replace(",", ".")),

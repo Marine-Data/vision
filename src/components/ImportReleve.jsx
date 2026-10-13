@@ -1,5 +1,5 @@
 import React from "react";
-import { budgetDuMois, itemCompte, ligneBudgetId } from "../lib/calculs.js";
+import { budgetDuMois, itemCompte, ligneBudgetId, montantSigne } from "../lib/calculs.js";
 import { catIcone, num } from "../lib/format.js";
 import { classer, dejaSaisie, lireFichierPdf, nomOperation, noteDesOperations } from "../lib/importReleve.js";
 import { anneeMoisDe, moisDepuisAncre } from "../lib/mois.js";
@@ -228,7 +228,7 @@ export function ImportReleve({
     dansApp = (lid) =>
       txMois
         .filter((x) => x.budget_line_id === lid)
-        .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+        .reduce((s, x) => s + montantSigne(x), 0),
     sportAPayer = (items || []).filter(
       (x) => (x.pocket === "sport" || x.pocket === "formation") && !x.paid && itemCompte(x),
     ),

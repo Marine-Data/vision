@@ -25,6 +25,7 @@ import {
   deficitsParMois,
   itemCompte,
   ligneBudgetId,
+  set_VISION_BUDGET,
   set_VISION_DEFICITS,
 } from "./lib/calculs.js";
 import { EP_AUTO_DEBUT, EP_AUTO_JOUR, EP_AUTO_NOTE, epAutoCle } from "./lib/epargneAuto.js";
@@ -1185,6 +1186,7 @@ export function App() {
   if (!supabaseConfigured) return <div className="warn">Configuration Supabase manquante.</div>;
   if (!r) return null;
   if (!MODE_PARTAGE && !t) return <Connexion />;
+  set_VISION_BUDGET(l, bm);
   set_VISION_DEFICITS(l ? deficitsParMois(l, bm, tx, MOIS.length) : []);
   const Ge = {
       budget: l,

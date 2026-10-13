@@ -1,4 +1,4 @@
-import { budgetDuMois, ligneBudgetId } from "./calculs.js";
+import { budgetDuMois, ligneBudgetId, montantSigne } from "./calculs.js";
 import { num } from "./format.js";
 
 export // Alerte salaire : même calcul que le tableau Excel (salaire − dépenses − épargne).
@@ -12,7 +12,7 @@ export function alerteSalaire(modele, bmRows, tx, m) {
     somme = (ids) =>
       txi
         .filter((x) => ids.includes(x.budget_line_id))
-        .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+        .reduce((s, x) => s + montantSigne(x), 0),
     budgetDe = (k) => lignes.filter((w) => w.kind === k).reduce((s, w) => s + num(w.montant), 0),
     idsRev = idsDe("revenu"),
     aSalaire = txi.some((x) => idsRev.includes(x.budget_line_id)),

@@ -1,5 +1,5 @@
 import React from "react";
-import { itemCompte, pocketCalc } from "../../lib/calculs.js";
+import { itemCompte, pocketCalc, tauxVacances } from "../../lib/calculs.js";
 import { num, paramOuDefaut } from "../../lib/format.js";
 import { moisNow } from "../../lib/mois.js";
 import {
@@ -22,7 +22,7 @@ export function GraphVacances({ params, items, indices }) {
     calc = pocketCalc(
       items,
       "vacances",
-      paramOuDefaut(params, "provision_vacances_mensuelle"),
+      tauxVacances(params),
       Math.max(...indices) + 1,
     ),
     postes = (items || []).filter((x) => x.pocket === "vacances" && itemCompte(x)),
