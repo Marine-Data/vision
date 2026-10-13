@@ -45,6 +45,7 @@ export function BudgetMensuel({
   onPasVerse,
   onCloturer,
   onRouvrir,
+  onImport,
 }) {
   const [exportEtat, setExportEtat] = React.useState(""),
     [clotEtape, setClotEtape] = React.useState(""),
@@ -391,6 +392,16 @@ export function BudgetMensuel({
         >
           →
         </button>
+        {onImport && (
+          <button
+            className="btn-outline btn-sm"
+            onClick={onImport}
+            aria-label="Importer un relevé BoursoBank"
+            title="Importer un relevé BoursoBank"
+          >
+            ↑
+          </button>
+        )}
         <button
           className="btn-outline btn-sm"
           onClick={exporter}
