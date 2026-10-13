@@ -104,10 +104,20 @@ export function nomOperation(libelle) {
     .trim();
 }
 
-export function classer(op, reglesPerso) {
+// Règles : celles de la base (Réglages → Import du relevé), mots-clés appris d'abord,
+// puis les mots-clés de base dans leur ordre. Chaque règle donne un groupe spécial
+// (ignorer, salaire, vacances, sport) ou un poste (nom actuel du poste).
+// Sans règles en base (mode partage, chargement), les règles du code servent de secours.
+export function classer(op, regles) {
   const t = (op.libelle + " " + op.detail.join(" ")).toUpperCase(),
-    perso = (reglesPerso || []).find((r) => r.motif && t.includes(r.motif.toUpperCase()));
-  if (perso) return perso.poste;
+    liste = regles || [];
+  const tri = [...liste].sort(
+    (a, b) =>
+      (a.source === "appris" ? 0 : 1) - (b.source === "appris" ? 0 : 1) || (a.sort || 0) - (b.sort || 0),
+  );
+  const r = tri.find((x) => x.motif && t.includes(x.motif.toUpperCase()));
+  if (r) return r.groupe || r.poste;
+  if (liste.some((x) => x.source === "base")) return null;
   for (const [poste, re] of REGLES) if (re.test(t)) return poste;
   return null;
 }

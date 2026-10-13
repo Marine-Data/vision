@@ -76,7 +76,13 @@ export const nombreEntier = (t) =>
     maximumFractionDigits: 0,
   }).format(Math.round(t));
 
+// Icône d'un poste : celle choisie par l'utilisatrice (vision_budget.icone), sinon déduite du nom.
+let ICONES_CHOISIES = new Map();
+export function set_ICONES(budget) {
+  ICONES_CHOISIES = new Map((budget || []).filter((b) => b.icone).map((b) => [b.poste, b.icone]));
+}
 export function catIcone(poste) {
+  if (ICONES_CHOISIES.has(poste)) return ICONES_CHOISIES.get(poste);
   const t = CAT_ICONES.find(([r]) => r.test(poste || ""));
   return t ? t[1] : "•";
 }

@@ -34,6 +34,8 @@ export function SaisieRapide({
       initial && initial.date_depense ? initial.date_depense : isoAujourdhui(),
     ),
     [toutesCats, setToutesCats] = React.useState(!!initial),
+    [exceptionnelle, setExceptionnelle] = React.useState(!!(initial && initial.exceptionnelle)),
+    [aVenir, setAVenir] = React.useState(!!(initial && initial.statut === "prevu")),
     [etat, setEtat] = React.useState(""),
     [erreur, setErreur] = React.useState(""),
     champMontant = React.useRef(null);
@@ -81,10 +83,7 @@ export function SaisieRapide({
   });
   const auj = isoAujourdhui(),
     duJour = (transactions || []).filter((t) => t.date_depense === auj),
-    totalJour = duJour.reduce(
-      (s, t) => s + montantSigne(t),
-      0,
-    ),
+    totalJour = duJour.reduce((s, t) => s + montantSigne(t), 0),
     valeur = Number(String(montant).replace(",", ".")),
     pret = ligneId && valeur > 0;
   async function enregistrer(enchainer) {
@@ -100,6 +99,8 @@ export function SaisieRapide({
             montant: valeur,
             note: note.trim() || null,
             date_depense: dateDep,
+            exceptionnelle,
+            statut: aVenir ? "prevu" : "fait",
           })
         : await onAdd({
             budget_line_id: ligneId,
@@ -107,6 +108,8 @@ export function SaisieRapide({
             note: note.trim() || null,
             date_depense: dateDep,
             type: remb ? "remboursement" : "depense",
+            exceptionnelle,
+            statut: aVenir ? "prevu" : "fait",
           });
       setEtat("✓ " + euros(valeur) + " · " + (categories.find((c) => c.id === ligneId) || {}).poste);
       if (enchainer && !edition)
@@ -280,6 +283,36 @@ export function SaisieRapide({
               MOIS[Math.max(0, Math.min(MOIS.length - 1, moisDepuisAncre(new Date(dateDep + "T00:00:00"))))]}
           </span>
         </div>
+        {!remb && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 10px" }}>
+            {[
+              [
+                exceptionnelle,
+                setExceptionnelle,
+                "Exceptionnelle",
+                "Compte dans le budget, pas dans le rythme de la projection",
+              ],
+              [aVenir, setAVenir, "À venir", "Pas encore prélevée"],
+            ].map(([on, setOn, l, aide]) => (
+              <button
+                key={l}
+                type="button"
+                className="pill"
+                aria-pressed={on}
+                title={aide}
+                onClick={() => setOn(!on)}
+                style={{
+                  margin: 0,
+                  background: on ? "var(--ink)" : undefined,
+                  color: on ? "#ffffff" : undefined,
+                  borderColor: on ? "var(--ink)" : undefined,
+                }}
+              >
+                {(on ? "✓ " : "") + l}
+              </button>
+            ))}
+          </div>
+        )}
         {erreur && <div className="txfail">{erreur}</div>}
         {etat && <div className="bok">{etat}</div>}
         <div

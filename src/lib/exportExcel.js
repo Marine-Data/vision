@@ -1,4 +1,11 @@
-import { budgetDuMois, itemCompte, ligneBudgetId, montantSigne, pocketCalc, tauxVacances } from "./calculs.js";
+import {
+  budgetDuMois,
+  itemCompte,
+  ligneBudgetId,
+  montantSigne,
+  pocketCalc,
+  tauxVacances,
+} from "./calculs.js";
 import { num, param, paramOuDefaut } from "./format.js";
 import { MOIS, anneeMoisDe, moisNow } from "./mois.js";
 
@@ -29,9 +36,7 @@ function donneesExport(budget, bmRows, tx, items, params, jusqua) {
     const lignes = budgetDuMois(bmRows, budget, m),
       txi = (tx || []).filter((x) => num(x.mois_index) === m),
       reel = (ids) =>
-        txi
-          .filter((x) => ids.includes(x.budget_line_id))
-          .reduce((s, x) => s + montantSigne(x), 0),
+        txi.filter((x) => ids.includes(x.budget_line_id)).reduce((s, x) => s + montantSigne(x), 0),
       courantes = {},
       ep = lignes.filter((w) => catDe(w) === "epargne" || w.kind === "epargne"),
       epHors = ep.filter((w) => !estVacances(w)),

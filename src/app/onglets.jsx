@@ -49,6 +49,11 @@ export const ONGLETS = [
     label: "Historique",
     icon: "horloge",
   },
+  {
+    id: "reglages",
+    label: "Réglages",
+    icon: "reglages",
+  },
 ];
 
 export const NAV_ICONS = {
@@ -82,6 +87,7 @@ export const NAV_ICONS = {
     "M12 6.6v12.2",
   ],
   horloge: ["M12 3.6a8.4 8.4 0 110 16.8 8.4 8.4 0 010-16.8", "M12 7.4V12l2.9 1.9"],
+  reglages: ["M4 7h10", "M18 7h2", "M4 17h4", "M12 17h8", "M16 5v4", "M10 15v4"],
 };
 
 export const navIcon = (cle) => (
@@ -106,7 +112,7 @@ export const MODE_PARTAGE =
   (new URLSearchParams(window.location.search).has("partage") ||
     (window.location.hash || "").includes("partage"));
 
-export const ONGLETS_VERROUILLES = ["tresorerie", "stats", "historique"];
+export const ONGLETS_VERROUILLES = ["tresorerie", "stats", "historique", "reglages"];
 
 export const MOT_DE_PASSE_PARTAGE = "vision2027";
 

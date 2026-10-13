@@ -1,6 +1,108 @@
 import React from "react";
 import { AUDIT_CHAMPS, AUDIT_GROUPES, PARAMS_LIBELLES } from "../data/contenu.js";
-import { auditValeur, hwkFmt } from "../lib/format.js";
+import { auditValeur, eurosCourt, hwkFmt, num } from "../lib/format.js";
+import { MOIS } from "../lib/mois.js";
+
+// Lignes « * » : la ligne entière avant / après (ajout, modification, suppression).
+const TABLES = {
+  vision_items: "provisions",
+  vision_params: "réglages",
+  vision_budget: "postes",
+  vision_budget_mois: "budget du mois",
+  vision_transactions: "dépenses",
+  vision_contenu: "contenu",
+  vision_recurrentes: "récurrentes",
+  vision_seances: "sport",
+  vision_import_regles: "import",
+};
+const IGNORES = [
+  "id",
+  "user_id",
+  "created_at",
+  "updated_at",
+  "sort",
+  "line_key",
+  "item_key",
+  "import_id",
+  "budget_line_id",
+  "recurrente_id",
+  "cours_id",
+  "est_override",
+];
+const NOMS_CHAMPS = {
+  montant: "montant",
+  poste: "nom",
+  note: "note",
+  date_depense: "date",
+  titre: "titre",
+  detail: "détail",
+  extra: "note",
+  date_iso: "date",
+  date_fin: "fin",
+  statut: "état",
+  exceptionnelle: "exceptionnelle",
+  archive_depuis: "archivé dès",
+  icone: "icône",
+  label: "nom",
+  jour: "jour",
+  fin: "fin",
+  actif: "actif",
+  motif: "mot-clé",
+  fait: "fait",
+  complement: "complément",
+  type: "type",
+  mois_index: "mois",
+  annee: "année",
+  mois: "mois",
+};
+function lire(j) {
+  try {
+    return j ? JSON.parse(j) : null;
+  } catch (e) {
+    return null;
+  }
+}
+function valeur(k, v) {
+  if (v == null || v === "") return "—";
+  if (k === "montant") return eurosCourt(num(v));
+  if (k === "mois_index" || k === "archive_depuis" || k === "fin") return MOIS[num(v)] || v;
+  if (typeof v === "boolean") return v ? "oui" : "non";
+  return String(v);
+}
+export function resumeLigne(l) {
+  const a = lire(l.old_value),
+    n = lire(l.new_value),
+    r = n || a || {},
+    nom =
+      r.poste ||
+      r.note ||
+      r.titre ||
+      r.label ||
+      r.motif ||
+      r.activite ||
+      (r.date ? "Séance du " + r.date : "") ||
+      TABLES[l.table_name] ||
+      "",
+    action = !a ? "ajout" : !n ? "suppression" : "modification",
+    champs =
+      a && n
+        ? Object.keys(n).filter((k) => !IGNORES.includes(k) && JSON.stringify(a[k]) !== JSON.stringify(n[k]))
+        : [];
+  return {
+    nom:
+      (l.table_name === "vision_transactions" && r.montant != null && action !== "modification"
+        ? eurosCourt(num(r.montant)) + " · "
+        : "") + nom,
+    chip:
+      action === "modification"
+        ? champs.map((k) => NOMS_CHAMPS[k] || k).join(", ") || "modification"
+        : action,
+    detail:
+      action === "modification"
+        ? champs.map((k) => valeur(k, a[k]) + " → " + valeur(k, n[k])).join(" · ")
+        : "",
+  };
+}
 
 export function Historique({ audit, items, params }) {
   const [fTable, setFTable] = React.useState("Toutes"),
@@ -63,9 +165,8 @@ export function Historique({ audit, items, params }) {
       <h2>Historique</h2>
       <p className="sub">Ce qui a changé dans ton plan, et quand. Enregistré automatiquement.</p>
       <div className="note">
-        Ce journal couvre les décisions de plan : provisions (formation, sport, vacances, épargne) et
-        paramètres. Le budget, le budget mensuel, les dépenses et le contenu des onglets ne sont pas
-        journalisés — ce sont des exécutions, pas des décisions.
+        Tout est gardé : budget, dépenses, postes, provisions, réglages, cours, étapes, récurrentes et
+        mots-clés de l'import. Chaque ligne montre l'avant et l'après.
       </div>
       <div className="detail">Quoi</div>
       <div>
@@ -86,7 +187,7 @@ export function Historique({ audit, items, params }) {
       <div>
         {tables.map((t) => (
           <button style={btn(fTable === t)} onClick={() => setFTable(t)} key={t}>
-            {t === "Toutes" ? "Partout" : t.replace("vision_", "")}
+            {t === "Toutes" ? "Partout" : TABLES[t] || t.replace("vision_", "")}
           </button>
         ))}
       </div>
@@ -120,56 +221,44 @@ export function Historique({ audit, items, params }) {
                 padding: "4px 12px",
               }}
             >
-              {j.lignes.map((l) => (
-                <div
-                  style={{
-                    padding: "9px 0",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                  key={l.id}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: 13.5,
-                    }}
-                  >
-                    {nomDe(l)}
-                    <span
-                      className="chip"
-                      style={{
-                        marginLeft: 6,
-                      }}
-                    >
-                      {AUDIT_CHAMPS[l.field] || l.field}
-                    </span>
-                  </div>
-                  <div
-                    className="detail"
-                    style={{
-                      marginTop: 2,
-                    }}
-                  >
-                    {auditValeur(l.field, l.old_value)}
-                    {" → "}
-                    <b>{auditValeur(l.field, l.new_value)}</b>
-                    {"  ·  "}
-                    {(l.changed_at || "").slice(11, 16)}
-                  </div>
-                  {l.note && (
-                    <div
-                      className="detail"
-                      style={{
-                        marginTop: 3,
-                        fontStyle: "italic",
-                        color: "var(--amber)",
-                      }}
-                    >
-                      {"⚑ " + l.note}
+              {j.lignes.map((l) => {
+                const r = l.field === "*" ? resumeLigne(l) : null;
+                return (
+                  <div style={{ padding: "9px 0", borderBottom: "1px solid var(--line)" }} key={l.id}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>
+                      {r ? r.nom : nomDe(l)}
+                      <span className="chip" style={{ marginLeft: 6 }}>
+                        {r ? r.chip : AUDIT_CHAMPS[l.field] || l.field}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div className="detail" style={{ marginTop: 2 }}>
+                      {r ? (
+                        r.detail ? (
+                          r.detail + "  ·  "
+                        ) : (
+                          (TABLES[l.table_name] || "") + "  ·  "
+                        )
+                      ) : (
+                        <>
+                          {auditValeur(l.field, l.old_value)}
+                          {" → "}
+                          <b>{auditValeur(l.field, l.new_value)}</b>
+                          {"  ·  "}
+                        </>
+                      )}
+                      {(l.changed_at || "").slice(11, 16)}
+                    </div>
+                    {l.note && (
+                      <div
+                        className="detail"
+                        style={{ marginTop: 3, fontStyle: "italic", color: "var(--amber)" }}
+                      >
+                        {"⚑ " + l.note}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))

@@ -218,38 +218,41 @@ export // Budget applicable à un mois. Lit d'abord vision_budget_mois ; à déf
 // ici : l'initialisation se fait au démarrage, donc pas de course entre onglets.
 function budgetDuMois(bmRows, modele, moisIndex) {
   const { annee, mois } = anneeMoisDe(moisIndex),
-    archive = new Map((modele || []).filter((b) => b.archive_depuis != null).map((b) => [b.id, num(b.archive_depuis)])),
+    archive = new Map(
+      (modele || []).filter((b) => b.archive_depuis != null).map((b) => [b.id, num(b.archive_depuis)]),
+    ),
     visible = (w) => !archive.has(ligneBudgetId(w)) || moisIndex < archive.get(ligneBudgetId(w)),
     lignes = (bmRows || []).filter((x) => x.annee === annee && x.mois === mois);
-  return (lignes.length
-    ? [...lignes]
-        .sort((a, b) => (a.sort || 0) - (b.sort || 0))
-        .map((x) => ({
-          id: x.id,
-          line_key: x.line_key,
-          kind: x.kind,
-          poste: x.poste,
-          detail: x.detail,
-          montant: x.montant,
-          sort: x.sort,
-          type: x.type,
-          budget_line_id: x.budget_line_id,
-          est_override: x.est_override,
-          source: "mois",
+  return (
+    lignes.length
+      ? [...lignes]
+          .sort((a, b) => (a.sort || 0) - (b.sort || 0))
+          .map((x) => ({
+            id: x.id,
+            line_key: x.line_key,
+            kind: x.kind,
+            poste: x.poste,
+            detail: x.detail,
+            montant: x.montant,
+            sort: x.sort,
+            type: x.type,
+            budget_line_id: x.budget_line_id,
+            est_override: x.est_override,
+            source: "mois",
+          }))
+      : (modele || []).map((b) => ({
+          id: b.id,
+          line_key: b.line_key,
+          kind: b.kind,
+          poste: b.poste,
+          detail: b.detail,
+          montant: b.montant,
+          sort: b.sort,
+          type: b.type,
+          budget_line_id: b.id,
+          est_override: !1,
+          source: "modele",
         }))
-    : (modele || []).map((b) => ({
-        id: b.id,
-        line_key: b.line_key,
-        kind: b.kind,
-        poste: b.poste,
-        detail: b.detail,
-        montant: b.montant,
-        sort: b.sort,
-        type: b.type,
-        budget_line_id: b.id,
-        est_override: !1,
-        source: "modele",
-      }))
   ).filter(visible);
 }
 
@@ -325,4 +328,65 @@ export function pocheCalcDe(p, items, params, n) {
 
 export function set_VISION_DEFICITS(v) {
   VISION_DEFICITS = v;
+}
+
+// ---------------------------------------------------------------
+// Projection de fin de mois (mois en cours) :
+//   reste aujourd'hui = salaire − épargne programmée − dépenses courantes déjà faites
+//   − prélèvements prévus (dépenses « à venir »)
+//   − rythme des dépenses courantes (hors récurrentes et exceptionnelles) × jours restants
+// ---------------------------------------------------------------
+export function projectionMois(modele, bmRows, tx, m, aujourdhui) {
+  const lignes = budgetDuMois(bmRows, modele, m),
+    ids = (k) =>
+      new Set(
+        lignes
+          .filter((w) => categorieDe(modele, w) === k || (k === "revenu" && w.kind === "revenu"))
+          .map(ligneBudgetId),
+      ),
+    idsC = new Set(
+      lignes
+        .filter((w) => categorieDe(modele, w) === "courantes" && w.line_key !== "c_sport")
+        .map(ligneBudgetId),
+    ),
+    idsE = ids("epargne"),
+    idsR = new Set(lignes.filter((w) => w.kind === "revenu").map(ligneBudgetId)),
+    txm = (tx || []).filter((x) => num(x.mois_index) === m),
+    iso =
+      aujourdhui.getFullYear() +
+      "-" +
+      String(aujourdhui.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(aujourdhui.getDate()).padStart(2, "0"),
+    aVenir = (x) => x.statut === "prevu" || (x.date_depense || "") > iso,
+    courantes = txm.filter((x) => idsC.has(x.budget_line_id)),
+    faites = courantes.filter((x) => !aVenir(x)),
+    prevues = courantes.filter(aVenir),
+    variables = faites.filter((x) => !x.recurrente_id && !x.exceptionnelle),
+    salaireReel = txm.some((x) => idsR.has(x.budget_line_id)) ? depenseDuMois(txm, m, [...idsR]) : null,
+    salaire =
+      salaireReel != null
+        ? salaireReel
+        : lignes.filter((w) => w.kind === "revenu").reduce((s, w) => s + num(w.montant), 0),
+    epargne = lignes.filter((w) => idsE.has(ligneBudgetId(w))).reduce((s, w) => s + num(w.montant), 0),
+    somme = (l) => l.reduce((s, x) => s + montantSigne(x), 0),
+    { annee, mois } = anneeMoisDe(m),
+    joursMois = new Date(annee, mois + 1, 0).getDate(),
+    ecoules = Math.min(joursMois, aujourdhui.getDate()),
+    restants = joursMois - ecoules,
+    parJour = ecoules ? somme(variables) / ecoules : 0,
+    resteAujourdhui = salaire - epargne - somme(faites),
+    prevu = somme(prevues),
+    rythme = parJour * restants;
+  return {
+    salaire,
+    epargne,
+    faites: somme(faites),
+    resteAujourdhui,
+    prevu,
+    parJour,
+    joursRestants: restants,
+    rythme,
+    finDeMois: resteAujourdhui - prevu - rythme,
+  };
 }
