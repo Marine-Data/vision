@@ -751,6 +751,8 @@ export function BudgetCartes(props) {
               fontSize: 13,
               fontWeight: 800,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flex: "none",
             }}
           >
             Salaire {e0(base)} {readOnly ? "" : "✏️"}

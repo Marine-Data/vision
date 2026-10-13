@@ -408,7 +408,12 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
           <span>Rappels sur le téléphone</span>
         </div>
         <section aria-label="Rappels" style={{ ...carte, padding: "4px 0" }}>
-          {notifs && notifs.etat !== "actives" && !readOnly && (
+          {notifs && notifs.etat === "actives" && (
+            <div style={{ padding: "10px 14px", fontSize: 13.5, fontWeight: 800, color: "#0b6e53" }}>
+              ✓ Rappels actifs sur ce téléphone
+            </div>
+          )}
+          {notifs && notifs.etat && notifs.etat !== "actives" && !readOnly && (
             <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink-soft)" }}>
                 {notifs.message}

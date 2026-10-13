@@ -31,6 +31,7 @@ import {
 } from "./lib/calculs.js";
 import { EP_AUTO_DEBUT, EP_AUTO_NOTE, epAutoCle, jourEpargneAuto } from "./lib/epargneAuto.js";
 import { ToastAnnuler } from "./components/ToastAnnuler.jsx";
+import { activerNotifications, etatNotifications } from "./lib/notifications.js";
 import { creerActions, messageErreur, recurrentesACreer } from "./app/actions.js";
 import { set_ALERTE_SEUIL } from "./lib/alerteSalaire.js";
 import { set_ICONES } from "./lib/format.js";
@@ -42,7 +43,14 @@ import { supabase, supabaseConfigured } from "./lib/supabase.js";
 export function App() {
   const [t, e] = React.useState(null),
     [r, n] = React.useState(!1),
-    [s, i] = React.useState("apercu"),
+    [s, i] = React.useState(() => {
+      try {
+        const q = new URLSearchParams(location.search).get("onglet");
+        return q && ONGLETS.some((x) => x.id === q) ? q : "apercu";
+      } catch (e) {
+        return "apercu";
+      }
+    }),
     [o, a] = React.useState({}),
     [l, u] = React.useState(null),
     [c, d] = React.useState([]),
@@ -70,7 +78,14 @@ export function App() {
   const [recurrentes, setRecurrentes] = React.useState([]),
     [seances, setSeances] = React.useState([]),
     [toast, setToast] = React.useState(null),
-    [recOk, setRecOk] = React.useState(!1);
+    [recOk, setRecOk] = React.useState(!1),
+    [etatNotifs, setEtatNotifs] = React.useState(null);
+  React.useEffect(() => {
+    MODE_PARTAGE ||
+      etatNotifications()
+        .then(setEtatNotifs)
+        .catch(() => {});
+  }, []);
   const recRef = React.useRef(!1);
   const [txOk, setTxOk] = React.useState(!1);
   const [tachesOk, setTachesOk] = React.useState(!1);
@@ -800,6 +815,16 @@ export function App() {
       stx((p) => [...(K || []), ...p]), await relireSpend();
     })();
   }, [t, l, bm, c, txOk]);
+  // L'historique est relu à chaque ouverture de l'onglet : il montre aussi ce qui vient d'être fait.
+  React.useEffect(() => {
+    if (s !== "historique" || MODE_PARTAGE || !t) return;
+    supabase
+      .from("vision_audit")
+      .select("*")
+      .order("changed_at", { ascending: !1 })
+      .limit(400)
+      .then(({ data: K }) => K && saud(K));
+  }, [s, t]);
   // Dépenses récurrentes : celles du mois en cours sont créées une fois (« à venir »
   // tant que leur date n'est pas passée), puis passent à « faite » le jour venu.
   React.useEffect(() => {
@@ -1385,11 +1410,28 @@ export function App() {
           .catch(() => window.prompt("Lien de partage :", N))
       : window.prompt("Lien de partage :", N);
   }
-  const notifs = null;
+  const notifs = MODE_PARTAGE
+    ? null
+    : {
+        ...(etatNotifs || { etat: "", message: "" }),
+        activer:
+          etatNotifs && etatNotifs.etat === "a-activer"
+            ? async () => {
+                try {
+                  await activerNotifications(t.user.id);
+                  setEtatNotifs({ etat: "actives", message: "" }),
+                    notifier("Rappels activés sur ce téléphone");
+                } catch (e) {
+                  signalerErreur(e), etatNotifications().then(setEtatNotifs);
+                }
+              }
+            : null,
+      };
   const actions = creerActions({
     uid: () => (t ? t.user.id : null),
     notifier,
     txModifier: txUpdate,
+    txAjouter: txAdd,
     txSupprimer: txSupprimerUI,
     txRemettre,
     get: {

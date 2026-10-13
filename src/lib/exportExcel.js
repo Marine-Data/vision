@@ -50,7 +50,7 @@ function donneesExport(budget, bmRows, tx, items, params, jusqua) {
     lignes
       .filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport")
       .forEach((w) => {
-        const k = w.poste || "?",
+        const k = w.poste || "?", // nom actuel du poste (budgetDuMois), donc un renommage garde une seule ligne
           c =
             courantes[k] ||
             (courantes[k] = {

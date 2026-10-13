@@ -222,6 +222,8 @@ function budgetDuMois(bmRows, modele, moisIndex) {
       (modele || []).filter((b) => b.archive_depuis != null).map((b) => [b.id, num(b.archive_depuis)]),
     ),
     visible = (w) => !archive.has(ligneBudgetId(w)) || moisIndex < archive.get(ligneBudgetId(w)),
+    // Le nom affiché est toujours le nom actuel du poste (un renommage vaut pour tous les mois).
+    noms = new Map((modele || []).map((b) => [b.id, b.poste])),
     lignes = (bmRows || []).filter((x) => x.annee === annee && x.mois === mois);
   return (
     lignes.length
@@ -231,7 +233,7 @@ function budgetDuMois(bmRows, modele, moisIndex) {
             id: x.id,
             line_key: x.line_key,
             kind: x.kind,
-            poste: x.poste,
+            poste: (x.budget_line_id && noms.get(x.budget_line_id)) || x.poste,
             detail: x.detail,
             montant: x.montant,
             sort: x.sort,

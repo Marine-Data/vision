@@ -27,12 +27,14 @@ export function creerActions(ctx) {
   const lignesDuPoste = (lid) => (get.bm() || []).filter((x) => x.budget_line_id === lid);
   const ligneDuMois = (lid, m) => lignesDuPoste(lid).find((x) => iMois(x) === m);
 
-  // Mois suivants qui ont déjà leur propre montant (différent de celui du mois de départ).
+  // Mois suivants qui ont déjà leur propre montant : différent du montant habituel du
+  // poste (le modèle) et de celui du mois de départ. Ceux-là, on demande.
   function conflits(lid, depuis) {
     const depart = ligneDuMois(lid, depuis),
-      ancien = depart ? num(depart.montant) : null;
+      modele = (get.budget() || []).find((b) => b.id === lid),
+      habituels = new Set([depart ? num(depart.montant) : null, modele ? num(modele.montant) : null]);
     return lignesDuPoste(lid)
-      .filter((x) => iMois(x) > depuis && !ferme(iMois(x)) && ancien != null && num(x.montant) !== ancien)
+      .filter((x) => iMois(x) > depuis && !ferme(iMois(x)) && !habituels.has(num(x.montant)))
       .sort((a, b) => iMois(a) - iMois(b))
       .map((x) => ({ m: iMois(x), montant: num(x.montant) }));
   }
@@ -313,6 +315,9 @@ export function creerActions(ctx) {
         .single(),
     );
     set.recurrentes((p) => [...p, d]);
+    // L'occurrence du mois en cours est créée tout de suite (« à venir » si sa date n'est pas passée).
+    const instances = recurrentesACreer([d], get.tx(), get.params(), moisNow(), new Date(), uid());
+    for (const l of instances) await ctx.txAjouter(l).catch(() => {});
     notifier("« " + d.label + " » ajoutée", async () => {
       const lies = (get.tx() || []).filter((x) => x.recurrente_id === d.id && x.statut === "prevu");
       for (const x of lies) await ctx.txSupprimer(x.id);
