@@ -1,42 +1,24 @@
-import { GraphMatelas } from "./GraphMatelas.jsx";
-import { GraphProjection } from "./GraphProjection.jsx";
-import { GraphRepartition } from "./GraphRepartition.jsx";
+import { MOIS } from "../../lib/mois.js";
+import { GraphDepenses } from "./GraphDepenses.jsx";
+import { GraphEpargne } from "./GraphEpargne.jsx";
 import { GraphVacances } from "./GraphVacances.jsx";
-import { budgetDuMois } from "../../lib/calculs.js";
-import { nombreEntier, totalParType } from "../../lib/format.js";
-import { moisNow } from "../../lib/mois.js";
 
-export function Graphiques({
-  budget: modele,
-  params: e,
-  voyages: r,
-  items: im,
-  spend: spAll,
-  budgetMois: bmAll,
-  poches: pochesRows,
-}) {
-  const t = modele ? budgetDuMois(bmAll, modele, moisNow()) : null;
-  if (!t)
+// Onglet Graphiques : 3 graphiques calculés comme le tableau Excel.
+// Période affichée : l'année scolaire, de septembre 2026 (mois 1) à août 2027 (mois 12).
+export function Graphiques({ budget, params, items, budgetMois, transactions }) {
+  if (!budget)
     return (
       <section className="sec">
         <p className="sub">Chargement…</p>
       </section>
     );
-  const n = totalParType(t, "charge");
+  const indices = Array.from({ length: Math.min(12, MOIS.length - 1) }, (_, k) => k + 1);
   return (
     <section className="sec">
       <h2>Graphiques</h2>
-      <p className="sub">
-        Calculés en direct depuis ton budget — ils se mettent à jour dès que tu édites la Trésorerie.
-      </p>
-      <div className="h3">Projection de l'épargne (livrets)</div>
-      <GraphProjection budget={t} params={e} voyages={r} items={im} poches={pochesRows} />
-      <div className="h3">Matelas de sécurité</div>
-      <GraphMatelas budget={t} params={e} items={im} poches={pochesRows} />
-      <div className="h3">Poche vacances</div>
-      <GraphVacances budget={t} params={e} items={im} />
-      <div className="h3">{`Répartition des charges — ${nombreEntier(n)} €/mois`}</div>
-      <GraphRepartition budget={t} spend={spAll} />
+      <GraphEpargne budget={budget} params={params} items={items} indices={indices} />
+      <GraphVacances params={params} items={items} indices={indices} />
+      <GraphDepenses budget={budget} budgetMois={budgetMois} transactions={transactions} />
     </section>
   );
 }

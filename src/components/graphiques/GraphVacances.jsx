@@ -1,90 +1,152 @@
-import { pocketCalc } from "../../lib/calculs.js";
-import { eurosEntiers, nombreEntier, paramOuDefaut } from "../../lib/format.js";
-import { MOIS } from "../../lib/mois.js";
+import React from "react";
+import { itemCompte, pocketCalc } from "../../lib/calculs.js";
+import { num, paramOuDefaut } from "../../lib/format.js";
+import { moisNow } from "../../lib/mois.js";
+import {
+  CarteGraph,
+  EtiquettesMois,
+  InfoMois,
+  LARGEUR,
+  Legende,
+  ZonesMois,
+  euros0,
+  moisCourt,
+  xMois,
+} from "./communs.jsx";
 
-export function GraphVacances({ budget: t, params: e, items: im }) {
-  const r = pocketCalc(im, "vacances", paramOuDefaut(e, "provision_vacances_mensuelle"), MOIS.length).solde,
-    n = MOIS,
-    s = 680,
-    i = 240,
-    o = {
-      l: 48,
-      r: 16,
-      t: 16,
-      b: 34,
-    },
-    a = s - o.l - o.r,
-    l = i - o.t - o.b;
-  let u = Math.min(0, ...r),
-    c = Math.max(...r, 1);
-  const d = c - u || 1;
-  (u -= d * 0.08), (c += d * 0.1);
-  const p = (y) => o.l + y * (a / (n.length - 1)),
-    m = (y) => o.t + (1 - (y - u) / (c - u)) * l,
-    v = r.map((y, f) => `${f === 0 ? "M" : "L"}${p(f).toFixed(1)},${m(y).toFixed(1)}`).join(" "),
-    k = Math.min(...r),
-    x = r.indexOf(k);
+// Provision vacances en fin de mois (calcul de l'Excel). Mois passés : solde réel.
+// Mois à venir : solde prévu, en retirant aussi les dépenses vacances prévues.
+export function GraphVacances({ params, items, indices }) {
+  const M = moisNow(),
+    n = indices.length,
+    calc = pocketCalc(
+      items,
+      "vacances",
+      paramOuDefaut(params, "provision_vacances_mensuelle"),
+      Math.max(...indices) + 1,
+    ),
+    postes = (items || []).filter((x) => x.pocket === "vacances" && itemCompte(x)),
+    montant = (x) => (x.paid && x.montant_reel != null ? num(x.montant_reel) : num(x.montant_prevu)),
+    depensesDu = (i) => postes.filter((x) => num(x.mois_index) === i).reduce((s, x) => s + montant(x), 0),
+    prevuNonPaye = (i) =>
+      postes
+        .filter((x) => !x.paid && num(x.mois_index) > M && num(x.mois_index) <= i)
+        .reduce((s, x) => s + montant(x), 0),
+    valeurs = indices.map((i) => (i <= M ? calc.solde[i] : calc.solde[i] - prevuNonPaye(i))),
+    [sel, setSel] = React.useState(Math.max(0, indices.indexOf(M))),
+    max = Math.max(...valeurs, 100),
+    largeurBarre = (LARGEUR - 20) / n - 6,
+    hauteur = (v) => Math.max(3, (Math.max(0, v) / max) * 120),
+    idxActuel = Math.max(0, indices.indexOf(M));
   return (
-    <div className="card">
-      <svg
-        viewBox={`0 0 ${s} ${i}`}
-        style={{
-          display: "block",
-          width: "100%",
-          height: "auto",
-        }}
-        role="img"
-        aria-label="Projection de la poche vacances"
-      >
-        {[0, 1, 2].map((y) => {
-          const f = u + ((c - u) * y) / 2;
-          return (
-            <g key={y}>
-              <line x1={o.l} y1={m(f)} x2={s - o.r} y2={m(f)} stroke="#d7e7e8" strokeWidth="1" />
-              <text x={o.l - 8} y={m(f) + 4} textAnchor="end" fontSize="11" fill="#5a787e">
-                {nombreEntier(f)}
-              </text>
-            </g>
-          );
-        })}
-        {u < 0 && (
-          <line
-            x1={o.l}
-            y1={m(0)}
-            x2={s - o.r}
-            y2={m(0)}
-            stroke="#dd5f43"
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-        )}
-        <path
-          d={v}
-          fill="none"
-          stroke="#12a07a"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
+    <CarteGraph titre="Provision vacances" chiffre={euros0(valeurs[idxActuel])} couleur="#9a4515">
+      <InfoMois
+        texte={`${moisCourt(indices[sel])} ${indices[sel] <= M ? "(réel)" : "(prévu)"} · ${euros0(valeurs[sel])}${depensesDu(indices[sel]) ? " après " + euros0(depensesDu(indices[sel])) + " de dépenses" : ""}`}
+      />
+      <div style={{ position: "relative" }}>
+        <svg
+          width="100%"
+          viewBox={`0 0 ${LARGEUR} 186`}
+          role="img"
+          aria-label={
+            "Provision vacances : " +
+            indices.map((i, k) => moisCourt(i) + " " + euros0(valeurs[k])).join(", ")
+          }
+        >
+          <line x1="0" x2={LARGEUR} y1="160" y2="160" stroke="#c9d8db" strokeWidth="1" />
+          {valeurs.map((v, k) => {
+            const reel = indices[k] <= M,
+              h = hauteur(v);
+            return (
+              <rect
+                key={k}
+                x={(xMois(k, n) - largeurBarre / 2).toFixed(1)}
+                y={(160 - h).toFixed(1)}
+                width={largeurBarre.toFixed(1)}
+                height={h.toFixed(1)}
+                rx="4"
+                fill={reel ? "#c2702f" : k === sel ? "#e9b27f" : "#f6dcc3"}
+                stroke={reel ? "none" : "#c2702f"}
+                strokeWidth={reel ? 0 : 1.2}
+              />
+            );
+          })}
+          {indices.map((i, k) => {
+            const d = depensesDu(i);
+            if (!d) return null;
+            const haut = 160 - hauteur(valeurs[k]) - 26,
+              t = "−" + euros0(d).replace(" €", ""),
+              w = t.length * 7 + 10;
+            return (
+              <g key={"d" + k}>
+                <rect
+                  x={(xMois(k, n) - w / 2).toFixed(1)}
+                  y={haut.toFixed(1)}
+                  width={w}
+                  height="20"
+                  rx="10"
+                  fill="#fbe9e4"
+                />
+                <text
+                  x={xMois(k, n).toFixed(1)}
+                  y={(haut + 14).toFixed(1)}
+                  textAnchor="middle"
+                  fontSize="12"
+                  fontWeight="800"
+                  fill="#b8432a"
+                >
+                  {t}
+                </text>
+              </g>
+            );
+          })}
+          <EtiquettesMois indices={indices} n={n} y={180} />
+        </svg>
+        <ZonesMois
+          n={n}
+          libelle={(k) => `${moisCourt(indices[k])} : ${euros0(valeurs[k])}`}
+          onPick={setSel}
         />
-        {n.map(
-          (y, f) =>
-            (f % 2 === 0 || f === n.length - 1) && (
-              <text x={p(f)} y={i - 12} textAnchor="middle" fontSize="11" fill="#5a787e" key={f}>
-                {y}
-              </text>
-            ),
-        )}
-        {r.map((y, f) => (
-          <circle cx={p(f)} cy={m(y)} r={f === x ? 4 : 2.5} fill={f === x ? "#dd5f43" : "#12a07a"} key={f} />
-        ))}
-      </svg>
-      <div className="note">
-        {"Plancher à "}
-        {eurosEntiers(k)}
-        {" en "}
-        {n[x]}
-        {" (après le grand voyage). En dessous de 0, ça déborderait sur les livrets."}
       </div>
-    </div>
+      <Legende
+        items={[
+          {
+            l: "Solde réel",
+            marque: <span style={{ width: 12, height: 12, borderRadius: 3, background: "#c2702f" }} />,
+          },
+          {
+            l: "Prévu",
+            marque: (
+              <span
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 3,
+                  background: "#f6dcc3",
+                  border: "1.5px dashed #c2702f",
+                  boxSizing: "border-box",
+                }}
+              />
+            ),
+          },
+          {
+            l: "Dépense vacances",
+            marque: (
+              <span
+                style={{
+                  padding: "0 6px",
+                  borderRadius: 8,
+                  background: "#fbe9e4",
+                  color: "#b8432a",
+                  fontWeight: 800,
+                }}
+              >
+                −
+              </span>
+            ),
+          },
+        ]}
+      />
+    </CarteGraph>
   );
 }

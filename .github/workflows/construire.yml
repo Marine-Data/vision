@@ -50,4 +50,5 @@ jobs:
         if: env.CHANGE == '1'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Relance manuelle inutile ou impossible : Pages se mettra à jour au prochain envoi."
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Relance impossible, Pages se mettra a jour au prochain envoi."
