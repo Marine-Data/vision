@@ -1,0 +1,53 @@
+name: Construire index.html
+
+# À chaque modification du code (src/, page/, configuration), GitHub reconstruit
+# le site et remplace index.html à la racine. GitHub Pages publie ensuite ce fichier.
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "page/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: construire
+  cancel-in-progress: false
+
+jobs:
+  construire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Remplacer index.html si le résultat a changé
+        run: |
+          cp dist/index.html index.html
+          if git diff --quiet -- index.html; then
+            echo "index.html est déjà à jour."
+            echo "CHANGE=0" >> "$GITHUB_ENV"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add index.html
+            git commit -m "Reconstruction automatique de index.html"
+            git push
+            echo "CHANGE=1" >> "$GITHUB_ENV"
+          fi
+      - name: Relancer la publication GitHub Pages
+        if: env.CHANGE == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Relance manuelle inutile ou impossible : Pages se mettra à jour au prochain envoi."
