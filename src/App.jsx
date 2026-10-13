@@ -10,8 +10,9 @@ import { Historique } from "./components/Historique.jsx";
 import { NavBas } from "./components/NavBas.jsx";
 import { Planning } from "./components/Planning.jsx";
 import { SaisieRapide } from "./components/SaisieRapide.jsx";
-import { Sport } from "./components/Sport.jsx";
-import { Suivi } from "./components/Suivi.jsx";
+import { SportPage } from "./components/SportPage.jsx";
+import { SuiviPage } from "./components/SuiviPage.jsx";
+import { Reglages } from "./components/Reglages.jsx";
 import { Verrou } from "./components/Verrou.jsx";
 import { Graphiques } from "./components/graphiques/Graphiques.jsx";
 import { Accueil } from "./components/kanban/Accueil.jsx";
@@ -25,18 +26,31 @@ import {
   deficitsParMois,
   itemCompte,
   ligneBudgetId,
+  set_VISION_BUDGET,
   set_VISION_DEFICITS,
 } from "./lib/calculs.js";
-import { EP_AUTO_DEBUT, EP_AUTO_JOUR, EP_AUTO_NOTE, epAutoCle } from "./lib/epargneAuto.js";
+import { EP_AUTO_DEBUT, EP_AUTO_NOTE, epAutoCle, jourEpargneAuto } from "./lib/epargneAuto.js";
+import { ToastAnnuler } from "./components/ToastAnnuler.jsx";
+import { activerNotifications, etatNotifications } from "./lib/notifications.js";
+import { creerActions, messageErreur, recurrentesACreer } from "./app/actions.js";
+import { set_ALERTE_SEUIL } from "./lib/alerteSalaire.js";
+import { set_ICONES } from "./lib/format.js";
 import { num, param } from "./lib/format.js";
-import { MOIS, anneeMoisDe, moisDepuisAncre, moisNow } from "./lib/mois.js";
+import { MOIS, anneeMoisDe, isoAujourdhui, moisDepuisAncre, moisNow } from "./lib/mois.js";
 import { debounceSave } from "./lib/outils.js";
 import { supabase, supabaseConfigured } from "./lib/supabase.js";
 
 export function App() {
   const [t, e] = React.useState(null),
     [r, n] = React.useState(!1),
-    [s, i] = React.useState("apercu"),
+    [s, i] = React.useState(() => {
+      try {
+        const q = new URLSearchParams(location.search).get("onglet");
+        return q && ONGLETS.some((x) => x.id === q) ? q : "apercu";
+      } catch (e) {
+        return "apercu";
+      }
+    }),
     [o, a] = React.useState({}),
     [l, u] = React.useState(null),
     [c, d] = React.useState([]),
@@ -61,12 +75,26 @@ export function App() {
     [reglesImport, setReglesImport] = React.useState([]),
     [importOuvert, setImportOuvert] = React.useState(false);
   const [pe, setPe] = React.useState({});
+  const [recurrentes, setRecurrentes] = React.useState([]),
+    [seances, setSeances] = React.useState([]),
+    [toast, setToast] = React.useState(null),
+    [recOk, setRecOk] = React.useState(!1),
+    [etatNotifs, setEtatNotifs] = React.useState(null);
+  React.useEffect(() => {
+    MODE_PARTAGE ||
+      etatNotifications()
+        .then(setEtatNotifs)
+        .catch(() => {});
+  }, []);
+  const recRef = React.useRef(!1);
   const [txOk, setTxOk] = React.useState(!1);
   const [tachesOk, setTachesOk] = React.useState(!1);
   const alerteRef = React.useRef({});
   const epAutoRef = React.useRef(!1);
   const ctRef = React.useRef([]);
   ctRef.current = ct;
+  const clotRef = React.useRef([]);
+  clotRef.current = cl;
   const pochesRef = React.useRef([]);
   pochesRef.current = poches;
   React.useEffect(() => {
@@ -248,8 +276,16 @@ export function App() {
           setImports(K || []);
         })(),
         (async () => {
-          const { data: K } = await supabase.from("vision_import_regles").select("motif, poste");
+          const { data: K } = await supabase.from("vision_import_regles").select("*").order("sort");
           setReglesImport(K || []);
+        })(),
+        (async () => {
+          const { data: K } = await supabase.from("vision_recurrentes").select("*").order("sort");
+          setRecurrentes(K || []), K && setRecOk(!0);
+        })(),
+        (async () => {
+          const { data: K } = await supabase.from("vision_seances").select("*").order("date");
+          setSeances(K || []);
         })(),
         (async () => {
           const { data: K } = await supabase
@@ -485,6 +521,80 @@ export function App() {
       ? window.alert("Suppression impossible : " + E.message)
       : setPoches((x) => x.filter((y) => y.id !== p.id));
   }
+  // Contenu (cours, étapes, fiche d'adhésion) : écriture immédiate, erreur affichée, « Annuler ».
+  async function ctMaj(id, patch, msg) {
+    const avant = ctRef.current.find((x) => x.id === id);
+    const ecrire = async (p2) => {
+      const { data: K, error: E } = await supabase
+        .from("vision_contenu")
+        .update({ ...p2, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (E) throw E;
+      sct((p) => p.map((x) => (x.id === id ? K : x)));
+    };
+    await ecrire(patch);
+    avant &&
+      notifier(msg || "Enregistré", () =>
+        ecrire(Object.fromEntries(Object.keys(patch).map((k) => [k, avant[k] ?? null]))),
+      );
+  }
+  async function ctCreer(type, groupe, champs, msg) {
+    const rows = ctRef.current.filter((x) => x.type === type && (x.groupe || null) === (groupe || null)),
+      ligne = {
+        user_id: t.user.id,
+        type,
+        groupe: groupe || null,
+        item_key: type + ":" + Date.now(),
+        sort: (rows.length ? Math.max(...rows.map((x) => x.sort || 0)) : 0) + 1,
+        ...champs,
+      };
+    const { data: K, error: E } = await supabase.from("vision_contenu").insert(ligne).select().single();
+    if (E) throw E;
+    sct((p) => [...p, K]);
+    notifier(msg || "Ajouté", async () => {
+      const { error: E2 } = await supabase.from("vision_contenu").delete().eq("id", K.id);
+      if (E2) throw E2;
+      sct((p) => p.filter((x) => x.id !== K.id));
+    });
+    return K;
+  }
+  async function ctSupprimer(id, msg) {
+    const avant = ctRef.current.find((x) => x.id === id);
+    const { error: E } = await supabase.from("vision_contenu").delete().eq("id", id);
+    if (E) throw E;
+    sct((p) => p.filter((x) => x.id !== id));
+    avant &&
+      notifier(msg || "Supprimé", async () => {
+        const { data: K, error: E2 } = await supabase
+          .from("vision_contenu")
+          .insert({ ...avant })
+          .select()
+          .single();
+        if (E2) throw E2;
+        sct((p) => [...p, K]);
+      });
+  }
+  // Échéances d'adhésion / enveloppe (vision_items) depuis les écrans.
+  async function itemMaj(id, patch) {
+    const avant = vi.find((x) => x.id === id);
+    const ecrire = async (p2) => {
+      const { data: K, error: E } = await supabase
+        .from("vision_items")
+        .update(p2)
+        .eq("id", id)
+        .select()
+        .single();
+      if (E) throw E;
+      mi((p) => p.map((x) => (x.id === id ? K : x)));
+    };
+    await ecrire(patch);
+    avant &&
+      notifier("Enregistré", () =>
+        ecrire(Object.fromEntries(Object.keys(patch).map((k) => [k, avant[k] ?? null]))),
+      );
+  }
   async function ctDel(id) {
     if (!window.confirm("Supprimer cette ligne ?")) return;
     sct((p) => p.filter((x) => x.id !== id)), await supabase.from("vision_contenu").delete().eq("id", id);
@@ -662,6 +772,7 @@ export function App() {
     epAutoRef.current = !0;
     (async () => {
       const auj = new Date(),
+        EP_AUTO_JOUR = jourEpargneAuto(c),
         dernier = moisDepuisAncre(auj) - (auj.getDate() >= EP_AUTO_JOUR ? 0 : 1);
       if (dernier < EP_AUTO_DEBUT) return;
       const { data: deja, error: E0 } = await supabase
@@ -704,6 +815,56 @@ export function App() {
       stx((p) => [...(K || []), ...p]), await relireSpend();
     })();
   }, [t, l, bm, c, txOk]);
+  // L'historique est relu à chaque ouverture de l'onglet : il montre aussi ce qui vient d'être fait.
+  React.useEffect(() => {
+    if (s !== "historique" || MODE_PARTAGE || !t) return;
+    supabase
+      .from("vision_audit")
+      .select("*")
+      .order("changed_at", { ascending: !1 })
+      .limit(400)
+      .then(({ data: K }) => K && saud(K));
+  }, [s, t]);
+  // Dépenses récurrentes : celles du mois en cours sont créées une fois (« à venir »
+  // tant que leur date n'est pas passée), puis passent à « faite » le jour venu.
+  React.useEffect(() => {
+    if (MODE_PARTAGE || !t || !l || !txOk || !recOk || !c.length || recRef.current) return;
+    recRef.current = !0;
+    (async () => {
+      const auj = new Date(),
+        M = moisNow(),
+        isoAuj = isoAujourdhui();
+      const { data: deja, error: E0 } = await supabase
+        .from("vision_transactions")
+        .select("recurrente_id, mois_index")
+        .not("recurrente_id", "is", null)
+        .eq("mois_index", M);
+      if (E0) return console.warn("récurrentes :", E0.message);
+      const nouveaux = recurrentesACreer(recurrentes, deja, c, M, auj, t.user.id);
+      if (nouveaux.length) {
+        const { data: K, error: E } = await supabase.from("vision_transactions").insert(nouveaux).select();
+        if (E) return console.warn("récurrentes :", E.message);
+        stx((p) => [...(K || []), ...p]);
+      }
+      const passees = tx.filter(
+        (x) =>
+          x.statut === "prevu" &&
+          x.recurrente_id &&
+          x.date_depense <= isoAuj &&
+          !cl.some((k) => k.mois_index === num(x.mois_index)),
+      );
+      for (const x of passees) {
+        const { data: K } = await supabase
+          .from("vision_transactions")
+          .update({ statut: "fait" })
+          .eq("id", x.id)
+          .select()
+          .single();
+        K && stx((p) => p.map((y) => (y.id === K.id ? K : y)));
+      }
+      await relireSpend();
+    })();
+  }, [t, l, txOk, recOk, c, recurrentes]);
   // Dépassement du salaire sur le mois en cours : une tâche « Revoir le budget »
   // apparaît dans la ligne Budget de l'Accueil (une seule par mois).
   React.useEffect(() => {
@@ -956,10 +1117,21 @@ export function App() {
         const { data: K } = await supabase
           .from("vision_import_regles")
           .upsert(
-            plan.regles.map((r) => ({ user_id: uid, motif: r.motif, poste: r.poste })),
+            plan.regles.map((r) => {
+              const g = ["ignorer", "salaire", "vacances", "sport"].includes(r.poste) ? r.poste : null,
+                ligne = g ? null : (l || []).find((b) => b.poste === r.poste && b.archive_depuis == null);
+              return {
+                user_id: uid,
+                motif: r.motif,
+                poste: r.poste,
+                groupe: g,
+                budget_line_id: ligne ? ligne.id : null,
+                source: "appris",
+              };
+            }),
             { onConflict: "user_id,motif" },
           )
-          .select("motif, poste");
+          .select("*");
         K && setReglesImport((A) => [...A.filter((x) => !K.some((k) => k.motif === x.motif)), ...K]);
       }
     } catch (e) {
@@ -1082,6 +1254,8 @@ export function App() {
     return Math.max(0, Math.min(MOIS.length - 1, moisDepuisAncre(dt)));
   }
   async function txAdd(ligne) {
+    if (clotRef.current.some((x) => x.mois_index === moisDeDate(ligne.date_depense)))
+      throw new Error("Mois clôturé : rouvre-le pour y ajouter une dépense.");
     const { data: u2 } = await supabase.auth.getUser(),
       uid = u2 && u2.user ? u2.user.id : null,
       payload = {
@@ -1092,6 +1266,9 @@ export function App() {
         date_depense: ligne.date_depense,
         type: ligne.type === "remboursement" ? "remboursement" : "depense",
         mois_index: moisDeDate(ligne.date_depense),
+        statut: ligne.statut === "prevu" ? "prevu" : "fait",
+        exceptionnelle: !!ligne.exceptionnelle,
+        recurrente_id: ligne.recurrente_id || null,
       },
       { data: K, error: E } = await supabase.from("vision_transactions").insert(payload).select().single();
     if (E) throw E;
@@ -1121,6 +1298,57 @@ export function App() {
     const { error: E } = await supabase.from("vision_transactions").delete().eq("id", id);
     if (E) throw E;
     stx((p) => p.filter((x) => x.id !== id)), await relireSpend();
+  }
+  // Remettre une dépense supprimée (bouton « Annuler ») : même identifiant, mêmes champs.
+  async function txRemettre(ligne) {
+    const { data: K, error: E } = await supabase
+      .from("vision_transactions")
+      .insert({ ...ligne })
+      .select()
+      .single();
+    if (E) throw E;
+    stx((p) => [K, ...p.filter((x) => x.id !== K.id)]), await relireSpend();
+    return K;
+  }
+  // Supprimer une dépense depuis les écrans : une instance de récurrente supprimée
+  // n'est pas recréée ce mois-ci (comme l'épargne automatique « pas versée »).
+  async function txSupprimerUI(id, silencieux) {
+    const avant = tx.find((x) => x.id === id);
+    if (avant && avant.recurrente_id) {
+      const cle = "rec_off_" + avant.recurrente_id + "_" + num(avant.mois_index);
+      b(cle, 1), await w(cle, 1);
+    }
+    await txDelete(id);
+    if (!silencieux && avant)
+      notifier("Dépense supprimée", async () => {
+        if (avant.recurrente_id) {
+          const cle = "rec_off_" + avant.recurrente_id + "_" + num(avant.mois_index);
+          b(cle, 0), await w(cle, 0);
+        }
+        await txRemettre(avant);
+      });
+  }
+  async function txModifierUI(id, patch) {
+    const avant = tx.find((x) => x.id === id),
+      K = await txUpdate(id, patch);
+    avant &&
+      notifier("Enregistré", async () => {
+        const retour = {};
+        Object.keys(patch).forEach((k) => (retour[k] = avant[k]));
+        await txUpdate(id, retour);
+      });
+    return K;
+  }
+  async function txAjouterUI(ligne) {
+    const K = await txAdd(ligne);
+    notifier("Dépense ajoutée", () => txDelete(K.id));
+    return K;
+  }
+  function notifier(msg, annuler) {
+    setToast({ msg, annuler, n: Date.now() });
+  }
+  function signalerErreur(e) {
+    setToast({ msg: messageErreur(e), erreur: !0, n: Date.now() });
   }
   async function saveSpend(lineId, moisIdx, montant, note) {
     const payload = {
@@ -1182,9 +1410,67 @@ export function App() {
           .catch(() => window.prompt("Lien de partage :", N))
       : window.prompt("Lien de partage :", N);
   }
+  const notifs = MODE_PARTAGE
+    ? null
+    : {
+        ...(etatNotifs || { etat: "", message: "" }),
+        activer:
+          etatNotifs && etatNotifs.etat === "a-activer"
+            ? async () => {
+                try {
+                  await activerNotifications(t.user.id);
+                  setEtatNotifs({ etat: "actives", message: "" }),
+                    notifier("Rappels activés sur ce téléphone");
+                } catch (e) {
+                  signalerErreur(e), etatNotifications().then(setEtatNotifs);
+                }
+              }
+            : null,
+      };
+  const actions = creerActions({
+    uid: () => (t ? t.user.id : null),
+    notifier,
+    txModifier: txUpdate,
+    txAjouter: txAdd,
+    txSupprimer: txSupprimerUI,
+    txRemettre,
+    get: {
+      budget: () => l,
+      bm: () => bm,
+      tx: () => tx,
+      params: () => c,
+      clotures: () => cl,
+      recurrentes: () => recurrentes,
+      seances: () => seances,
+      regles: () => reglesImport,
+    },
+    set: {
+      budget: u,
+      bm: sbm,
+      params: d,
+      recurrentes: setRecurrentes,
+      seances: setSeances,
+      regles: setReglesImport,
+    },
+  });
+  // Une action déclenchée depuis un écran : erreur affichée, jamais avalée.
+  const agir =
+    (fn) =>
+    async (...args) => {
+      if (MODE_PARTAGE) return;
+      try {
+        return await fn(...args);
+      } catch (e) {
+        signalerErreur(e);
+        throw e;
+      }
+    };
   if (!supabaseConfigured) return <div className="warn">Configuration Supabase manquante.</div>;
   if (!r) return null;
   if (!MODE_PARTAGE && !t) return <Connexion />;
+  set_VISION_BUDGET(l, bm);
+  set_ICONES(l);
+  set_ALERTE_SEUIL(param(c, "alerte_seuil", 50));
   set_VISION_DEFICITS(l ? deficitsParMois(l, bm, tx, MOIS.length) : []);
   const Ge = {
       budget: l,
@@ -1320,16 +1606,15 @@ export function App() {
           />
         )}
         {s === "suivi" && (
-          <Suivi
-            progress={o}
-            toggle={x}
-            readOnly={MODE_PARTAGE}
+          <SuiviPage
             rows={ct}
-            edit={ctEdit}
-            save={ctSave}
-            add={ctAdd}
-            del={ctDel}
-            move={ctMove}
+            progress={o}
+            readOnly={MODE_PARTAGE}
+            onToggle={x}
+            onCtMaj={agir(ctMaj)}
+            onCtCreer={agir(ctCreer)}
+            onCtSupprimer={agir(ctSupprimer)}
+            onMove={agir(ctMove)}
           />
         )}
         {s === "budget" && <Formations items={vi} />}
@@ -1352,14 +1637,24 @@ export function App() {
                 onAddVacances={MODE_PARTAGE ? rienFaire : vacAdd}
                 onSaveVacances={MODE_PARTAGE ? rienFaire : vacSave}
                 onDelVacances={MODE_PARTAGE ? rienFaire : vacDel}
-                onAddTx={MODE_PARTAGE ? rienFaire : txAdd}
-                onUpdateTx={MODE_PARTAGE ? rienFaire : txUpdate}
+                onAddTx={MODE_PARTAGE ? rienFaire : agir(txAjouterUI)}
+                onUpdateTx={MODE_PARTAGE ? rienFaire : agir(txModifierUI)}
                 onAddFormation={MODE_PARTAGE ? rienFaire : formAdd}
                 onPatchItem={MODE_PARTAGE ? rienFaire : vacSave}
                 onPasVerse={MODE_PARTAGE ? rienFaire : epargnePasVersee}
                 onCloturer={MODE_PARTAGE ? rienFaire : clotureFixer}
                 onRouvrir={MODE_PARTAGE ? rienFaire : clotureRouvrir}
                 onImport={MODE_PARTAGE ? null : () => setImportOuvert(true)}
+                actions={
+                  MODE_PARTAGE
+                    ? null
+                    : {
+                        conflits: actions.conflits,
+                        posteModifier: agir(actions.posteModifier),
+                        posteAjouter: agir(actions.posteAjouter),
+                        posteArchiver: agir(actions.posteArchiver),
+                      }
+                }
               />
               <details
                 className="collapsible"
@@ -1378,7 +1673,39 @@ export function App() {
           )}
         {s === "stats" &&
           gt(<Graphiques budget={l} params={c} items={vi} budgetMois={bm} transactions={tx} />)}
-        {s === "sport" && <Sport rows={ct} />}
+        {s === "sport" && (
+          <SportPage
+            rows={ct}
+            items={vi}
+            seances={seances}
+            readOnly={MODE_PARTAGE}
+            ferme={actions.ferme}
+            onCtMaj={agir(ctMaj)}
+            onCtCreer={agir(ctCreer)}
+            onCtSupprimer={agir(ctSupprimer)}
+            onItemMaj={agir(itemMaj)}
+            onSeance={agir(actions.seanceBasculer)}
+          />
+        )}
+        {s === "reglages" &&
+          gt(
+            <Reglages
+              params={c}
+              budget={l}
+              budgetMois={bm}
+              recurrentes={recurrentes}
+              regles={reglesImport}
+              readOnly={MODE_PARTAGE}
+              notifs={notifs}
+              actions={{
+                reglage: agir(actions.reglage),
+                recurrenteEnregistrer: agir(actions.recurrenteEnregistrer),
+                recurrenteArreter: agir(actions.recurrenteArreter),
+                regleAjouter: agir(actions.regleAjouter),
+                regleSupprimer: agir(actions.regleSupprimer),
+              }}
+            />,
+          )}
         {s === "pieces" && (
           <PiecesPage
             rows={ct}
@@ -1429,7 +1756,10 @@ export function App() {
           transactions={tx}
           items={vi}
           imports={imports}
-          regles={reglesImport}
+          regles={reglesImport.map((r) => ({
+            ...r,
+            poste: r.groupe || ((l || []).find((b) => b.id === r.budget_line_id) || {}).poste || r.poste,
+          }))}
           onEnregistrer={importEnregistrer}
           onAnnuler={importAnnuler}
           onClose={() => setImportOuvert(false)}
@@ -1440,15 +1770,16 @@ export function App() {
           budget={l}
           budgetMois={bm}
           transactions={tx}
-          onAdd={txAdd}
-          onUpdate={txUpdate}
-          onDelete={txDelete}
+          onAdd={txAjouterUI}
+          onUpdate={txModifierUI}
+          onDelete={(id) => txSupprimerUI(id)}
           initial={txEdit}
           onClose={() => {
             setSaisieOuverte(!1), setTxEdit(null);
           }}
         />
       )}
+      <ToastAnnuler toast={toast} onFermer={() => setToast(null)} />
       <NavBas
         onglets={ONGLETS}
         actif={s}

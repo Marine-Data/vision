@@ -1,5 +1,5 @@
 import React from "react";
-import { budgetDuMois, ligneBudgetId } from "../../lib/calculs.js";
+import { budgetDuMois, ligneBudgetId, montantSigne } from "../../lib/calculs.js";
 import { num } from "../../lib/format.js";
 import { MOIS, moisNow } from "../../lib/mois.js";
 import { CarteGraph, Legende, euros0, euros2 } from "./communs.jsx";
@@ -17,7 +17,7 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
     reelDe = (id) =>
       txm
         .filter((x) => x.budget_line_id === id)
-        .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+        .reduce((s, x) => s + montantSigne(x), 0),
     lignes = budgetDuMois(budgetMois, budget, m)
       .filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport")
       .map((w) => ({ poste: w.poste, b: num(w.montant), r: reelDe(ligneBudgetId(w)) }))

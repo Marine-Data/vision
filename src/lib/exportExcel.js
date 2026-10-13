@@ -1,4 +1,11 @@
-import { budgetDuMois, itemCompte, ligneBudgetId, pocketCalc } from "./calculs.js";
+import {
+  budgetDuMois,
+  itemCompte,
+  ligneBudgetId,
+  montantSigne,
+  pocketCalc,
+  tauxVacances,
+} from "./calculs.js";
 import { num, param, paramOuDefaut } from "./format.js";
 import { MOIS, anneeMoisDe, moisNow } from "./mois.js";
 
@@ -23,15 +30,13 @@ function donneesExport(budget, bmRows, tx, items, params, jusqua) {
       return c != null ? c : w.kind === "charge" ? "courantes" : w.kind === "epargne" ? "epargne" : null;
     },
     estVacances = (w) => /vacances/i.test(w.poste || "") || /vacances/i.test(w.line_key || ""),
-    vac0 = pocketCalc(items, "vacances", paramOuDefaut(params, "provision_vacances_mensuelle"), 1),
+    vac0 = pocketCalc(items, "vacances", tauxVacances(params), 1),
     mois = [];
   for (let m = 1; m <= jusqua; m++) {
     const lignes = budgetDuMois(bmRows, budget, m),
       txi = (tx || []).filter((x) => num(x.mois_index) === m),
       reel = (ids) =>
-        txi
-          .filter((x) => ids.includes(x.budget_line_id))
-          .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+        txi.filter((x) => ids.includes(x.budget_line_id)).reduce((s, x) => s + montantSigne(x), 0),
       courantes = {},
       ep = lignes.filter((w) => catDe(w) === "epargne" || w.kind === "epargne"),
       epHors = ep.filter((w) => !estVacances(w)),
@@ -45,7 +50,7 @@ function donneesExport(budget, bmRows, tx, items, params, jusqua) {
     lignes
       .filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport")
       .forEach((w) => {
-        const k = w.poste || "?",
+        const k = w.poste || "?", // nom actuel du poste (budgetDuMois), donc un renommage garde une seule ligne
           c =
             courantes[k] ||
             (courantes[k] = {

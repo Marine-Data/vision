@@ -30,7 +30,60 @@ export function statutLibelle(s) {
   return t ? t[1] : s;
 }
 
+// ---------------------------------------------------------------
+// Source unique : le budget de chaque mois (vision_budget_mois, sinon le
+// modèle). L'app le déclare une fois par rendu ; tous les calculs le lisent.
+// ---------------------------------------------------------------
+let VISION_BUDGET = { modele: null, bmRows: null };
+export function set_VISION_BUDGET(modele, bmRows) {
+  VISION_BUDGET = { modele, bmRows };
+}
+
+// Montant d'une dépense : un remboursement vient en déduction.
+export const montantSigne = (x) => (x && x.type === "remboursement" ? -num(x.montant) : num(x && x.montant));
+
+// Total des dépenses d'un mois, pour une liste de postes (ou tous). LE calcul du dépensé.
+export function depenseDuMois(tx, m, ids) {
+  const garde = ids ? new Set(ids) : null;
+  return (tx || [])
+    .filter((x) => num(x.mois_index) === m && (!garde || garde.has(x.budget_line_id)))
+    .reduce((s, x) => s + montantSigne(x), 0);
+}
+
+// Catégorie d'une ligne : courantes, épargne (ou revenu → null).
+export function categorieDe(modele, w) {
+  const m = (modele || []).find((b) => b.id === ligneBudgetId(w)),
+    c = m ? m.categorie : null;
+  return c != null ? c : w.kind === "charge" ? "courantes" : w.kind === "epargne" ? "epargne" : null;
+}
+
+// Montant budgété d'une ligne (par sa clé) au mois i, lu dans le budget du mois.
+function montantLigne(i, filtre) {
+  const { modele, bmRows } = VISION_BUDGET;
+  if (!modele) return null;
+  const l = budgetDuMois(bmRows, modele, i).filter(filtre);
+  return l.length ? l.reduce((s, w) => s + num(w.montant), 0) : null;
+}
+const estVacancesLigne = (w) => w.line_key === "e_vacances";
+
+// Provision vacances du mois i : la ligne « Provision vacances » du budget de ce mois.
+export function tauxVacances(params) {
+  return (i) => {
+    const v = montantLigne(i, estVacancesLigne);
+    return v != null ? v : paramOuDefaut(params, "provision_vacances_mensuelle");
+  };
+}
+
+// Épargne vers les livrets au mois i : les lignes d'épargne du budget, hors vacances.
+export function tauxLivrets(params) {
+  return (i) => {
+    const v = montantLigne(i, (w) => w.kind === "epargne" && !estVacancesLigne(w));
+    return v != null ? v : paramOuDefaut(params, "epargne_mensuelle");
+  };
+}
+
 export function pocketCalc(items, pocket, monthlyRate, r = MOIS.length, totalMode) {
+  const taux = typeof monthlyRate === "function" ? monthlyRate : () => monthlyRate;
   const list = (items || []).filter((x) => x.pocket === pocket && itemCompte(x));
   const prevu = [],
     reel = [],
@@ -41,11 +94,11 @@ export function pocketCalc(items, pocket, monthlyRate, r = MOIS.length, totalMod
   for (let i = 0; i < r; i++) {
     for (const it of list)
       if (num(it.mois_index) === i) {
-        if (monthlyRate === 0 && !totalMode) pc += num(it.montant_prevu);
+        if (taux(i) === 0 && !totalMode) pc += num(it.montant_prevu);
         if (it.paid) rc += it.montant_reel != null ? num(it.montant_reel) : num(it.montant_prevu);
       }
     pocket === "vacances" && (rc -= num(VISION_DEFICITS[i]));
-    pc += monthlyRate;
+    pc += taux(i);
     prevu.push(totalMode ? totalPrevu : pc), reel.push(rc), solde.push((totalMode ? totalPrevu : pc) - rc);
   }
   return {
@@ -72,10 +125,7 @@ export function deficitsParMois(modele, bmRows, tx, n = MOIS.length) {
     const lignes = budgetDuMois(bmRows, modele, i),
       idsDe = (k) => lignes.filter((w) => w.kind === k).map(ligneBudgetId),
       txi = (tx || []).filter((x) => num(x.mois_index) === i),
-      somme = (ids) =>
-        txi
-          .filter((x) => ids.includes(x.budget_line_id))
-          .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+      somme = (ids) => depenseDuMois(txi, i, ids),
       idsRev = idsDe("revenu"),
       aSalaire = txi.some((x) => idsRev.includes(x.budget_line_id));
     out.push(aSalaire ? Math.min(0, somme(idsRev) - somme(idsDe("charge")) - somme(idsDe("epargne"))) : 0);
@@ -85,15 +135,15 @@ export function deficitsParMois(modele, bmRows, tx, n = MOIS.length) {
 
 export function planEpargne(items, e, r = MOIS.length) {
   // Calcule le solde des livrets PRÉVU mois par mois (avant déduction des provisions)
-  // Formule : plan_baseline + (epargne_mensuelle × mois) - items épargne prévus
+  // Formule : plan_baseline + (épargne livrets du budget de chaque mois) - items épargne prévus
   const base = paramOuDefaut(e, "plan_baseline"),
-    s = paramOuDefaut(e, "epargne_mensuelle"),
+    taux = tauxLivrets(e),
     du = (items || []).filter((x) => x.pocket === "epargne" && itemCompte(x));
   const a = [];
   let cur = base,
     cost = 0;
   for (let i = 0; i < r; i++) {
-    if (i > 0) cur += s;
+    if (i > 0) cur += taux(i);
     for (const it of du) if (num(it.mois_index) === i) cost += num(it.montant_prevu);
     a.push(cur - cost);
   }
@@ -168,36 +218,44 @@ export // Budget applicable à un mois. Lit d'abord vision_budget_mois ; à déf
 // ici : l'initialisation se fait au démarrage, donc pas de course entre onglets.
 function budgetDuMois(bmRows, modele, moisIndex) {
   const { annee, mois } = anneeMoisDe(moisIndex),
+    archive = new Map(
+      (modele || []).filter((b) => b.archive_depuis != null).map((b) => [b.id, num(b.archive_depuis)]),
+    ),
+    visible = (w) => !archive.has(ligneBudgetId(w)) || moisIndex < archive.get(ligneBudgetId(w)),
+    // Le nom affiché est toujours le nom actuel du poste (un renommage vaut pour tous les mois).
+    noms = new Map((modele || []).map((b) => [b.id, b.poste])),
     lignes = (bmRows || []).filter((x) => x.annee === annee && x.mois === mois);
-  return lignes.length
-    ? [...lignes]
-        .sort((a, b) => (a.sort || 0) - (b.sort || 0))
-        .map((x) => ({
-          id: x.id,
-          line_key: x.line_key,
-          kind: x.kind,
-          poste: x.poste,
-          detail: x.detail,
-          montant: x.montant,
-          sort: x.sort,
-          type: x.type,
-          budget_line_id: x.budget_line_id,
-          est_override: x.est_override,
-          source: "mois",
+  return (
+    lignes.length
+      ? [...lignes]
+          .sort((a, b) => (a.sort || 0) - (b.sort || 0))
+          .map((x) => ({
+            id: x.id,
+            line_key: x.line_key,
+            kind: x.kind,
+            poste: (x.budget_line_id && noms.get(x.budget_line_id)) || x.poste,
+            detail: x.detail,
+            montant: x.montant,
+            sort: x.sort,
+            type: x.type,
+            budget_line_id: x.budget_line_id,
+            est_override: x.est_override,
+            source: "mois",
+          }))
+      : (modele || []).map((b) => ({
+          id: b.id,
+          line_key: b.line_key,
+          kind: b.kind,
+          poste: b.poste,
+          detail: b.detail,
+          montant: b.montant,
+          sort: b.sort,
+          type: b.type,
+          budget_line_id: b.id,
+          est_override: !1,
+          source: "modele",
         }))
-    : (modele || []).map((b) => ({
-        id: b.id,
-        line_key: b.line_key,
-        kind: b.kind,
-        poste: b.poste,
-        detail: b.detail,
-        montant: b.montant,
-        sort: b.sort,
-        type: b.type,
-        budget_line_id: b.id,
-        est_override: !1,
-        source: "modele",
-      }));
+  ).filter(visible);
 }
 
 // Identifiant de rattachement aux dépenses : toujours celui du modèle.
@@ -261,10 +319,76 @@ export function formationCalc(items, params, n = MOIS.length) {
 export function pocheCalcDe(p, items, params, n) {
   if (p.regime === "postes_dates" && p.param_key && param(params, p.param_key, 0) > 0)
     return enveloppeCalc(items, p.cle, param(params, p.param_key, 0), n);
-  const taux = p.regime === "provision_mensuelle" && p.param_key ? paramOuDefaut(params, p.param_key) : 0;
+  const taux =
+    p.regime !== "provision_mensuelle" || !p.param_key
+      ? 0
+      : p.param_key === "provision_vacances_mensuelle"
+        ? tauxVacances(params)
+        : paramOuDefaut(params, p.param_key);
   return pocketCalc(items, p.cle, taux, n, p.regime === "postes_dates");
 }
 
 export function set_VISION_DEFICITS(v) {
   VISION_DEFICITS = v;
+}
+
+// ---------------------------------------------------------------
+// Projection de fin de mois (mois en cours) :
+//   reste aujourd'hui = salaire − épargne programmée − dépenses courantes déjà faites
+//   − prélèvements prévus (dépenses « à venir »)
+//   − rythme des dépenses courantes (hors récurrentes et exceptionnelles) × jours restants
+// ---------------------------------------------------------------
+export function projectionMois(modele, bmRows, tx, m, aujourdhui) {
+  const lignes = budgetDuMois(bmRows, modele, m),
+    ids = (k) =>
+      new Set(
+        lignes
+          .filter((w) => categorieDe(modele, w) === k || (k === "revenu" && w.kind === "revenu"))
+          .map(ligneBudgetId),
+      ),
+    idsC = new Set(
+      lignes
+        .filter((w) => categorieDe(modele, w) === "courantes" && w.line_key !== "c_sport")
+        .map(ligneBudgetId),
+    ),
+    idsE = ids("epargne"),
+    idsR = new Set(lignes.filter((w) => w.kind === "revenu").map(ligneBudgetId)),
+    txm = (tx || []).filter((x) => num(x.mois_index) === m),
+    iso =
+      aujourdhui.getFullYear() +
+      "-" +
+      String(aujourdhui.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(aujourdhui.getDate()).padStart(2, "0"),
+    aVenir = (x) => x.statut === "prevu" || (x.date_depense || "") > iso,
+    courantes = txm.filter((x) => idsC.has(x.budget_line_id)),
+    faites = courantes.filter((x) => !aVenir(x)),
+    prevues = courantes.filter(aVenir),
+    variables = faites.filter((x) => !x.recurrente_id && !x.exceptionnelle),
+    salaireReel = txm.some((x) => idsR.has(x.budget_line_id)) ? depenseDuMois(txm, m, [...idsR]) : null,
+    salaire =
+      salaireReel != null
+        ? salaireReel
+        : lignes.filter((w) => w.kind === "revenu").reduce((s, w) => s + num(w.montant), 0),
+    epargne = lignes.filter((w) => idsE.has(ligneBudgetId(w))).reduce((s, w) => s + num(w.montant), 0),
+    somme = (l) => l.reduce((s, x) => s + montantSigne(x), 0),
+    { annee, mois } = anneeMoisDe(m),
+    joursMois = new Date(annee, mois + 1, 0).getDate(),
+    ecoules = Math.min(joursMois, aujourdhui.getDate()),
+    restants = joursMois - ecoules,
+    parJour = ecoules ? somme(variables) / ecoules : 0,
+    resteAujourdhui = salaire - epargne - somme(faites),
+    prevu = somme(prevues),
+    rythme = parJour * restants;
+  return {
+    salaire,
+    epargne,
+    faites: somme(faites),
+    resteAujourdhui,
+    prevu,
+    parJour,
+    joursRestants: restants,
+    rythme,
+    finDeMois: resteAujourdhui - prevu - rythme,
+  };
 }

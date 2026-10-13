@@ -1,22 +1,27 @@
 import React from "react";
 import { AlerteSalaire } from "./AlerteSalaire.jsx";
 import { BudgetMoisEditor } from "./BudgetMoisEditor.jsx";
+import { BudgetCartes } from "./budget/BudgetCartes.jsx";
 import { alerteSalaire } from "../lib/alerteSalaire.js";
 import {
   VISION_DEFICITS,
   budgetDuMois,
   calcsDesPoches,
   formationCalc,
+  getCible,
   itemCompte,
   ligneBudgetId,
+  montantSigne,
+  tauxVacances,
   planDisponible,
   planEpargne,
   pocheAffichee,
   pocketCalc,
+  projectionMois,
   reelDisponible,
   seuilPoche,
 } from "../lib/calculs.js";
-import { EP_AUTO_NOTE } from "../lib/epargneAuto.js";
+import { EP_AUTO_NOTE, jourEpargneAuto } from "../lib/epargneAuto.js";
 import { exporterBudgetExcel } from "../lib/exportExcel.js";
 import { catIcone, euros, hwkFmt, num, param, paramOuDefaut, relevesLivrets } from "../lib/format.js";
 import { anneeMoisDe, isoAujourdhui, moisNow } from "../lib/mois.js";
@@ -46,6 +51,7 @@ export function BudgetMensuel({
   onCloturer,
   onRouvrir,
   onImport,
+  actions,
 }) {
   const [exportEtat, setExportEtat] = React.useState(""),
     [clotEtape, setClotEtape] = React.useState(""),
@@ -90,8 +96,7 @@ export function BudgetMensuel({
       txMois
         .filter((x) => x.budget_line_id === id)
         .sort((a, b) => (b.date_depense || "").localeCompare(a.date_depense || "")),
-    reelDe = (id) =>
-      txDe(id).reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+    reelDe = (id) => txDe(id).reduce((s, x) => s + montantSigne(x), 0),
     rembOk = (w) => /santé|sante|transport/i.test((w && w.poste) || ""),
     avecReel = (l) =>
       l.map((w) => ({
@@ -99,10 +104,13 @@ export function BudgetMensuel({
         lid: ligneBudgetId(w),
         b: num(w.montant),
         r: reelDe(ligneBudgetId(w)),
+        prevu: txDe(ligneBudgetId(w))
+          .filter((x) => x.statut === "prevu")
+          .reduce((s, x) => s + montantSigne(x), 0),
       })),
-    courantes = avecReel(lignes.filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport"))
-      .filter((w) => w.b !== 0 || w.r !== 0)
-      .sort((a, b) => (a.poste || "").localeCompare(b.poste || "", "fr")),
+    courantes = avecReel(lignes.filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport")).sort(
+      (a, b) => (a.poste || "").localeCompare(b.poste || "", "fr"),
+    ),
     epargne = avecReel(lignes.filter((w) => catDe(w) === "epargne")),
     somme = (l, k) => l.reduce((s, w) => s + w[k], 0),
     totC = {
@@ -125,7 +133,7 @@ export function BudgetMensuel({
     reste = salaire - sorties.b,
     pocheVac = (poches || []).find((p) => p.cle === "vacances"),
     vacActive = pocheVac ? pocheAffichee(pocheVac) : !0,
-    vacCalc = pocketCalc(items, "vacances", paramOuDefaut(params, "provision_vacances_mensuelle"), n),
+    vacCalc = pocketCalc(items, "vacances", tauxVacances(params), n),
     vacSolde = vacCalc.solde[moisSel],
     vacPrec = moisSel > 0 ? vacCalc.solde[moisSel - 1] : null,
     vacPayes = (items || [])
@@ -149,7 +157,8 @@ export function BudgetMensuel({
     fAVenir = fItems
       .filter((x) => !x.paid && (x.statut || "actif") === "actif")
       .reduce((s, x) => s + fMt(x), 0),
-    fReste = fTotal - fPaye;
+    fReste = fTotal - fPaye,
+    moisDepartEpargne = moisSel > moisNow() ? moisSel : Math.min(n - 1, moisNow() + 1);
   async function enregistrerSalaire(brut) {
     if (String(brut).trim() === "") return;
     const v = nombre(brut);
@@ -418,54 +427,8 @@ export function BudgetMensuel({
         vacSolde={vacSolde}
         onAjuster={readOnly || ferme ? null : () => setAjusterOuvert(!0)}
       />
-      <div
-        className="sumrow"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2,1fr)",
-          gap: 8,
-          marginBottom: 16,
-        }}
-        role="group"
-        aria-label={"Résumé de " + mois[moisSel]}
-      >
-        {carte(
-          "Provision vacances",
-          euros(vacSolde),
-          vacSolde < seuilPoche(params) ? "low" : "",
-          vacPrec != null ? "Fin " + mois[moisSel - 1] + " : " + euros(vacPrec) : "Cumul de la poche",
-        )}
-        {carte("ÉPARGNE", euros(epDispo), "", "Départ fin août + épargne versée")}
-      </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          flexWrap: "wrap",
-        }}
-      >
-        <div
-          className="h3"
-          style={{
-            margin: 0,
-          }}
-        >
-          DÉPENSES COURANTES
-        </div>
-        {!readOnly && (
-          <button className="btn-outline btn-sm" onClick={() => setAjusterOuvert(!ajusterOuvert)}>
-            {ajusterOuvert ? "Fermer l'ajustement" : "Ajuster le budget de " + mois[moisSel]}
-          </button>
-        )}
-      </div>
       {!readOnly && ajusterOuvert && (
-        <div
-          style={{
-            marginTop: 10,
-          }}
-        >
+        <div style={{ marginTop: 10 }}>
           <BudgetMoisEditor
             moisIndex={moisSel}
             rows={budgetMois}
@@ -475,150 +438,41 @@ export function BudgetMensuel({
           />
         </div>
       )}
-      <div
-        className="card"
-        style={{
-          padding: 0,
-          overflowX: "auto",
-          marginTop: 10,
-        }}
-      >
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Poste</th>
-              <th style={thNum}>Budget</th>
-              <th style={thNum}>Réalisé</th>
-              <th style={thNum}>Écart</th>
-            </tr>
-          </thead>
-          <tbody>
-            {courantes.map((w) => (
-              <tr key={w.lid}>
-                {posteTd(w)}
-                <td className="num">{euros(w.b)}</td>
-                <td className="num">{euros(w.r)}</td>
-                {ecartTd(w.b - w.r)}
-              </tr>
-            ))}
-            <tr className="total">
-              <td>Total courantes</td>
-              <td className="num">{euros(totC.b)}</td>
-              <td className="num">{euros(totC.r)}</td>
-              {ecartTd(totC.b - totC.r)}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div
-        className="h3"
-        style={{
-          marginTop: 18,
-        }}
-      >
-        ÉPARGNE PROGRAMMÉE
-      </div>
-      <div
-        className="card"
-        style={{
-          padding: 0,
-          overflowX: "auto",
-        }}
-      >
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Poste</th>
-              <th style={thNum}>Budget</th>
-              <th style={thNum}>Réalisé</th>
-            </tr>
-          </thead>
-          <tbody>
-            {epargne.map((w) => (
-              <tr key={w.lid}>
-                {posteTd(w)}
-                <td className="num">{euros(w.b)}</td>
-                <td className="num">{euros(w.r)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div
-        className="h3"
-        style={{
-          marginTop: 18,
-        }}
-      >
-        SOLDE
-      </div>
-      <div
-        className="card"
-        style={{
-          padding: 0,
-          overflowX: "auto",
-        }}
-      >
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Poste</th>
-              <th style={thNum}>Budget</th>
-              <th style={thNum}>Réalisé</th>
-              <th style={thNum}>Écart</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="total">
-              <td>SOLDE</td>
-              <td className="num">{euros(sorties.b)}</td>
-              <td className="num">{euros(sorties.r)}</td>
-              <td />
-            </tr>
-            <tr>
-              <td
-                style={{
-                  fontWeight: 700,
-                }}
-              >
-                SALAIRE MENSUEL (net)
-              </td>
-              <td className="num">{euros(salaire)}</td>
-              <td className="num">
-                {readOnly ? (
-                  salaireReel == null ? (
-                    "—"
-                  ) : (
-                    euros(salaireReel)
-                  )
-                ) : (
-                  <input
-                    key={moisSel + "|" + (salaireReel == null ? "" : salaireReel)}
-                    className="bedit bnum"
-                    inputMode="decimal"
-                    placeholder="✏️ réel"
-                    aria-label={"Salaire réel de " + mois[moisSel]}
-                    defaultValue={salaireReel == null ? "" : String(salaireReel).replace(".", ",")}
-                    onBlur={(g) => enregistrerSalaire(g.target.value)}
-                    onKeyDown={(g) => {
-                      g.key === "Enter" && g.target.blur();
-                    }}
-                  />
-                )}
-              </td>
-              {salaireReel == null ? <td className="num">—</td> : ecartTd(salaireReel - sorties.r)}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div
-        className="detail"
-        style={{
-          marginTop: 6,
-        }}
-      >
-        SOLDE = dépenses courantes + épargne programmée. Écart salaire = salaire réel − SOLDE réalisé.
-      </div>
+      <BudgetCartes
+        moisSel={moisSel}
+        nomMois={(i) => (mois[i] || "").replace(/ \d\d$/, "")}
+        courantes={courantes}
+        epargne={epargne.map((w) => ({
+          ...w,
+          bDepart: num(
+            (
+              budgetDuMois(budgetMois, budget, moisDepartEpargne).find((x) => ligneBudgetId(x) === w.lid) ||
+              {}
+            ).montant,
+          ),
+        }))}
+        salaire={salaire}
+        salaireReel={salaireReel}
+        revenu={revenus.length ? { lid: ligneBudgetId(revenus[0]) } : null}
+        vacSolde={vacSolde}
+        epDispo={epDispo}
+        cible={getCible(params, budget)}
+        projection={
+          moisSel === moisNow() ? projectionMois(budget, budgetMois, transactions, moisSel, new Date()) : null
+        }
+        jourEpargne={jourEpargneAuto(params)}
+        moisDepartEpargne={moisDepartEpargne}
+        readOnly={readOnly}
+        ferme={ferme}
+        actions={actions || {}}
+        txDe={txDe}
+        onEditTx={onEditTx}
+        onNewTx={onNewTx}
+        dateDefaut={dateDefaut}
+        onPasVerse={onPasVerse}
+        onPayee={(x) => onUpdateTx(x.id, { statut: "fait" })}
+        onSalaireRecu={enregistrerSalaire}
+      />
       {vacActive && (
         <>
           <div

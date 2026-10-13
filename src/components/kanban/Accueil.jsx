@@ -33,7 +33,9 @@ import {
   ligneBudgetId,
   planDisponible,
   planEpargne,
+  montantSigne,
   pocketCalc,
+  tauxVacances,
 } from "../../lib/calculs.js";
 import { eurosCourt, num, paramOuDefaut } from "../../lib/format.js";
 import { MOIS, moisNow } from "../../lib/mois.js";
@@ -80,7 +82,7 @@ function Accueil({
     const calcs = calcsDesPoches(poches, items, params, n),
       epargne = planDisponible(planEpargne(items, params, n), calcs, M),
       cible = getCible(params, budget),
-      vac = pocketCalc(items, "vacances", paramOuDefaut(params, "provision_vacances_mensuelle"), n).solde[M],
+      vac = pocketCalc(items, "vacances", tauxVacances(params), n).solde[M],
       catDe = (w) => {
         const m = budget.find((b) => b.id === ligneBudgetId(w)),
           c = m ? m.categorie : null;
@@ -92,7 +94,7 @@ function Accueil({
       ids = lignes.map(ligneBudgetId),
       reel = (transactions || [])
         .filter((x) => num(x.mois_index) === M && ids.includes(x.budget_line_id))
-        .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+        .reduce((s, x) => s + montantSigne(x), 0),
       reste = lignes.reduce((s, w) => s + num(w.montant), 0) - reel,
       al = alerteSalaire(budget, budgetMois, transactions, M);
     kpis = [
