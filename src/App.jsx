@@ -1255,17 +1255,7 @@ export function App() {
             </>,
           )}
         {s === "stats" &&
-          gt(
-            <Graphiques
-              budget={l}
-              params={c}
-              voyages={p}
-              items={vi}
-              spend={sp}
-              budgetMois={bm}
-              poches={poches}
-            />,
-          )}
+          gt(<Graphiques budget={l} params={c} items={vi} budgetMois={bm} transactions={tx} />)}
         {s === "sport" && <Sport rows={ct} />}
         {s === "pieces" && (
           <PiecesPage
