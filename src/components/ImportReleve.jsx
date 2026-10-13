@@ -1,0 +1,732 @@
+import React from "react";
+import { budgetDuMois, itemCompte, ligneBudgetId } from "../lib/calculs.js";
+import { num } from "../lib/format.js";
+import { classer, dejaSaisie, lireFichierPdf, nomOperation, noteDesOperations } from "../lib/importReleve.js";
+import { anneeMoisDe, moisDepuisAncre } from "../lib/mois.js";
+import { KbSheet, KB_SR, accIcone, kbBouton } from "./kanban/communs.jsx";
+
+const SPECIAUX = {
+  salaire: { l: "Salaire", sous: "→ salaire réel du mois", c: "#0b6e53" },
+  vacances: { l: "Vacances", sous: "→ poche vacances", c: "#c2702f" },
+  sport: { l: "Sport", sous: "→ paiement de l'enveloppe", c: "#b03a6e" },
+  ignorer: { l: "Virements entre tes comptes", sous: "ignorés", c: "#8fa6ab" },
+};
+const COULEURS = [
+  "#0b7a5c",
+  "#3b5fc4",
+  "#b03a6e",
+  "#8a5a12",
+  "#5a4fa8",
+  "#086b78",
+  "#3d545c",
+  "#9a4515",
+  "#c2702f",
+  "#536b72",
+  "#0b6e53",
+];
+const MOIS_LONGS = [
+  "janvier",
+  "février",
+  "mars",
+  "avril",
+  "mai",
+  "juin",
+  "juillet",
+  "août",
+  "septembre",
+  "octobre",
+  "novembre",
+  "décembre",
+];
+const eur = (v) =>
+  (v < 0 ? "+" : "") +
+  new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v)) +
+  " €";
+const dateCourte = (iso) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+const ICONE_DOC = "M6.2 3.6h6.6l5 5v11.8a1 1 0 0 1-1 1H6.2a1 1 0 0 1-1-1V4.6a1 1 0 0 1 1-1zM12.8 3.6V8.6h5";
+
+// Écran d'import d'un relevé BoursoBank : aperçu complet, rien n'est enregistré
+// avant le bouton final, et chaque import peut être annulé en une fois.
+export function ImportReleve({
+  budget,
+  budgetMois,
+  transactions,
+  items,
+  imports,
+  regles,
+  onEnregistrer,
+  onAnnuler,
+  onClose,
+}) {
+  const [etat, setEtat] = React.useState(""),
+    [releve, setReleve] = React.useState(null),
+    [choix, setChoix] = React.useState({}),
+    [off, setOff] = React.useState({}),
+    [ouvert, setOuvert] = React.useState({}),
+    [edit, setEdit] = React.useState(null),
+    [fini, setFini] = React.useState(null),
+    [confAnnul, setConfAnnul] = React.useState(null),
+    [erreur, setErreur] = React.useState("");
+
+  async function lire(ev) {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if (!f) return;
+    setErreur(""), setEtat("lecture");
+    try {
+      const r = await lireFichierPdf(f);
+      if (!r.ops.length || !r.periode)
+        throw new Error("aucune opération trouvée : est-ce bien un relevé BoursoBank ?");
+      if (r.compte !== "courant")
+        throw new Error("c'est un relevé de livret. Seul le relevé du compte courant s'importe.");
+      setReleve(r), setChoix({}), setOff({}), setOuvert({}), setEdit(null), setEtat("");
+    } catch (e) {
+      setEtat(""), setErreur(e && e.message ? e.message : "lecture impossible");
+    }
+  }
+
+  async function annuler(imp) {
+    if (confAnnul !== imp.id) {
+      setConfAnnul(imp.id);
+      return;
+    }
+    try {
+      await onAnnuler(imp), setConfAnnul(null), fini && fini.id === imp.id && setFini(null);
+    } catch (e) {
+      setErreur("Annulation impossible : " + (e && e.message ? e.message : "connexion"));
+    }
+  }
+
+  // ---------- étape 1 : choisir le fichier ----------
+  if (!releve || fini) {
+    return (
+      <KbSheet label="Importer un relevé" onClose={onClose}>
+        {fini ? (
+          <div
+            style={{
+              background: "#e3f4ed",
+              borderRadius: 16,
+              padding: 14,
+              marginBottom: 16,
+              color: "#0b6e53",
+              fontWeight: 800,
+              fontSize: 15,
+            }}
+          >
+            ✓ {fini.n} opérations enregistrées
+          </div>
+        ) : (
+          <p style={{ margin: "0 0 14px", fontSize: 15 }}>
+            Choisis le relevé PDF de ton compte courant BoursoBank.
+          </p>
+        )}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            minHeight: 56,
+            borderRadius: 16,
+            border: "2px dashed #9ec9cf",
+            background: "#f3f8f9",
+            color: "var(--teal-dark)",
+            fontSize: 16,
+            fontWeight: 800,
+            cursor: "pointer",
+            marginBottom: 12,
+          }}
+        >
+          {accIcone(ICONE_DOC, 22, 2.2)}
+          {etat === "lecture"
+            ? "Lecture du relevé…"
+            : fini
+              ? "Importer un autre relevé"
+              : "Choisir le relevé PDF"}
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={lire}
+            disabled={etat === "lecture"}
+            style={KB_SR}
+          />
+        </label>
+        {erreur && (
+          <p role="alert" style={{ margin: "0 0 12px", color: "#b8432a", fontWeight: 700 }}>
+            {erreur}
+          </p>
+        )}
+        {(imports || []).length > 0 && (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ink-soft)", margin: "10px 0 6px" }}>
+              Imports précédents
+            </div>
+            {[...imports]
+              .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+              .map((imp) => (
+                <div
+                  key={imp.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 0",
+                    borderBottom: "1px solid var(--line)",
+                  }}
+                >
+                  <span style={{ flex: 1, fontSize: 14.5, fontWeight: 700 }}>
+                    {MOIS_LONGS[Number(imp.debut.slice(5, 7)) - 1]} {imp.debut.slice(0, 4)}
+                    <span className="detail" style={{ display: "block" }}>
+                      {imp.nb_operations} opérations
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-outline btn-sm"
+                    onClick={() => annuler(imp)}
+                    style={{
+                      minHeight: 44,
+                      color: "#b8432a",
+                      borderColor: confAnnul === imp.id ? "#b8432a" : "#f0d5ce",
+                    }}
+                  >
+                    {confAnnul === imp.id ? "Confirmer l'annulation" : "Annuler l'import"}
+                  </button>
+                </div>
+              ))}
+          </>
+        )}
+      </KbSheet>
+    );
+  }
+
+  // ---------- étape 2 : aperçu ----------
+  const m = moisDepuisAncre(new Date(releve.periode.debut + "T00:00:00")),
+    { mois: m0, annee } = anneeMoisDe(m),
+    catDe = (w) => {
+      const b = (budget || []).find((x) => x.id === ligneBudgetId(w)),
+        c = b ? b.categorie : null;
+      return c != null ? c : w.kind === "charge" ? "courantes" : null;
+    },
+    lignesMois = budgetDuMois(budgetMois, budget, m),
+    postes = lignesMois.filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport"),
+    lidDe = (p) => {
+      const w = postes.find((x) => x.poste === p);
+      return w ? ligneBudgetId(w) : null;
+    },
+    revenu = lignesMois.find((w) => w.kind === "revenu"),
+    txMois = (transactions || []).filter((x) => num(x.mois_index) === m),
+    dansApp = (lid) =>
+      txMois
+        .filter((x) => x.budget_line_id === lid)
+        .reduce((s, x) => s + (x.type === "remboursement" ? -num(x.montant) : num(x.montant)), 0),
+    sportAPayer = (items || []).filter(
+      (x) => (x.pocket === "sport" || x.pocket === "formation") && !x.paid && itemCompte(x),
+    ),
+    dejaImporte = (imports || []).find((i) => i.compte === releve.compte && i.debut === releve.periode.debut),
+    ops = releve.ops.map((o, i) => {
+      let g = choix[i] !== undefined ? choix[i] : classer(o, regles);
+      if (g && !SPECIAUX[g] && !lidDe(g)) g = null;
+      const signe = o.sens === "debit" ? o.montant : -o.montant;
+      let note = null,
+        actifDefaut = !!g && g !== "ignorer",
+        sport = null;
+      if (g === "salaire") {
+        actifDefaut = o.sens === "credit" && /salaire/i.test(o.detail.join(" "));
+        if (!actifDefaut) note = "pas le salaire du mois : décoché";
+      }
+      if (g === "sport") {
+        sport = sportAPayer.find((x) => Math.abs(num(x.montant_prevu) - o.montant) < 0.01);
+        if (sport) note = "→ « " + sport.label + " » payé";
+        else (actifDefaut = false), (note = "aucune échéance de ce montant");
+      }
+      const doublon = g && g !== "ignorer" ? dejaSaisie(o, transactions) : null;
+      return {
+        ...o,
+        i,
+        g,
+        signe,
+        nom: nomOperation(o.libelle),
+        actif: actifDefaut ? !off[i] : !!off[i] && off[i] === "on",
+        note,
+        sport,
+        doublon,
+      };
+    }),
+    toggle = (o) => {
+      if (o.g === "ignorer" || !o.g) return;
+      const x = { ...off };
+      const defaut =
+        o.g === "salaire"
+          ? o.sens === "credit" && /salaire/i.test(o.detail.join(" "))
+          : o.g === "sport"
+            ? !!o.sport
+            : true;
+      if (defaut) x[o.i] = !x[o.i];
+      else x[o.i] = x[o.i] === "on" ? false : "on";
+      setOff(x);
+    },
+    aChoisir = ops.filter((o) => !o.g),
+    groupes = [...postes.map((w) => w.poste), "salaire", "vacances", "sport", "ignorer"]
+      .map((g, k) => {
+        const list = ops.filter((o) => o.g === g);
+        if (!list.length) return null;
+        const sp = SPECIAUX[g],
+          actifs = list.filter((o) => o.actif),
+          tot = actifs.reduce((s, o) => s + o.signe, 0);
+        return {
+          g,
+          list,
+          tot,
+          l: sp ? sp.l : g,
+          c: sp ? sp.c : COULEURS[k % COULEURS.length],
+          sous: sp
+            ? list.length + " · " + sp.sous
+            : list.length +
+              " opération" +
+              (list.length > 1 ? "s" : "") +
+              " · dans l'app : " +
+              eur(dansApp(lidDe(g))),
+        };
+      })
+      .filter(Boolean),
+    nbActifs = ops.filter((o) => o.actif).length,
+    choixPostes = [...postes.map((w) => w.poste), "vacances", "ignorer"];
+
+  async function enregistrer() {
+    if (!nbActifs || etat === "enreg") return;
+    setEtat("enreg"), setErreur("");
+    const actifs = ops.filter((o) => o.actif),
+      parPoste = {};
+    actifs.filter((o) => !SPECIAUX[o.g]).forEach((o) => (parPoste[o.g] = parPoste[o.g] || []).push(o));
+    const fin = releve.periode.fin,
+      plan = {
+        compte: releve.compte,
+        debut: releve.periode.debut,
+        fin,
+        nb: actifs.length,
+        postes: Object.entries(parPoste).map(([p, l]) => ({
+          lid: lidDe(p),
+          montant: Math.round(l.reduce((s, o) => s + o.signe, 0) * 100) / 100,
+          note: noteDesOperations(l),
+          date: fin,
+        })),
+        salaire: (() => {
+          const l = actifs.filter((o) => o.g === "salaire");
+          return l.length && revenu
+            ? {
+                lid: ligneBudgetId(revenu),
+                montant: Math.round(l.reduce((s, o) => s - o.signe, 0) * 100) / 100,
+                date: l[l.length - 1].date,
+              }
+            : null;
+        })(),
+        vacances: actifs
+          .filter((o) => o.g === "vacances")
+          .map((o) => ({ label: o.nom, montant: o.signe, mois: m })),
+        sport: actifs
+          .filter((o) => o.g === "sport" && o.sport)
+          .map((o) => ({ id: o.sport.id, montant: o.montant })),
+        regles: Object.keys(choix)
+          .map((i) => ({ motif: nomOperation(releve.ops[i].libelle).toUpperCase(), poste: choix[i] }))
+          .filter((r) => r.motif.length >= 3),
+      };
+    try {
+      const imp = await onEnregistrer(plan);
+      setFini({ id: imp.id, n: actifs.length }), setReleve(null), setEtat("");
+    } catch (e) {
+      setEtat(""), setErreur("Enregistrement impossible : " + (e && e.message ? e.message : "connexion"));
+    }
+  }
+
+  const ligneOp = (o) => (
+    <div key={o.i} style={{ borderBottom: "1px solid #f3f8f9" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px 4px 4px", minHeight: 48 }}
+      >
+        <button
+          type="button"
+          onClick={() => toggle(o)}
+          aria-pressed={o.actif ? "true" : "false"}
+          aria-label={(o.actif ? "Retirer " : "Ajouter ") + o.nom}
+          disabled={o.g === "ignorer" || !o.g}
+          style={{
+            flex: "none",
+            width: 44,
+            height: 44,
+            border: 0,
+            background: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          <span
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 7,
+              border: "2px solid " + (o.actif ? "var(--teal-dark)" : "#b9cfd3"),
+              background: o.actif ? "var(--teal-dark)" : "#ffffff",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxSizing: "border-box",
+            }}
+          >
+            {o.actif ? accIcone("M5 12l5 5L20 7", 14, 3.2) : null}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setEdit(edit === o.i ? null : o.i)}
+          aria-expanded={edit === o.i ? "true" : "false"}
+          aria-label={"Changer le poste de " + o.nom}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            border: 0,
+            background: "none",
+            padding: 0,
+            textAlign: "left",
+            color: o.actif ? "var(--ink)" : "var(--slate)",
+            fontFamily: "inherit",
+            cursor: "pointer",
+          }}
+        >
+          <span style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+            <span
+              style={{
+                flex: "none",
+                width: 40,
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: "var(--slate)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {dateCourte(o.dateAchat)}
+            </span>
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontSize: 14,
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {o.nom}
+            </span>
+            <span
+              style={{
+                flex: "none",
+                fontSize: 14,
+                fontWeight: 700,
+                fontVariantNumeric: "tabular-nums",
+                color: o.signe < 0 ? "#0b6e53" : undefined,
+              }}
+            >
+              {eur(o.signe)}
+            </span>
+          </span>
+          {(o.doublon || o.note) && (
+            <span
+              style={{
+                display: "block",
+                marginLeft: 48,
+                fontSize: 12.5,
+                fontWeight: 800,
+                color: o.doublon ? "#9a4515" : "var(--slate)",
+              }}
+            >
+              {o.doublon
+                ? "⚠ déjà saisie ? (" +
+                  eur(num(o.doublon.montant)) +
+                  " le " +
+                  dateCourte(o.doublon.date_depense) +
+                  ")"
+                : o.note}
+            </span>
+          )}
+        </button>
+      </div>
+      {edit === o.i && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 12px 12px 52px" }}>
+          {choixPostes.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => {
+                setChoix({ ...choix, [o.i]: p }), setEdit(null);
+                const x = { ...off };
+                delete x[o.i];
+                setOff(x);
+              }}
+              aria-pressed={o.g === p ? "true" : "false"}
+              style={{
+                minHeight: 36,
+                padding: "0 12px",
+                borderRadius: 99,
+                border: "2px solid " + (o.g === p ? "var(--ink)" : "#d6e3e5"),
+                background: o.g === p ? "var(--ink)" : "#ffffff",
+                color: o.g === p ? "#ffffff" : "var(--ink-soft)",
+                fontSize: 13,
+                fontWeight: 800,
+                fontFamily: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              {SPECIAUX[p] ? SPECIAUX[p].l.replace("Virements entre tes comptes", "Ignorer") : p}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <KbSheet label="Importer un relevé" onClose={onClose}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: "#f3f8f9",
+          borderRadius: 16,
+          padding: "10px 12px",
+          marginBottom: 12,
+        }}
+      >
+        <span
+          style={{
+            flex: "none",
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: "#f6ecd9",
+            color: "#8a5a12",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {accIcone(ICONE_DOC, 20, 2.2)}
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>
+            Compte courant · {MOIS_LONGS[m0]} {annee}
+          </span>
+          <span
+            style={{
+              display: "block",
+              fontSize: 13,
+              fontWeight: 700,
+              color: releve.controle === 0 ? "#0b6e53" : "#b8432a",
+            }}
+          >
+            {releve.ops.length} opérations ·{" "}
+            {releve.controle === 0 ? "✓ solde vérifié" : "⚠ le total ne correspond pas au solde du relevé"}
+          </span>
+        </span>
+        <button
+          type="button"
+          className="btn-outline btn-sm"
+          onClick={() => setReleve(null)}
+          style={{ minHeight: 40 }}
+        >
+          Changer
+        </button>
+      </div>
+      {dejaImporte && (
+        <p
+          role="alert"
+          style={{
+            margin: "0 0 12px",
+            padding: "10px 12px",
+            borderRadius: 14,
+            background: "#fff3e6",
+            color: "#7a3a12",
+            fontWeight: 800,
+            fontSize: 14,
+          }}
+        >
+          ⚠ Ce relevé a déjà été importé le {new Date(dejaImporte.created_at).toLocaleDateString("fr-FR")}.
+        </p>
+      )}
+      <div
+        style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 6, marginBottom: 12 }}
+      >
+        {[
+          { n: nbActifs, l: "à enregistrer", bg: "#dff2f4", fg: "#086b78" },
+          { n: aChoisir.length, l: "à choisir", bg: "#fff3e6", fg: "#9a4515" },
+          { n: ops.filter((o) => o.g === "ignorer").length, l: "ignorées", bg: "#eef3f4", fg: "#3d545c" },
+        ].map((c) => (
+          <span
+            key={c.l}
+            style={{
+              borderRadius: 14,
+              padding: "8px 4px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              background: c.bg,
+              color: c.fg,
+            }}
+          >
+            <span style={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{c.n}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800 }}>{c.l}</span>
+          </span>
+        ))}
+      </div>
+      {aChoisir.length > 0 && (
+        <section
+          style={{
+            background: "#fff3e6",
+            border: "2px solid #e9b27f",
+            borderRadius: 18,
+            padding: "10px 0",
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ padding: "0 14px 4px", fontSize: 15, fontWeight: 800, color: "#7a3a12" }}>
+            À choisir
+          </div>
+          {aChoisir.map((o) => (
+            <div key={o.i} style={{ padding: "6px 14px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontSize: 14.5,
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontWeight: 700 }}>
+                  {dateCourte(o.dateAchat)} · {o.nom}
+                </span>
+                <span
+                  style={{
+                    flex: "none",
+                    whiteSpace: "nowrap",
+                    fontWeight: 800,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {eur(o.signe)}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {choixPostes.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setChoix({ ...choix, [o.i]: p })}
+                    style={{
+                      minHeight: 36,
+                      padding: "0 12px",
+                      borderRadius: 99,
+                      border: "2px solid #d6e3e5",
+                      background: "#ffffff",
+                      color: "var(--ink-soft)",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {SPECIAUX[p] ? SPECIAUX[p].l.replace("Virements entre tes comptes", "Ignorer") : p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      {groupes.map((g) => {
+        const isOpen = !!ouvert[g.g];
+        return (
+          <section
+            key={g.g}
+            style={{
+              background: "#ffffff",
+              border: "1px solid var(--line)",
+              borderRadius: 18,
+              marginBottom: 10,
+              overflow: "hidden",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setOuvert({ ...ouvert, [g.g]: !isOpen })}
+              aria-expanded={isOpen ? "true" : "false"}
+              style={{
+                width: "100%",
+                border: 0,
+                background: "none",
+                padding: "10px 14px",
+                minHeight: 56,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                textAlign: "left",
+                color: "var(--ink)",
+                fontFamily: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ flex: "none", width: 10, height: 10, borderRadius: 99, background: g.c }} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>{g.l}</span>
+                <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--slate)" }}>
+                  {g.sous}
+                </span>
+              </span>
+              {g.g !== "ignorer" && (
+                <span style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  {eur(g.tot)}
+                </span>
+              )}
+              <span aria-hidden="true" style={{ color: "var(--slate-light)", display: "flex" }}>
+                {accIcone(isOpen ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6", 18, 2.4)}
+              </span>
+            </button>
+            {isOpen && <div style={{ borderTop: "1px solid #eef3f4" }}>{g.list.map(ligneOp)}</div>}
+          </section>
+        );
+      })}
+      {erreur && (
+        <p role="alert" style={{ color: "#b8432a", fontWeight: 700 }}>
+          {erreur}
+        </p>
+      )}
+      <div
+        style={{
+          position: "sticky",
+          bottom: -24,
+          marginBottom: -24,
+          paddingBottom: 24,
+          background: "#ffffff",
+          paddingTop: 10,
+          boxShadow: "0 -10px 14px -10px rgba(14,58,66,.18)",
+        }}
+      >
+        {kbBouton(
+          etat === "enreg"
+            ? "Enregistrement…"
+            : "Enregistrer " + nbActifs + " opération" + (nbActifs > 1 ? "s" : ""),
+          enregistrer,
+          { disabled: !nbActifs || etat === "enreg", h: 56 },
+        )}
+        <p className="detail" style={{ textAlign: "center", margin: "6px 0 0" }}>
+          Un total par poste · rien n'est enregistré avant ce bouton · import annulable
+        </p>
+      </div>
+    </KbSheet>
+  );
+}

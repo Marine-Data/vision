@@ -1,4 +1,5 @@
 import React from "react";
+import { ImportReleve } from "./components/ImportReleve.jsx";
 import { MODE_PARTAGE, ONGLETS, ONGLETS_VERROUILLES, rienFaire } from "./app/onglets.jsx";
 import { IMG_FOND } from "./assets/images.js";
 import { AutresOutils } from "./components/AutresOutils.jsx";
@@ -56,6 +57,9 @@ export function App() {
     [saisieOuverte, setSaisieOuverte] = React.useState(!1),
     [txEdit, setTxEdit] = React.useState(null);
   const [taches, setTaches] = React.useState([]);
+  const [imports, setImports] = React.useState([]),
+    [reglesImport, setReglesImport] = React.useState([]),
+    [importOuvert, setImportOuvert] = React.useState(false);
   const [pe, setPe] = React.useState({});
   const [txOk, setTxOk] = React.useState(!1);
   const [tachesOk, setTachesOk] = React.useState(!1);
@@ -238,6 +242,14 @@ export function App() {
             .order("sort")
             .order("created_at");
           setTaches(K || []), K && setTachesOk(!0);
+        })(),
+        (async () => {
+          const { data: K } = await supabase.from("vision_imports").select("*").order("created_at");
+          setImports(K || []);
+        })(),
+        (async () => {
+          const { data: K } = await supabase.from("vision_import_regles").select("motif, poste");
+          setReglesImport(K || []);
         })(),
         (async () => {
           const { data: K } = await supabase
@@ -865,6 +877,115 @@ export function App() {
     if (E) throw E;
     sct((p) => p.filter((x) => x.id !== id));
   }
+  // Import d'un relevé : un total par poste, plus salaire, vacances et sport.
+  // Tout ce qui est créé porte l'identifiant de l'import, pour pouvoir l'annuler en une fois.
+  async function importEnregistrer(plan) {
+    const uid = t.user.id,
+      { data: imp, error: E0 } = await supabase
+        .from("vision_imports")
+        .insert({
+          user_id: uid,
+          compte: plan.compte,
+          debut: plan.debut,
+          fin: plan.fin,
+          nb_operations: plan.nb,
+          details: { sport: plan.sport.map((x) => x.id) },
+        })
+        .select()
+        .single();
+    if (E0) throw E0;
+    try {
+      const lignes = plan.postes
+        .filter((p) => p.lid && p.montant)
+        .map((p) => ({
+          user_id: uid,
+          budget_line_id: p.lid,
+          montant: Math.abs(p.montant),
+          type: p.montant < 0 ? "remboursement" : "depense",
+          note: p.note,
+          date_depense: p.date,
+          mois_index: moisDeDate(p.date),
+          import_id: imp.id,
+        }));
+      if (plan.salaire && plan.salaire.montant)
+        lignes.push({
+          user_id: uid,
+          budget_line_id: plan.salaire.lid,
+          montant: plan.salaire.montant,
+          type: "depense",
+          note: "Salaire (relevé)",
+          date_depense: plan.salaire.date,
+          mois_index: moisDeDate(plan.salaire.date),
+          import_id: imp.id,
+        });
+      if (lignes.length) {
+        const { data: K, error: E } = await supabase.from("vision_transactions").insert(lignes).select();
+        if (E) throw E;
+        stx((p) => [...(K || []), ...p]);
+      }
+      if (plan.vacances.length) {
+        let rang = Math.max(0, ...vi.filter((A) => A.pocket === "vacances").map((A) => A.sort || 0));
+        const { data: K, error: E } = await supabase
+          .from("vision_items")
+          .insert(
+            plan.vacances.map((v) => ({
+              user_id: uid,
+              pocket: "vacances",
+              label: v.label,
+              montant_prevu: v.montant,
+              montant_reel: v.montant,
+              mois_index: v.mois,
+              paid: true,
+              sort: ++rang,
+              import_id: imp.id,
+            })),
+          )
+          .select();
+        if (E) throw E;
+        mi((A) => [...A, ...(K || [])]);
+      }
+      for (const sp of plan.sport) {
+        const { error: E } = await supabase
+          .from("vision_items")
+          .update({ paid: true, montant_reel: sp.montant })
+          .eq("id", sp.id);
+        if (E) throw E;
+        itemLocal(sp.id, { paid: true, montant_reel: sp.montant });
+      }
+      if (plan.regles.length) {
+        const { data: K } = await supabase
+          .from("vision_import_regles")
+          .upsert(
+            plan.regles.map((r) => ({ user_id: uid, motif: r.motif, poste: r.poste })),
+            { onConflict: "user_id,motif" },
+          )
+          .select("motif, poste");
+        K && setReglesImport((A) => [...A.filter((x) => !K.some((k) => k.motif === x.motif)), ...K]);
+      }
+    } catch (e) {
+      await importAnnuler(imp).catch(() => {});
+      throw e;
+    }
+    setImports((A) => [...A, imp]), await relireSpend();
+    return imp;
+  }
+  async function importAnnuler(imp) {
+    const sport = (imp.details && imp.details.sport) || [];
+    for (const id of sport) {
+      await supabase.from("vision_items").update({ paid: false, montant_reel: null }).eq("id", id);
+      itemLocal(id, { paid: false, montant_reel: null });
+    }
+    const r1 = await supabase.from("vision_transactions").delete().eq("import_id", imp.id);
+    if (r1.error) throw r1.error;
+    const r2 = await supabase.from("vision_items").delete().eq("import_id", imp.id);
+    if (r2.error) throw r2.error;
+    const r3 = await supabase.from("vision_imports").delete().eq("id", imp.id);
+    if (r3.error) throw r3.error;
+    stx((p) => p.filter((x) => x.import_id !== imp.id));
+    mi((p) => p.filter((x) => x.import_id !== imp.id));
+    setImports((A) => A.filter((x) => x.id !== imp.id));
+    await relireSpend();
+  }
   async function tacheAdd(v) {
     const K = Object.assign(
         {
@@ -1238,6 +1359,7 @@ export function App() {
                 onPasVerse={MODE_PARTAGE ? rienFaire : epargnePasVersee}
                 onCloturer={MODE_PARTAGE ? rienFaire : clotureFixer}
                 onRouvrir={MODE_PARTAGE ? rienFaire : clotureRouvrir}
+                onImport={MODE_PARTAGE ? null : () => setImportOuvert(true)}
               />
               <details
                 className="collapsible"
@@ -1299,6 +1421,19 @@ export function App() {
         >
           +
         </button>
+      )}
+      {importOuvert && !MODE_PARTAGE && (
+        <ImportReleve
+          budget={l}
+          budgetMois={bm}
+          transactions={tx}
+          items={vi}
+          imports={imports}
+          regles={reglesImport}
+          onEnregistrer={importEnregistrer}
+          onAnnuler={importAnnuler}
+          onClose={() => setImportOuvert(false)}
+        />
       )}
       {(saisieOuverte || txEdit) && (
         <SaisieRapide
