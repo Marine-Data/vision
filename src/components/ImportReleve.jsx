@@ -1,6 +1,6 @@
 import React from "react";
 import { budgetDuMois, itemCompte, ligneBudgetId } from "../lib/calculs.js";
-import { num } from "../lib/format.js";
+import { catIcone, num } from "../lib/format.js";
 import { classer, dejaSaisie, lireFichierPdf, nomOperation, noteDesOperations } from "../lib/importReleve.js";
 import { anneeMoisDe, moisDepuisAncre } from "../lib/mois.js";
 import { KbSheet, KB_SR, accIcone, kbBouton } from "./kanban/communs.jsx";
@@ -66,7 +66,9 @@ export function ImportReleve({
     [edit, setEdit] = React.useState(null),
     [fini, setFini] = React.useState(null),
     [confAnnul, setConfAnnul] = React.useState(null),
-    [erreur, setErreur] = React.useState("");
+    [erreur, setErreur] = React.useState(""),
+    [det, setDet] = React.useState(null),
+    [autre, setAutre] = React.useState(false);
 
   async function lire(ev) {
     const f = ev.target.files && ev.target.files[0];
@@ -79,7 +81,14 @@ export function ImportReleve({
         throw new Error("aucune opération trouvée : est-ce bien un relevé BoursoBank ?");
       if (r.compte !== "courant")
         throw new Error("c'est un relevé de livret. Seul le relevé du compte courant s'importe.");
-      setReleve(r), setChoix({}), setOff({}), setOuvert({}), setEdit(null), setEtat("");
+      setReleve(r),
+        setChoix({}),
+        setOff({}),
+        setOuvert({}),
+        setEdit(null),
+        setDet(null),
+        setAutre(false),
+        setEtat("");
     } catch (e) {
       setEtat(""), setErreur(e && e.message ? e.message : "lecture impossible");
     }
@@ -294,7 +303,7 @@ export function ImportReleve({
     choixPostes = [...postes.map((w) => w.poste), "vacances", "ignorer"];
 
   async function enregistrer() {
-    if (!nbActifs || etat === "enreg") return;
+    if (!nbActifs || etat === "enreg" || ops.some((o) => !o.g)) return;
     setEtat("enreg"), setErreur("");
     const actifs = ops.filter((o) => o.actif),
       parPoste = {};
@@ -329,7 +338,7 @@ export function ImportReleve({
           .map((o) => ({ id: o.sport.id, montant: o.montant })),
         regles: Object.keys(choix)
           .map((i) => ({ motif: nomOperation(releve.ops[i].libelle).toUpperCase(), poste: choix[i] }))
-          .filter((r) => r.motif.length >= 3),
+          .filter((r) => r.motif.length >= 3 && !/PAYPAL/.test(r.motif)),
       };
     try {
       const imp = await onEnregistrer(plan);
@@ -339,17 +348,66 @@ export function ImportReleve({
     }
   }
 
+  const emoji = (g) =>
+      g === "autre"
+        ? "⋯"
+        : g === "salaire"
+          ? "💼"
+          : g === "vacances"
+            ? "✈️"
+            : g === "sport"
+              ? "🏋️"
+              : g === "ignorer"
+                ? "↔"
+                : catIcone(g),
+    libelleGroupe = (g) =>
+      g === "autre" ? "Autre" : SPECIAUX[g] ? (g === "ignorer" ? "Ignorer" : SPECIAUX[g].l) : g,
+    courant = aChoisir[0],
+    rapides = ["Abonnements", "Plaisir / sorties", "Alimentation", "vacances", "ignorer"].filter(
+      (p) => SPECIAUX[p] || lidDe(p),
+    ),
+    groupeDetail = det ? groupes.find((g) => g.g === det) : null,
+    bouton = (p, onPick, clair) => (
+      <button
+        key={p}
+        type="button"
+        onClick={onPick}
+        style={{
+          minHeight: 64,
+          border: clair ? "2px solid #d6e3e5" : 0,
+          borderRadius: 16,
+          background: clair ? "#ffffff" : "rgba(255,255,255,.16)",
+          color: clair ? "var(--ink)" : "#ffffff",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+          fontSize: 12.5,
+          fontWeight: 800,
+          fontFamily: "inherit",
+          cursor: "pointer",
+          padding: "4px",
+        }}
+      >
+        <span aria-hidden="true" style={{ fontSize: 20 }}>
+          {emoji(p)}
+        </span>
+        {libelleGroupe(p).replace(" / sorties", "").replace(" & high-tech", "")}
+      </button>
+    );
+
   const ligneOp = (o) => (
     <div key={o.i} style={{ borderBottom: "1px solid #f3f8f9" }}>
       <div
-        style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px 4px 4px", minHeight: 48 }}
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 14px 4px 4px", minHeight: 52 }}
       >
         <button
           type="button"
           onClick={() => toggle(o)}
           aria-pressed={o.actif ? "true" : "false"}
           aria-label={(o.actif ? "Retirer " : "Ajouter ") + o.nom}
-          disabled={o.g === "ignorer" || !o.g}
+          disabled={o.g === "ignorer"}
           style={{
             flex: "none",
             width: 44,
@@ -391,7 +449,7 @@ export function ImportReleve({
             background: "none",
             padding: 0,
             textAlign: "left",
-            color: o.actif ? "var(--ink)" : "var(--slate)",
+            color: o.actif || o.g === "ignorer" ? "var(--ink)" : "var(--slate)",
             fontFamily: "inherit",
             cursor: "pointer",
           }}
@@ -413,7 +471,7 @@ export function ImportReleve({
               style={{
                 flex: 1,
                 minWidth: 0,
-                fontSize: 14,
+                fontSize: 14.5,
                 fontWeight: 600,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -425,7 +483,8 @@ export function ImportReleve({
             <span
               style={{
                 flex: "none",
-                fontSize: 14,
+                whiteSpace: "nowrap",
+                fontSize: 14.5,
                 fontWeight: 700,
                 fontVariantNumeric: "tabular-nums",
                 color: o.signe < 0 ? "#0b6e53" : undefined,
@@ -456,90 +515,121 @@ export function ImportReleve({
         </button>
       </div>
       {edit === o.i && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 12px 12px 52px" }}>
-          {choixPostes.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => {
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+            gap: 6,
+            padding: "0 14px 12px",
+          }}
+        >
+          {choixPostes.map((p) =>
+            bouton(
+              p,
+              () => {
                 setChoix({ ...choix, [o.i]: p }), setEdit(null);
                 const x = { ...off };
                 delete x[o.i];
                 setOff(x);
-              }}
-              aria-pressed={o.g === p ? "true" : "false"}
-              style={{
-                minHeight: 36,
-                padding: "0 12px",
-                borderRadius: 99,
-                border: "2px solid " + (o.g === p ? "var(--ink)" : "#d6e3e5"),
-                background: o.g === p ? "var(--ink)" : "#ffffff",
-                color: o.g === p ? "#ffffff" : "var(--ink-soft)",
-                fontSize: 13,
-                fontWeight: 800,
-                fontFamily: "inherit",
-                cursor: "pointer",
-              }}
-            >
-              {SPECIAUX[p] ? SPECIAUX[p].l.replace("Virements entre tes comptes", "Ignorer") : p}
-            </button>
-          ))}
+              },
+              true,
+            ),
+          )}
         </div>
       )}
     </div>
   );
 
+  // ---------- détail d'un poste ----------
+  if (groupeDetail) {
+    return (
+      <KbSheet label={emoji(groupeDetail.g) + " " + groupeDetail.l} onClose={() => setDet(null)}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 6,
+          }}
+        >
+          <span className="detail">{groupeDetail.sous}</span>
+          {groupeDetail.g !== "ignorer" && (
+            <span
+              style={{
+                fontFamily: "Georgia,serif",
+                fontSize: 22,
+                fontWeight: 700,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {eur(groupeDetail.tot)}
+            </span>
+          )}
+        </div>
+        <p className="detail" style={{ margin: "0 0 8px" }}>
+          Touche une case pour retirer l'opération, ou son nom pour la changer de poste.
+        </p>
+        <div style={{ margin: "0 -18px" }}>{groupeDetail.list.map(ligneOp)}</div>
+        <div
+          style={{
+            position: "sticky",
+            bottom: -24,
+            marginBottom: -24,
+            paddingBottom: 24,
+            paddingTop: 10,
+            background: "#ffffff",
+          }}
+        >
+          {kbBouton("Retour au relevé", () => setDet(null), { h: 52, icone: "M15 6l-6 6 6 6" })}
+        </div>
+      </KbSheet>
+    );
+  }
+
+  // ---------- aperçu ----------
   return (
-    <KbSheet label="Importer un relevé" onClose={onClose}>
+    <KbSheet label={"Relevé de " + MOIS_LONGS[m0]} onClose={onClose}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
-          background: "#f3f8f9",
-          borderRadius: 16,
-          padding: "10px 12px",
-          marginBottom: 12,
+          gap: 8,
+          flexWrap: "wrap",
+          marginTop: -8,
+          marginBottom: 14,
         }}
       >
         <span
           style={{
-            flex: "none",
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            background: "#f6ecd9",
-            color: "#8a5a12",
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
+            gap: 5,
+            padding: "4px 10px",
+            borderRadius: 99,
+            background: releve.controle === 0 ? "#e3f4ed" : "#fbe9e4",
+            color: releve.controle === 0 ? "#0b6e53" : "#b8432a",
+            fontSize: 13,
+            fontWeight: 800,
           }}
         >
-          {accIcone(ICONE_DOC, 20, 2.2)}
-        </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>
-            Compte courant · {MOIS_LONGS[m0]} {annee}
-          </span>
-          <span
-            style={{
-              display: "block",
-              fontSize: 13,
-              fontWeight: 700,
-              color: releve.controle === 0 ? "#0b6e53" : "#b8432a",
-            }}
-          >
-            {releve.ops.length} opérations ·{" "}
-            {releve.controle === 0 ? "✓ solde vérifié" : "⚠ le total ne correspond pas au solde du relevé"}
-          </span>
+          {releve.controle === 0
+            ? "✓ " + releve.ops.length + " opérations · solde vérifié"
+            : "⚠ le total ne correspond pas au solde"}
         </span>
         <button
           type="button"
-          className="btn-outline btn-sm"
           onClick={() => setReleve(null)}
-          style={{ minHeight: 40 }}
+          style={{
+            minHeight: 36,
+            border: 0,
+            background: "none",
+            color: "var(--teal-dark)",
+            fontWeight: 800,
+            fontFamily: "inherit",
+            cursor: "pointer",
+          }}
         >
-          Changer
+          Changer de fichier
         </button>
       </div>
       {dejaImporte && (
@@ -558,148 +648,176 @@ export function ImportReleve({
           ⚠ Ce relevé a déjà été importé le {new Date(dejaImporte.created_at).toLocaleDateString("fr-FR")}.
         </p>
       )}
-      <div
-        style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 6, marginBottom: 12 }}
-      >
-        {[
-          { n: nbActifs, l: "à enregistrer", bg: "#dff2f4", fg: "#086b78" },
-          { n: aChoisir.length, l: "à choisir", bg: "#fff3e6", fg: "#9a4515" },
-          { n: ops.filter((o) => o.g === "ignorer").length, l: "ignorées", bg: "#eef3f4", fg: "#3d545c" },
-        ].map((c) => (
-          <span
-            key={c.l}
-            style={{
-              borderRadius: 14,
-              padding: "8px 4px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              background: c.bg,
-              color: c.fg,
-            }}
-          >
-            <span style={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{c.n}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 800 }}>{c.l}</span>
-          </span>
-        ))}
-      </div>
-      {aChoisir.length > 0 && (
+      {courant && (
         <section
+          aria-label="Opération à classer"
           style={{
-            background: "#fff3e6",
-            border: "2px solid #e9b27f",
-            borderRadius: 18,
-            padding: "10px 0",
-            marginBottom: 12,
+            borderRadius: 22,
+            background: "var(--teal-dark)",
+            color: "#ffffff",
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            marginBottom: 14,
+            boxShadow: "0 10px 24px rgba(10,123,138,.25)",
           }}
         >
-          <div style={{ padding: "0 14px 4px", fontSize: 15, fontWeight: 800, color: "#7a3a12" }}>
-            À choisir
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              fontSize: 13,
+              fontWeight: 800,
+            }}
+          >
+            <span style={{ letterSpacing: ".06em", textTransform: "uppercase" }}>
+              À classer · {aChoisir.length} restante{aChoisir.length > 1 ? "s" : ""}
+            </span>
+            <span>{dateCourte(courant.dateAchat)}</span>
           </div>
-          {aChoisir.map((o) => (
-            <div key={o.i} style={{ padding: "6px 14px" }}>
-              <div
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.25 }}>{courant.nom}</span>
+            <span
+              style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 700, whiteSpace: "nowrap" }}
+            >
+              {eur(courant.signe)}
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+            {rapides.map((p) => bouton(p, () => setChoix({ ...choix, [courant.i]: p })))}
+            {bouton("autre", () => setAutre(!autre))}
+          </div>
+          {autre && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+              {choixPostes
+                .filter((p) => !rapides.includes(p))
+                .map((p) =>
+                  bouton(p, () => {
+                    setChoix({ ...choix, [courant.i]: p }), setAutre(false);
+                  }),
+                )}
+            </div>
+          )}
+        </section>
+      )}
+      <div
+        style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10, marginBottom: 12 }}
+      >
+        {groupes
+          .filter((g) => g.g !== "ignorer")
+          .map((g) => {
+            const actifs = g.list.filter((o) => o.actif).length,
+              doublons = g.list.filter((o) => o.doublon).length,
+              app = SPECIAUX[g.g] ? null : dansApp(lidDe(g.g));
+            return (
+              <button
+                key={g.g}
+                type="button"
+                onClick={() => setDet(g.g)}
+                aria-label={
+                  g.l +
+                  " : " +
+                  eur(g.tot) +
+                  ", " +
+                  actifs +
+                  " opérations cochées sur " +
+                  g.list.length +
+                  ". Voir le détail"
+                }
                 style={{
+                  position: "relative",
+                  border: "2px solid " + (actifs ? "var(--teal-dark)" : "#d6e3e5"),
+                  borderRadius: 18,
+                  background: "#ffffff",
+                  padding: 12,
+                  minHeight: 108,
                   display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 14.5,
-                  marginBottom: 6,
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 3,
+                  textAlign: "left",
+                  color: "var(--ink)",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
                 }}
               >
-                <span style={{ fontWeight: 700 }}>
-                  {dateCourte(o.dateAchat)} · {o.nom}
+                <span aria-hidden="true" style={{ fontSize: 20 }}>
+                  {emoji(g.g)}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ink-soft)", lineHeight: 1.2 }}>
+                  {g.l}
                 </span>
                 <span
                   style={{
-                    flex: "none",
-                    whiteSpace: "nowrap",
-                    fontWeight: 800,
+                    fontFamily: "Georgia,serif",
+                    fontSize: 20,
+                    fontWeight: 700,
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {eur(o.signe)}
-                </span>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {choixPostes.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setChoix({ ...choix, [o.i]: p })}
-                    style={{
-                      minHeight: 36,
-                      padding: "0 12px",
-                      borderRadius: 99,
-                      border: "2px solid #d6e3e5",
-                      background: "#ffffff",
-                      color: "var(--ink-soft)",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {SPECIAUX[p] ? SPECIAUX[p].l.replace("Virements entre tes comptes", "Ignorer") : p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-      {groupes.map((g) => {
-        const isOpen = !!ouvert[g.g];
-        return (
-          <section
-            key={g.g}
-            style={{
-              background: "#ffffff",
-              border: "1px solid var(--line)",
-              borderRadius: 18,
-              marginBottom: 10,
-              overflow: "hidden",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setOuvert({ ...ouvert, [g.g]: !isOpen })}
-              aria-expanded={isOpen ? "true" : "false"}
-              style={{
-                width: "100%",
-                border: 0,
-                background: "none",
-                padding: "10px 14px",
-                minHeight: 56,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                textAlign: "left",
-                color: "var(--ink)",
-                fontFamily: "inherit",
-                cursor: "pointer",
-              }}
-            >
-              <span style={{ flex: "none", width: 10, height: 10, borderRadius: 99, background: g.c }} />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>{g.l}</span>
-                <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--slate)" }}>
-                  {g.sous}
-                </span>
-              </span>
-              {g.g !== "ignorer" && (
-                <span style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                   {eur(g.tot)}
                 </span>
-              )}
-              <span aria-hidden="true" style={{ color: "var(--slate-light)", display: "flex" }}>
-                {accIcone(isOpen ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6", 18, 2.4)}
-              </span>
-            </button>
-            {isOpen && <div style={{ borderTop: "1px solid #eef3f4" }}>{g.list.map(ligneOp)}</div>}
-          </section>
-        );
-      })}
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--slate)" }}>
+                  {actifs}/{g.list.length} op.{app != null ? " · app " + eur(app) : ""}
+                </span>
+                {doublons > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "#9a4515" }}>
+                    ⚠ {doublons} déjà saisie{doublons > 1 ? "s" : ""} ?
+                  </span>
+                )}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 8,
+                    background: actifs ? "var(--teal-dark)" : "#ffffff",
+                    border: "2px solid " + (actifs ? "var(--teal-dark)" : "#b9cfd3"),
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {actifs ? accIcone("M5 12l5 5L20 7", 14, 3.2) : null}
+                </span>
+              </button>
+            );
+          })}
+      </div>
+      {groupes.some((g) => g.g === "ignorer") && (
+        <button
+          type="button"
+          onClick={() => setDet("ignorer")}
+          style={{
+            width: "100%",
+            minHeight: 48,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "0 14px",
+            borderRadius: 16,
+            border: 0,
+            background: "#eef3f4",
+            color: "var(--ink-soft)",
+            fontSize: 14,
+            fontWeight: 700,
+            textAlign: "left",
+            fontFamily: "inherit",
+            cursor: "pointer",
+            marginBottom: 12,
+          }}
+        >
+          <span aria-hidden="true">↔</span>
+          {ops.filter((o) => o.g === "ignorer").length} virements entre tes comptes · ignorés
+        </button>
+      )}
       {erreur && (
         <p role="alert" style={{ color: "#b8432a", fontWeight: 700 }}>
           {erreur}
@@ -711,21 +829,20 @@ export function ImportReleve({
           bottom: -24,
           marginBottom: -24,
           paddingBottom: 24,
-          background: "#ffffff",
           paddingTop: 10,
+          background: "#ffffff",
           boxShadow: "0 -10px 14px -10px rgba(14,58,66,.18)",
         }}
       >
         {kbBouton(
-          etat === "enreg"
-            ? "Enregistrement…"
-            : "Enregistrer " + nbActifs + " opération" + (nbActifs > 1 ? "s" : ""),
+          courant
+            ? "Classe d'abord " + aChoisir.length + " opération" + (aChoisir.length > 1 ? "s" : "")
+            : etat === "enreg"
+              ? "Enregistrement…"
+              : "Enregistrer " + nbActifs + " opération" + (nbActifs > 1 ? "s" : ""),
           enregistrer,
-          { disabled: !nbActifs || etat === "enreg", h: 56 },
+          { disabled: !!courant || !nbActifs || etat === "enreg", h: 56 },
         )}
-        <p className="detail" style={{ textAlign: "center", margin: "6px 0 0" }}>
-          Un total par poste · rien n'est enregistré avant ce bouton · import annulable
-        </p>
       </div>
     </KbSheet>
   );
