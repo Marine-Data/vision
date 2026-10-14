@@ -37,7 +37,7 @@ export function CarteGraph({ titre, chiffre, couleur, children }) {
     <section
       aria-label={titre}
       style={{
-        background: "#ffffff",
+        background: "var(--surface)",
         borderRadius: 22,
         padding: 16,
         boxShadow: "var(--shadow)",
@@ -136,7 +136,7 @@ export function EtiquettesMois({ indices, n, y }) {
     .map((k) => {
       const pos = indices.indexOf(k);
       return (
-        <text key={k} x={xMois(pos, n).toFixed(1)} y={y} textAnchor="middle" fontSize="12" fill="#536b72">
+        <text key={k} x={xMois(pos, n).toFixed(1)} y={y} textAnchor="middle" fontSize="12" fill="var(--slate)">
           {moisCourt(k)}
         </text>
       );

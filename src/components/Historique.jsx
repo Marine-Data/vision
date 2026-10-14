@@ -153,7 +153,7 @@ export function Historique({ audit, items, params }) {
     fontFamily: "inherit",
     cursor: "pointer",
     border: "1px solid " + (a ? "var(--oxblood)" : "var(--line)"),
-    background: a ? "var(--oxblood)" : "#fff",
+    background: a ? "var(--oxblood)" : "var(--surface)",
     color: a ? "#fff" : "var(--ink)",
     fontSize: 12.5,
     fontWeight: 600,

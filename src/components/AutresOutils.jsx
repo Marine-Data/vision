@@ -166,6 +166,18 @@ export function AutresOutils(t) {
       setEtatSave("Modification en cours…"),
       debounceSave("item:" + id, () => si(id, savePatch || patch).then(() => flashSave()));
   };
+  // Tous les « hooks » avant le premier « return » (sinon l'écran plante au chargement direct).
+  const [moisSel, setMoisSel] = React.useState(() => moisNow()),
+    [reelInput, setReelInput] = React.useState(""),
+    [saving, setSaving] = React.useState(!1),
+    [closing, setClosing] = React.useState(!1),
+    [justClosed, setJustClosed] = React.useState(!1),
+    [msg, setMsg] = React.useState("");
+  React.useEffect(() => {
+    if (!e) return;
+    const rr = releveDuMois(r, moisSel);
+    setReelInput(rr === "" ? "" : String(rr));
+  }, [moisSel, !!e]);
   if (!e)
     return (
       <section className="sec">
@@ -209,20 +221,10 @@ export function AutresOutils(t) {
       for (let w = MOIS.length - 1; w >= 0; w--) if (rawReel[w] != null) return w;
       return -1;
     })(),
-    [moisSel, setMoisSel] = React.useState(M),
-    [reelInput, setReelInput] = React.useState(curReelRaw === "" ? "" : String(curReelRaw)),
-    [saving, setSaving] = React.useState(!1),
-    [closing, setClosing] = React.useState(!1),
-    [justClosed, setJustClosed] = React.useState(!1),
-    [msg, setMsg] = React.useState(""),
     selClosed = isClosed(moisSel),
     enAttente = items
       .filter((x) => !x.paid && num(x.mois_index) <= moisSel)
       .sort((a, b) => num(a.mois_index) - num(b.mois_index));
-  React.useEffect(() => {
-    const rr = releveDuMois(r, moisSel);
-    setReelInput(rr === "" ? "" : String(rr));
-  }, [moisSel]);
   async function enregistrer() {
     const val = parseFloat(String(reelInput).replace(",", "."));
     if (Number.isNaN(val)) {
@@ -801,7 +803,7 @@ export function AutresOutils(t) {
                         alignItems: "center",
                         gap: 4,
                         fontSize: 11.5,
-                        background: "#eef7fb",
+                        background: "var(--teal-doux)",
                         borderRadius: 99,
                         padding: "3px 8px 3px 3px",
                       }}
@@ -825,7 +827,7 @@ export function AutresOutils(t) {
                         alignItems: "center",
                         gap: 4,
                         fontSize: 11.5,
-                        background: "#eef7f4",
+                        background: "var(--vert-doux)",
                         borderRadius: 99,
                         padding: "3px 8px 3px 3px",
                       }}
@@ -1082,7 +1084,7 @@ export function AutresOutils(t) {
             <div
               className="note"
               style={{
-                background: "#f4fafb",
+                background: "var(--fond-doux)",
               }}
             >
               <div
@@ -1246,7 +1248,7 @@ export function AutresOutils(t) {
           <div
             className="note"
             style={{
-              background: "#eef7f4",
+              background: "var(--vert-doux)",
               borderColor: "var(--green)",
             }}
           >
@@ -1345,7 +1347,7 @@ export function AutresOutils(t) {
               gap: 8,
               marginTop: 10,
               padding: 8,
-              background: "#eef7fb",
+              background: "var(--teal-doux)",
               borderRadius: 10,
             }}
           >

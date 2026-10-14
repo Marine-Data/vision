@@ -39,7 +39,7 @@ export function GraphVacances({ params, items, indices }) {
     hauteur = (v) => Math.max(3, (Math.max(0, v) / max) * 120),
     idxActuel = Math.max(0, indices.indexOf(M));
   return (
-    <CarteGraph titre="Provision vacances" chiffre={euros0(valeurs[idxActuel])} couleur="#9a4515">
+    <CarteGraph titre="Provision vacances" chiffre={euros0(valeurs[idxActuel])} couleur="var(--t-orange)">
       <InfoMois
         texte={`${moisCourt(indices[sel])} ${indices[sel] <= M ? "(réel)" : "(prévu)"} · ${euros0(valeurs[sel])}${depensesDu(indices[sel]) ? " après " + euros0(depensesDu(indices[sel])) + " de dépenses" : ""}`}
       />
@@ -53,7 +53,7 @@ export function GraphVacances({ params, items, indices }) {
             indices.map((i, k) => moisCourt(i) + " " + euros0(valeurs[k])).join(", ")
           }
         >
-          <line x1="0" x2={LARGEUR} y1="160" y2="160" stroke="#c9d8db" strokeWidth="1" />
+          <line x1="0" x2={LARGEUR} y1="160" y2="160" stroke="var(--line-strong)" strokeWidth="1" />
           {valeurs.map((v, k) => {
             const reel = indices[k] <= M,
               h = hauteur(v);
@@ -65,8 +65,8 @@ export function GraphVacances({ params, items, indices }) {
                 width={largeurBarre.toFixed(1)}
                 height={h.toFixed(1)}
                 rx="4"
-                fill={reel ? "#c2702f" : k === sel ? "#e9b27f" : "#f6dcc3"}
-                stroke={reel ? "none" : "#c2702f"}
+                fill={reel ? "var(--c-orange)" : k === sel ? "#e9b27f" : "var(--orange-doux)"}
+                stroke={reel ? "none" : "var(--c-orange)"}
                 strokeWidth={reel ? 0 : 1.2}
               />
             );
@@ -85,7 +85,7 @@ export function GraphVacances({ params, items, indices }) {
                   width={w}
                   height="20"
                   rx="10"
-                  fill="#fbe9e4"
+                  fill="var(--rouge-doux)"
                 />
                 <text
                   x={xMois(k, n).toFixed(1)}
@@ -93,7 +93,7 @@ export function GraphVacances({ params, items, indices }) {
                   textAnchor="middle"
                   fontSize="12"
                   fontWeight="800"
-                  fill="#b8432a"
+                  fill="var(--c-rouge)"
                 >
                   {t}
                 </text>
@@ -112,7 +112,7 @@ export function GraphVacances({ params, items, indices }) {
         items={[
           {
             l: "Solde réel",
-            marque: <span style={{ width: 12, height: 12, borderRadius: 3, background: "#c2702f" }} />,
+            marque: <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--c-orange)" }} />,
           },
           {
             l: "Prévu",
@@ -122,8 +122,8 @@ export function GraphVacances({ params, items, indices }) {
                   width: 12,
                   height: 12,
                   borderRadius: 3,
-                  background: "#f6dcc3",
-                  border: "1.5px dashed #c2702f",
+                  background: "var(--orange-doux)",
+                  border: "1.5px dashed var(--c-orange)",
                   boxSizing: "border-box",
                 }}
               />
@@ -136,8 +136,8 @@ export function GraphVacances({ params, items, indices }) {
                 style={{
                   padding: "0 6px",
                   borderRadius: 8,
-                  background: "#fbe9e4",
-                  color: "#b8432a",
+                  background: "var(--rouge-doux)",
+                  color: "var(--t-rouge)",
                   fontWeight: 800,
                 }}
               >

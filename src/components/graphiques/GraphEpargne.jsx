@@ -33,7 +33,7 @@ export function GraphEpargne({ budget, params, items, indices }) {
     actuel = valeurs[Math.max(0, nbReel - 1)];
   const anneeAtteinte = atteint != null ? anneeMoisDe(atteint).annee : "";
   return (
-    <CarteGraph titre="Épargne · objectif 6 mois" chiffre={pct(actuel)} couleur="#086b78">
+    <CarteGraph titre="Épargne · objectif 6 mois" chiffre={pct(actuel)} couleur="var(--t-teal)">
       <InfoMois
         texte={`${moisCourt(indices[sel])} ${indices[sel] <= M ? "(réel)" : "(prévu)"} · ${euros0(valeurs[sel])} · ${pct(valeurs[sel])}`}
       />
@@ -49,7 +49,7 @@ export function GraphEpargne({ budget, params, items, indices }) {
             x2={LARGEUR}
             y1={y(cible)}
             y2={y(cible)}
-            stroke="#0b6e53"
+            stroke="var(--c-vert)"
             strokeWidth="1.5"
             strokeDasharray="2 4"
           />
@@ -59,21 +59,21 @@ export function GraphEpargne({ budget, params, items, indices }) {
             textAnchor="end"
             fontSize="12"
             fontWeight="700"
-            fill="#0b6e53"
+            fill="var(--c-vert)"
           >
             Objectif {euros0(cible)}
           </text>
           {nbReel > 0 && (
             <path
               d={`${tracer(pts.slice(0, nbReel))} L${pts[nbReel - 1][0].toFixed(1)},150 L${pts[0][0].toFixed(1)},150 Z`}
-              fill="#dff2f4"
+              fill="var(--teal-doux)"
             />
           )}
           {nbReel > 1 && (
             <path
               d={tracer(pts.slice(0, nbReel))}
               fill="none"
-              stroke="#086b78"
+              stroke="var(--c-teal)"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -82,7 +82,7 @@ export function GraphEpargne({ budget, params, items, indices }) {
           <path
             d={tracer(pts.slice(Math.max(0, nbReel - 1)))}
             fill="none"
-            stroke="#086b78"
+            stroke="var(--c-teal)"
             strokeWidth="2"
             strokeDasharray="5 5"
             strokeLinecap="round"
@@ -93,8 +93,8 @@ export function GraphEpargne({ budget, params, items, indices }) {
               cx={p[0]}
               cy={p[1]}
               r={k === sel ? 6 : 4}
-              fill={k === sel || k < nbReel ? "#086b78" : "#ffffff"}
-              stroke="#086b78"
+              fill={k === sel || k < nbReel ? "var(--c-teal)" : "var(--surface)"}
+              stroke="var(--c-teal)"
               strokeWidth="2"
             />
           ))}
@@ -112,7 +112,7 @@ export function GraphEpargne({ budget, params, items, indices }) {
             l: "Réel",
             marque: (
               <svg width="22" height="6" aria-hidden="true">
-                <line x1="0" x2="22" y1="3" y2="3" stroke="#086b78" strokeWidth="2.5" />
+                <line x1="0" x2="22" y1="3" y2="3" stroke="var(--c-teal)" strokeWidth="2.5" />
               </svg>
             ),
           },
@@ -120,7 +120,7 @@ export function GraphEpargne({ budget, params, items, indices }) {
             l: "Prévu",
             marque: (
               <svg width="22" height="6" aria-hidden="true">
-                <line x1="0" x2="22" y1="3" y2="3" stroke="#086b78" strokeWidth="2" strokeDasharray="5 4" />
+                <line x1="0" x2="22" y1="3" y2="3" stroke="var(--c-teal)" strokeWidth="2" strokeDasharray="5 4" />
               </svg>
             ),
           },
@@ -131,8 +131,8 @@ export function GraphEpargne({ budget, params, items, indices }) {
           style={{
             padding: "10px 12px",
             borderRadius: 14,
-            background: "#e3f4ed",
-            color: "#0b6e53",
+            background: "var(--vert-doux)",
+            color: "var(--t-vert)",
             fontSize: 14.5,
             fontWeight: 800,
           }}

@@ -5,6 +5,9 @@ import { App } from "./App.jsx";
 import { IMG_ICONE } from "./assets/images.js";
 import { GardeErreur } from "./components/GardeErreur.js";
 import { enregistrerServiceWorker } from "./lib/notifications.js";
+import { affichageDemarrage } from "./lib/affichage.js";
+
+affichageDemarrage();
 
 export function definirIcone(t) {
   let e = document.querySelector(`link[rel="${t}"]`);

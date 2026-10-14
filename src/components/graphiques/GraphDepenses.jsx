@@ -42,7 +42,7 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
     <CarteGraph
       titre={"Dépenses de " + MOIS[m]}
       chiffre={euros0(totR)}
-      couleur={totR > totB ? "#b8432a" : "var(--ink)"}
+      couleur={totR > totB ? "var(--t-rouge)" : "var(--ink)"}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         {bouton("←", "Mois précédent", m - 1, m > 1)}
@@ -74,7 +74,7 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
               <span
                 style={{
                   fontWeight: 700,
-                  color: depasse ? "#b8432a" : "var(--ink-soft)",
+                  color: depasse ? "var(--t-rouge)" : "var(--ink-soft)",
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
@@ -86,7 +86,7 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
                 position: "relative",
                 height: 12,
                 borderRadius: 99,
-                background: "#eef3f4",
+                background: "var(--fond-gris)",
                 width: piste.toFixed(1) + "%",
                 overflow: "hidden",
               }}
@@ -98,7 +98,7 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
                   top: 0,
                   bottom: 0,
                   borderRadius: 99,
-                  background: "#086b78",
+                  background: "var(--c-teal)",
                   width: plein.toFixed(1) + "%",
                 }}
               />
@@ -110,7 +110,7 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
                     bottom: 0,
                     right: 0,
                     borderRadius: "0 99px 99px 0",
-                    background: "#b8432a",
+                    background: "var(--c-rouge)",
                     width: (100 - plein).toFixed(1) + "%",
                   }}
                 />
@@ -134,19 +134,19 @@ export function GraphDepenses({ budget, budgetMois, transactions }) {
                   width: 18,
                   height: 8,
                   borderRadius: 99,
-                  background: "#eef3f4",
-                  border: "1px solid #c9d8db",
+                  background: "var(--fond-gris)",
+                  border: "1px solid var(--line-strong)",
                 }}
               />
             ),
           },
           {
             l: "Dépensé",
-            marque: <span style={{ width: 18, height: 8, borderRadius: 99, background: "#086b78" }} />,
+            marque: <span style={{ width: 18, height: 8, borderRadius: 99, background: "var(--c-teal)" }} />,
           },
           {
             l: "Dépassement",
-            marque: <span style={{ width: 18, height: 8, borderRadius: 99, background: "#b8432a" }} />,
+            marque: <span style={{ width: 18, height: 8, borderRadius: 99, background: "var(--c-rouge)" }} />,
           },
         ]}
       />

@@ -15,7 +15,7 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
     rouge = a.niveau === "rouge",
     blocs = [];
   if (a.niveau) {
-    const sous = rouge ? "rgba(255,255,255,.85)" : "#7a3a12";
+    const sous = rouge ? "rgba(255,255,255,.85)" : "var(--c-orange)";
     blocs.push(
       <div
         role="status"
@@ -33,7 +33,7 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
           borderRadius: 20,
           padding: "14px 16px",
           marginBottom: 10,
-          background: rouge ? "#a63a24" : "#fff3e6",
+          background: rouge ? "var(--c-rouge)" : "var(--orange-doux)",
           border: rouge ? "0" : "2px solid #e9b27f",
           color: rouge ? "#ffffff" : "var(--ink)",
           boxShadow: rouge ? "0 10px 24px rgba(166,58,36,.28)" : "none",
@@ -54,8 +54,8 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
               width: 42,
               height: 42,
               borderRadius: 14,
-              background: rouge ? "rgba(255,255,255,.16)" : "#fbe0c6",
-              color: rouge ? "#ffffff" : "#9a4515",
+              background: rouge ? "rgba(255,255,255,.16)" : "var(--orange-doux)",
+              color: rouge ? "#ffffff" : "var(--t-orange)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -105,7 +105,7 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
             style={{
               height: 10,
               borderRadius: 99,
-              background: rouge ? "rgba(255,255,255,.25)" : "#f6dcc3",
+              background: rouge ? "rgba(255,255,255,.25)" : "var(--orange-doux)",
               overflow: "hidden",
             }}
           >
@@ -115,8 +115,8 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
                 height: "100%",
                 borderRadius: 99,
                 background: rouge
-                  ? "repeating-linear-gradient(135deg,#ffffff 0 6px,#ffd9cf 6px 10px)"
-                  : "#c2702f",
+                  ? "repeating-linear-gradient(135deg,var(--surface) 0 6px,var(--rouge-doux) 6px 10px)"
+                  : "var(--c-orange)",
               }}
             />
           </div>
@@ -143,8 +143,8 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
           borderRadius: 16,
           padding: "8px 8px 8px 12px",
           marginBottom: 10,
-          background: "#fff8f0",
-          border: "1px solid #f0cfa9",
+          background: "var(--orange-doux)",
+          border: "1px solid var(--line-strong)",
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -155,7 +155,7 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
           aria-hidden="true"
           style={{
             flex: "none",
-            color: "#9a4515",
+            color: "var(--t-orange)",
             display: "flex",
           }}
         >
@@ -167,7 +167,7 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
             minWidth: 0,
             fontSize: 14.5,
             fontWeight: 800,
-            color: "#7a3a12",
+            color: "var(--t-orange)",
             fontVariantNumeric: "tabular-nums",
           }}
         >
@@ -185,8 +185,8 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
             style={{
               flex: "none",
               minHeight: 44,
-              borderColor: "#c2702f",
-              color: "#7a3a12",
+              borderColor: "var(--c-orange)",
+              color: "var(--t-orange)",
             }}
           >
             Ajuster

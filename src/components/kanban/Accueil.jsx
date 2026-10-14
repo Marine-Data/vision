@@ -101,20 +101,20 @@ function Accueil({
       {
         l: "Objectif 6 mois",
         v: (cible ? Math.round((epargne / cible) * 100) : 0) + " %",
-        c: "#086b78",
+        c: "var(--t-teal)",
         i: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01",
       },
       {
         l: "Vacances",
         v: eurosCourt(vac),
-        c: "#9a4515",
+        c: "var(--t-orange)",
         i: "M3 20h18M5 20l4-11 3 5 3-3 4 9M15 6a2 2 0 1 0 0-.01",
       },
       al.niveau === "rouge"
         ? {
             l: "Salaire dépassé",
             v: eurosCourt(al.reste),
-            c: "#b8432a",
+            c: "var(--t-rouge)",
             alerte: "rouge",
             i: "M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17h.01",
           }
@@ -122,14 +122,14 @@ function Accueil({
           ? {
               l: "Avant le salaire",
               v: eurosCourt(al.reste),
-              c: "#9a4515",
+              c: "var(--t-orange)",
               alerte: "orange",
               i: "M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17h.01",
             }
           : {
               l: "Reste du mois",
               v: eurosCourt(reste),
-              c: reste < 0 ? "#b8432a" : "#0b7a5c",
+              c: reste < 0 ? "var(--t-rouge)" : "var(--t-vert)",
               alerte: reste < 0 ? "rouge" : null,
               i: ACC_THEMES.budget.i,
             },
@@ -448,7 +448,7 @@ function Accueil({
           {kpis.map((k) => (
             <span
               style={{
-                background: k.alerte === "rouge" ? "#fdeeea" : k.alerte === "orange" ? "#fff3e6" : "#ffffff",
+                background: k.alerte === "rouge" ? "var(--rouge-doux)" : k.alerte === "orange" ? "var(--orange-doux)" : "var(--surface)",
                 borderRadius: 16,
                 padding: "10px 6px",
                 display: "flex",
@@ -458,7 +458,7 @@ function Accueil({
                 boxShadow: "var(--shadow)",
                 border:
                   "2px solid " +
-                  (k.alerte === "rouge" ? "#b8432a" : k.alerte === "orange" ? "#c2702f" : "transparent"),
+                  (k.alerte === "rouge" ? "var(--c-rouge)" : k.alerte === "orange" ? "var(--c-orange)" : "transparent"),
               }}
               key={k.l}
             >
@@ -507,7 +507,7 @@ function Accueil({
             width: "100%",
             border: prochaine.e.late ? "3px solid #ffd2c7" : 0,
             borderRadius: 22,
-            background: prochaine.e.late ? "#a63a24" : "var(--teal-dark)",
+            background: prochaine.e.late ? "var(--c-rouge)" : "var(--teal-dark)",
             color: "#ffffff",
             padding: 14,
             display: "flex",
@@ -555,8 +555,8 @@ function Accueil({
               flex: "none",
               padding: "6px 10px",
               borderRadius: 12,
-              background: "#ffffff",
-              color: prochaine.e.urgent ? "#b8432a" : "var(--teal-dark)",
+              background: "var(--surface)",
+              color: prochaine.e.urgent ? "var(--t-rouge)" : "var(--teal-dark)",
               fontSize: 15,
               fontWeight: 900,
             }}
@@ -603,8 +603,8 @@ function Accueil({
                 style={{
                   padding: "3px 10px",
                   borderRadius: 99,
-                  background: accEcheance(sel.due).urgent ? "#fbe9e4" : "#eef3f4",
-                  color: accEcheance(sel.due).urgent ? "#b8432a" : "var(--ink-soft)",
+                  background: accEcheance(sel.due).urgent ? "var(--rouge-doux)" : "var(--fond-gris)",
+                  color: accEcheance(sel.due).urgent ? "var(--t-rouge)" : "var(--ink-soft)",
                   fontSize: 13,
                   fontWeight: 800,
                 }}
@@ -617,8 +617,8 @@ function Accueil({
           {sel.src === "tache"
             ? kbBouton(confSuppr ? "Confirmer la suppression" : "Supprimer la tâche", () => supprimer(sel), {
                 outline: !0,
-                fg: "#b8432a",
-                bd: confSuppr ? "#b8432a" : "#f0d5ce",
+                fg: "var(--t-rouge)",
+                bd: confSuppr ? "var(--c-rouge)" : "var(--rouge-doux)",
                 h: 48,
               })
             : kbBouton(
@@ -690,7 +690,7 @@ function Accueil({
                       height: 52,
                       borderRadius: 16,
                       border: "2px solid " + th.c,
-                      background: on ? th.c : "#ffffff",
+                      background: on ? th.c : "var(--surface)",
                       color: on ? "#ffffff" : th.c,
                       display: "flex",
                       alignItems: "center",
