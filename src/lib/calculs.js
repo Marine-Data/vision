@@ -70,8 +70,11 @@ export const estLignePEA = (w) => /^e_pea/.test((w && w.line_key) || "");
 const estLivret = (w) => w.kind === "epargne" && !estVacancesLigne(w) && !estLignePEA(w);
 
 // Provision vacances du mois i : la ligne « Provision vacances » du budget de ce mois.
+// Avant le mois de création du compte (« compte_debut »), rien n'est provisionné ni versé.
+const avantDebut = (params, i) => i < param(params, "compte_debut", 0);
 export function tauxVacances(params) {
   return (i) => {
+    if (avantDebut(params, i)) return 0;
     const v = montantLigne(i, estVacancesLigne);
     return v != null ? v : paramOuDefaut(params, "provision_vacances_mensuelle");
   };
@@ -80,6 +83,7 @@ export function tauxVacances(params) {
 // Épargne vers les livrets au mois i : les lignes d'épargne du budget, hors vacances.
 export function tauxLivrets(params) {
   return (i) => {
+    if (avantDebut(params, i)) return 0;
     const v = montantLigne(i, estLivret);
     return v != null ? v : paramOuDefaut(params, "epargne_mensuelle");
   };

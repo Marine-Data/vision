@@ -14,6 +14,8 @@ import { SportPage } from "./components/SportPage.jsx";
 import { SuiviPage } from "./components/SuiviPage.jsx";
 import { Reglages } from "./components/Reglages.jsx";
 import { affichageDepuisParams } from "./lib/affichage.js";
+import { Bienvenue } from "./components/Bienvenue.jsx";
+import { entete, ongletVisible } from "./lib/profil.js";
 import { Verrou } from "./components/Verrou.jsx";
 import { Graphiques } from "./components/graphiques/Graphiques.jsx";
 import { Accueil } from "./components/kanban/Accueil.jsx";
@@ -81,7 +83,9 @@ export function App() {
     [toast, setToast] = React.useState(null),
     [recOk, setRecOk] = React.useState(!1),
     [etatNotifs, setEtatNotifs] = React.useState(null),
-    [pea, setPea] = React.useState([]);
+    [pea, setPea] = React.useState([]),
+    [bienvenue, setBienvenue] = React.useState(null),
+    [recharge, setRecharge] = React.useState(0);
   React.useEffect(() => affichageDepuisParams(c), [c]);
   React.useEffect(() => {
     MODE_PARTAGE ||
@@ -137,6 +141,10 @@ export function App() {
       }
       if (!t) return;
       const N = t.user.id;
+      // Compte neuf (ni budget ni profil) : écran « Bienvenue » au lieu de l'app.
+      // Plus aucun contenu par défaut n'est recopié : chacun part de ses réponses.
+      let annule = !1;
+      const charger = () => {
       supabase
         .from("vision_progress")
         .select("item_key, done, etape")
@@ -150,34 +158,12 @@ export function App() {
             setPe(P);
         }),
         (async () => {
-          let { data: K } = await supabase.from("vision_budget").select("*").order("sort");
-          (!K || K.length === 0) &&
-            (await supabase.from("vision_budget").upsert(
-              BUDGET_DEFAUT.map((H) => ({
-                ...H,
-                user_id: N,
-              })),
-              {
-                onConflict: "user_id,line_key",
-              },
-            ),
-            (K = (await supabase.from("vision_budget").select("*").order("sort")).data)),
-            u(K || []);
+          const { data: K } = await supabase.from("vision_budget").select("*").order("sort");
+          u(K || []);
         })(),
         (async () => {
-          let { data: K } = await supabase.from("vision_params").select("*");
-          (!K || K.length === 0) &&
-            (await supabase.from("vision_params").upsert(
-              PARAMS_DEFAUT.map((H) => ({
-                ...H,
-                user_id: N,
-              })),
-              {
-                onConflict: "user_id,param_key",
-              },
-            ),
-            (K = (await supabase.from("vision_params").select("*")).data)),
-            d(K || []);
+          const { data: K } = await supabase.from("vision_params").select("*");
+          d(K || []);
         })(),
         async () => {
           let { data: K } = await supabase
@@ -199,13 +185,8 @@ export function App() {
             m(K || []);
         },
         (async () => {
-          let { data: K } = await supabase.from("vision_contenu").select("*").order("type").order("sort");
-          (!K || K.length === 0) &&
-            (await supabase.from("vision_contenu").upsert(contenuDefauts(N), {
-              onConflict: "user_id,type,item_key",
-            }),
-            (K = (await supabase.from("vision_contenu").select("*").order("type").order("sort")).data)),
-            sct(K || []);
+          const { data: K } = await supabase.from("vision_contenu").select("*").order("type").order("sort");
+          sct(K || []);
         })(),
         (async () => {
           const { data: K } = await supabase
@@ -314,7 +295,24 @@ export function App() {
           const { data: K } = await supabase.from("vision_savings").select("*").order("sort");
           ssv(K || []);
         })();
-    }, [t]);
+      };
+      (async () => {
+        const [{ data: B, error: eB }, { data: P, error: eP }] = await Promise.all([
+          supabase.from("vision_budget").select("id").limit(1),
+          supabase.from("vision_contenu").select("id").eq("type", "note").eq("groupe", "profil").limit(1),
+        ]);
+        if (annule) return;
+        if (!eB && !eP && !(B && B.length) && !(P && P.length)) {
+          setBienvenue(!0);
+          return;
+        }
+        setBienvenue(!1);
+        charger();
+      })();
+      return () => {
+        annule = !0;
+      };
+    }, [t, recharge]);
   function ctEdit(id, patch) {
     sct((p) =>
       p.map((x) =>
@@ -546,6 +544,12 @@ export function App() {
       notifier(msg || "Enregistré", () =>
         ecrire(Object.fromEntries(Object.keys(patch).map((k) => [k, avant[k] ?? null]))),
       );
+  }
+  // Profil (prénom, projet) : une ligne « note » du groupe « profil ».
+  async function profilEnregistrer(prenom, projet) {
+    const p = ctRef.current.find((x) => x.type === "note" && x.groupe === "profil");
+    if (p) await ctMaj(p.id, { detail: prenom, titre: projet }, "Profil enregistré");
+    else await ctCreer("note", "profil", { item_key: "profil", detail: prenom, titre: projet, sort: 0 }, "Profil enregistré");
   }
   async function ctCreer(type, groupe, champs, msg) {
     const rows = ctRef.current.filter((x) => x.type === type && (x.groupe || null) === (groupe || null)),
@@ -1477,6 +1481,19 @@ export function App() {
   if (!supabaseConfigured) return <div className="warn">Configuration Supabase manquante.</div>;
   if (!r) return null;
   if (!MODE_PARTAGE && !t) return <Connexion />;
+  if (!MODE_PARTAGE && bienvenue === !0)
+    return (
+      <Bienvenue
+        supabase={supabase}
+        uid={t.user.id}
+        onTermine={() => {
+          setBienvenue(null), setRecharge((x) => x + 1), i("apercu"), window.scrollTo(0, 0);
+        }}
+      />
+    );
+  const visibles = ONGLETS.filter((x) => MODE_PARTAGE || ongletVisible(c, x.id)),
+    tete = MODE_PARTAGE ? entete([]) : entete(ct),
+    ong = visibles.some((x) => x.id === s) ? s : "apercu";
   set_VISION_BUDGET(l, bm, txOk ? tx : null);
   set_ICONES(l);
   set_ALERTE_SEUIL(param(c, "alerte_seuil", 50));
@@ -1558,8 +1575,8 @@ export function App() {
         }}
       >
         <div className="wrap">
-          <div className="kick">Reconversion · 2026 – 2027</div>
-          <h1>{"Juriste Data, IA & Cyber"}</h1>
+          <div className="kick">{tete.kicker}</div>
+          <h1>{tete.titre}</h1>
           {MODE_PARTAGE ? (
             <>
               <div className="who">Aperçu partagé</div>
@@ -1585,7 +1602,7 @@ export function App() {
         </div>
       </header>
       <main className="wrap">
-        {s === "apercu" && (
+        {ong === "apercu" && (
           <Accueil
             budget={l}
             budgetMois={bm}
@@ -1610,7 +1627,7 @@ export function App() {
             onDelete={MODE_PARTAGE ? rienFaire : tacheDelete}
           />
         )}
-        {s === "planning" && (
+        {ong === "planning" && (
           <Planning
             rows={ct}
             edit={ctEdit}
@@ -1621,7 +1638,7 @@ export function App() {
             readOnly={MODE_PARTAGE}
           />
         )}
-        {s === "suivi" && (
+        {ong === "suivi" && (
           <SuiviPage
             rows={ct}
             progress={o}
@@ -1633,8 +1650,8 @@ export function App() {
             onMove={agir(ctMove)}
           />
         )}
-        {s === "budget" && <Formations items={vi} />}
-        {s === "tresorerie" &&
+        {ong === "budget" && <Formations items={vi} />}
+        {ong === "tresorerie" &&
           gt(
             <>
               <BudgetMensuel
@@ -1692,9 +1709,9 @@ export function App() {
               </details>
             </>,
           )}
-        {s === "stats" &&
+        {ong === "stats" &&
           gt(<Graphiques budget={l} params={c} items={vi} budgetMois={bm} transactions={tx} />)}
-        {s === "sport" && (
+        {ong === "sport" && (
           <SportPage
             rows={ct}
             items={vi}
@@ -1708,9 +1725,10 @@ export function App() {
             onSeance={agir(actions.seanceBasculer)}
           />
         )}
-        {s === "reglages" &&
+        {ong === "reglages" &&
           gt(
             <Reglages
+              contenu={ct}
               params={c}
               budget={l}
               budgetMois={bm}
@@ -1720,6 +1738,7 @@ export function App() {
               notifs={notifs}
               actions={{
                 reglage: agir(actions.reglage),
+                profil: agir(profilEnregistrer),
                 recurrenteEnregistrer: agir(actions.recurrenteEnregistrer),
                 recurrenteArreter: agir(actions.recurrenteArreter),
                 regleAjouter: agir(actions.regleAjouter),
@@ -1727,7 +1746,7 @@ export function App() {
               }}
             />,
           )}
-        {s === "pieces" && (
+        {ong === "pieces" && (
           <PiecesPage
             rows={ct}
             progress={o}
@@ -1742,8 +1761,8 @@ export function App() {
             onRenameGroupe={groupeRename}
           />
         )}
-        {s === "historique" && gt(<Historique audit={aud} items={vi} params={c} />)}
-        {s === "homework" && (
+        {ong === "historique" && gt(<Historique audit={aud} items={vi} params={c} />)}
+        {ong === "homework" && (
           <DevoirsPage
             rows={hwRows}
             setRows={setHwRows}
@@ -1802,8 +1821,8 @@ export function App() {
       )}
       <ToastAnnuler toast={toast} onFermer={() => setToast(null)} />
       <NavBas
-        onglets={ONGLETS}
-        actif={s}
+        onglets={visibles}
+        actif={ong}
         aller={(N) => {
           i(N), window.scrollTo(0, 0);
         }}

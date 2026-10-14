@@ -39,6 +39,7 @@ import {
 } from "../../lib/calculs.js";
 import { eurosCourt, num, paramOuDefaut } from "../../lib/format.js";
 import { MOIS, moisNow } from "../../lib/mois.js";
+import { lireProfil, ongletVisible } from "../../lib/profil.js";
 
 export // ============================================================
 // ACCUEIL
@@ -64,6 +65,10 @@ function Accueil({
   onPieceEtape,
   onSuiviToggle,
 }) {
+  // Thèmes affichés = onglets affichés ; « Reconversion » devient « Parcours » pour les autres comptes.
+  const nomReco = lireProfil(contenu).existe ? "Parcours" : "Reconversion";
+  (ACC_THEMES.reco.l = nomReco), (ACC_THEMES.reco.short = lireProfil(contenu).existe ? "Parcours" : "Reconv.");
+  const themesVisibles = Object.keys(ACC_THEMES).filter((k) => ongletVisible(params, ACC_THEMES[k].tab));
   const [selKey, setSelKey] = React.useState(null),
     [ajout, setAjout] = React.useState(!1),
     [titre, setTitre] = React.useState(""),
@@ -307,7 +312,7 @@ function Accueil({
       day: "numeric",
       month: "long",
     }).format(aujD);
-  const couloirs = Object.keys(ACC_THEMES).map((key) => {
+  const couloirs = themesVisibles.map((key) => {
     const th = ACC_THEMES[key],
       liste = cartes
         .filter((c) => c.theme === key)
@@ -657,12 +662,12 @@ function Accueil({
             aria-label="Thème"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(5,minmax(0,1fr))",
+              gridTemplateColumns: "repeat(" + themesVisibles.length + ",minmax(0,1fr))",
               gap: 6,
               marginBottom: 14,
             }}
           >
-            {Object.keys(ACC_THEMES).map((key) => {
+            {themesVisibles.map((key) => {
               const th = ACC_THEMES[key],
                 on = key === theme;
               return (

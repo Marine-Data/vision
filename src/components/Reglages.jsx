@@ -3,6 +3,7 @@ import { KbSheet } from "./kanban/communs.jsx";
 import { catIcone, euros, num, param } from "../lib/format.js";
 import { MOIS, moisNow } from "../lib/mois.js";
 import { TAILLES, THEMES, appliquerAffichage } from "../lib/affichage.js";
+import { ONGLETS_AU_CHOIX, entete, lireProfil, ongletVisible } from "../lib/profil.js";
 
 // Réglages : jour de l'épargne automatique, seuil de l'alerte, dépenses récurrentes,
 // rappels sur le téléphone, mots-clés de l'import. Tout est enregistré dans la base.
@@ -269,7 +270,71 @@ function Segments({ label, choix, valeur, onChoisir }) {
   );
 }
 
-export function Reglages({ params, budget, budgetMois, recurrentes, regles, actions, readOnly, notifs }) {
+// Interrupteur marche / arrêt.
+function Interrupteur({ on, label, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      style={{ flex: "none", width: 52, height: 32, borderRadius: 99, border: 0, background: on ? "var(--teal-dark)" : "var(--line-strong)", position: "relative", padding: 0, cursor: "pointer" }}
+    >
+      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 26, height: 26, borderRadius: "50%", background: "var(--surface)", boxShadow: "0 1px 3px rgba(0,0,0,.2)", transition: "left .15s" }} />
+    </button>
+  );
+}
+
+// Profil (en-tête de l'app) et onglets affichés.
+function ProfilOnglets({ contenu, params, readOnly, a }) {
+  // Compte créé avant l'écran Bienvenue : le titre actuel est repris tel quel.
+  const lu = lireProfil(contenu),
+    p = lu.existe ? lu : { ...lu, projet: entete(contenu).titre },
+    [prenom, setPrenom] = React.useState(p.prenom),
+    [projet, setProjet] = React.useState(p.projet);
+  React.useEffect(() => {
+    setPrenom(p.prenom), setProjet(p.projet);
+  }, [p.prenom, p.projet]);
+  const enregistrer = () => {
+    if (readOnly || !a.profil) return;
+    if (prenom.trim() === p.prenom && projet.trim() === p.projet) return;
+    a.profil(prenom.trim(), projet.trim());
+  };
+  const champP = { height: 46, borderRadius: 12, border: "2px solid var(--line)", padding: "0 12px", font: "inherit", fontSize: 16, fontWeight: 700, color: "var(--ink)", background: "var(--surface)", minWidth: 0, width: "100%", boxSizing: "border-box" };
+  return (
+    <>
+      <div style={{ ...carte, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>👤 Profil</div>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--slate)" }}>Prénom</span>
+          <input style={champP} value={prenom} placeholder={p.existe ? "" : "Reconversion"} disabled={readOnly} onChange={(e) => setPrenom(e.target.value)} onBlur={enregistrer} />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--slate)" }}>Projet de l'année (titre en haut)</span>
+          <input style={champP} value={projet} placeholder={p.existe ? "Mon année" : "Juriste Data, IA & Cyber"} disabled={readOnly} onChange={(e) => setProjet(e.target.value)} onBlur={enregistrer} />
+        </label>
+      </div>
+      <section aria-label="Onglets" style={{ ...carte, padding: "4px 0" }}>
+        <div style={{ padding: "12px 14px 4px", fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>🗂️ Onglets</div>
+        <div style={{ padding: "0 14px 6px", fontSize: 13, fontWeight: 600, color: "var(--slate)" }}>Accueil, Budget mois, Historique et Réglages sont toujours là.</div>
+        {ONGLETS_AU_CHOIX.map(([id, i, l]) => {
+          const on = ongletVisible(params, id);
+          return (
+            <div key={id} style={{ minHeight: 56, display: "flex", alignItems: "center", gap: 10, padding: "0 10px 0 14px" }}>
+              <span aria-hidden="true" style={{ fontSize: 20 }}>{i}</span>
+              <span style={{ flex: 1, fontSize: 14.5, fontWeight: 800 }}>{l}</span>
+              <Interrupteur on={on} label={l} disabled={readOnly} onClick={() => a.reglage && a.reglage("onglet_" + id, on ? 0 : 1, l + (on ? " : onglet caché" : " : onglet affiché"))} />
+            </div>
+          );
+        })}
+      </section>
+    </>
+  );
+}
+
+export function Reglages({ contenu, params, budget, budgetMois, recurrentes, regles, actions, readOnly, notifs }) {
   const [ouvert, setOuvert] = React.useState(null),
     [groupeOuvert, setGroupeOuvert] = React.useState(null),
     [saisie, setSaisie] = React.useState("");
@@ -326,6 +391,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
             onChoisir={(v) => affichage("affichage_theme", v, "Thème : " + THEMES.find((t) => t[0] === v)[1].replace(/^\S+ /, "").toLowerCase())}
           />
         </div>
+        <ProfilOnglets contenu={contenu} params={params} readOnly={readOnly} a={a} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
           <Reglette
             icone="🐷"
