@@ -33,7 +33,7 @@ const VISION_CONFIG = {
   // --- Règles de calcul ----------------------------------------
   matelas: {
     multiplicateurSalaire: 6,
-    fallback: 12900,
+    fallback: 0,
   },
   seuilPocheDefaut: 200,
   // --- Contenu -------------------------------------------------

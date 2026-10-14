@@ -816,6 +816,12 @@ export function SportPage({
               </button>
             )}
           </div>
+          {!fiche && !echeances.length ? (
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--slate)" }}>
+              Pas encore d'adhésion. Touche ✏️ pour noter ton club, la date de fin et le certificat médical.
+            </div>
+          ) : (
+          <>
           <div
             style={{
               display: "grid",
@@ -887,6 +893,8 @@ export function SportPage({
               </div>
             )}
           </div>
+          </>
+          )}
         </section>
       </div>
       {ouvert && ouvert.type === "cours" && (
