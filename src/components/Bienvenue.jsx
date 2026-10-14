@@ -3,6 +3,7 @@ import { IMG_FOND } from "../assets/images.js";
 import { EPARGNES_PROPOSEES, POSTES_PROPOSES, creerNouveauCompte, nombre } from "../lib/nouveauCompte.js";
 import { ONGLETS_AU_CHOIX } from "../lib/profil.js";
 import { moisNow } from "../lib/mois.js";
+import { catIcone } from "../lib/format.js";
 
 // Écran « Bienvenue » d'un compte neuf : 6 questions courtes, chacune peut être passée.
 
@@ -76,7 +77,7 @@ function Case({ on }) {
   );
 }
 
-export function Bienvenue({ supabase, uid, onTermine }) {
+export function Bienvenue({ supabase, uid, onTermine, invite }) {
   const [E, setE] = React.useState(0),
     [r, setR] = React.useState({
       prenom: "",
@@ -103,10 +104,31 @@ export function Bienvenue({ supabase, uid, onTermine }) {
     deja = nombre(r.deja),
     pct = objectif > 0 ? Math.min(100, (deja / objectif) * 100) : 0;
 
+  // Invitation avec « Partir du modèle » : postes et onglets de l'invitante, sans ses montants.
+  React.useEffect(() => {
+    if (!invite || !invite.modele) return;
+    supabase
+      .rpc("vision_partage_modele", { p_jeton: invite.jeton })
+      .then(({ data }) => {
+        if (!data) return;
+        const postes = (data.postes || []).map((p) => ({ k: p.line_key, e: p.icone || catIcone(p.poste), l: p.poste, m: "", on: true })),
+          o = data.onglets || {},
+          suivis = Object.fromEntries(ONGLETS_AU_CHOIX.filter(([id]) => id !== "budget").map(([id]) => [id, o[id] == null || Number(o[id]) !== 0]));
+        setR((x) => ({ ...x, postes: postes.length ? postes : x.postes, suivis }));
+      })
+      .catch(() => {});
+  }, []);
   async function terminer(rep) {
     setEnCours(true), setErreur("");
     try {
       await creerNouveauCompte(supabase, { ...rep, mois: moisNow() }, uid);
+      if (invite)
+        await supabase
+          .rpc("vision_invitation_utilisee", { p_jeton: invite.jeton, p_echange: !!invite.echange, p_nouveau: true })
+          .then(
+            () => {},
+            () => {},
+          );
       onTermine();
     } catch (e) {
       setErreur("L'enregistrement n'a pas marché (" + e.message + "). Réessaie.");
@@ -171,6 +193,12 @@ export function Bienvenue({ supabase, uid, onTermine }) {
       <div style={{ flex: 1, width: "100%", maxWidth: 560, margin: "0 auto", padding: "18px 16px 120px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 10 }}>
         {etape[0] === "toi" && (
           <>
+            {invite && (
+              <div style={{ ...carte, background: "var(--teal-doux)", boxShadow: "none", fontSize: 14, fontWeight: 700, color: "var(--t-teal)" }}>
+                👋 Invitée par {invite.prenom || "une amie"}
+                {invite.modele ? " · son modèle est prérempli, sans ses montants" : ""}
+              </div>
+            )}
             <label style={carte}>
               <span style={libelle}>Ton prénom</span>
               <input style={champ} value={r.prenom} onChange={(e) => maj({ prenom: e.target.value })} autoComplete="given-name" />

@@ -26,7 +26,7 @@ export const STYLE_CARTE_CONNEXION = {
   boxShadow: "0 12px 44px rgba(35,50,58,.22)",
 };
 
-export function Connexion() {
+export function Connexion({ bandeau } = {}) {
   const [t, e] = React.useState(""),
     [r, n] = React.useState(""),
     [s, i] = React.useState(!1),
@@ -107,8 +107,14 @@ export function Connexion() {
   ) : (
     <div style={STYLE_ECRAN_CONNEXION}>
       <div className="auth" style={STYLE_CARTE_CONNEXION}>
-        <h1>Vision</h1>
-        <p>Ta feuille de route vers la mer. Connecte-toi pour retrouver ton suivi sur tous tes appareils.</p>
+        {bandeau && bandeau.props && bandeau.props.info && bandeau.props.info.etat === "ok" && !bandeau.props.info.proprio ? (
+          bandeau
+        ) : (
+          <>
+            <h1>Vision</h1>
+            <p>Ta feuille de route vers la mer. Connecte-toi pour retrouver ton suivi sur tous tes appareils.</p>
+          </>
+        )}
         <form onSubmit={c}>
           <input
             type="email"

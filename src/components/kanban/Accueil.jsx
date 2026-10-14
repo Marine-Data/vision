@@ -50,6 +50,7 @@ function Accueil({
   transactions,
   items,
   params,
+  ongletsLecture,
   poches,
   progress,
   pieceEtapes,
@@ -68,7 +69,10 @@ function Accueil({
   // Thèmes affichés = onglets affichés ; « Reconversion » devient « Parcours » pour les autres comptes.
   const nomReco = lireProfil(contenu).existe ? "Parcours" : "Reconversion";
   (ACC_THEMES.reco.l = nomReco), (ACC_THEMES.reco.short = lireProfil(contenu).existe ? "Parcours" : "Reconv.");
-  const themesVisibles = Object.keys(ACC_THEMES).filter((k) => ongletVisible(params, ACC_THEMES[k].tab));
+  // En lecture seule (lien partagé) : seulement les parties partagées, sans le couloir Budget.
+  const themesVisibles = Object.keys(ACC_THEMES).filter((k) =>
+    ongletsLecture ? k !== "budget" && ongletsLecture.includes(ACC_THEMES[k].tab) : ongletVisible(params, ACC_THEMES[k].tab),
+  );
   const [selKey, setSelKey] = React.useState(null),
     [ajout, setAjout] = React.useState(!1),
     [titre, setTitre] = React.useState(""),

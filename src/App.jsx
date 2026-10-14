@@ -15,7 +15,11 @@ import { SuiviPage } from "./components/SuiviPage.jsx";
 import { Reglages } from "./components/Reglages.jsx";
 import { affichageDepuisParams } from "./lib/affichage.js";
 import { Bienvenue } from "./components/Bienvenue.jsx";
-import { entete, ongletVisible } from "./lib/profil.js";
+import { Partager } from "./components/Partager.jsx";
+import { KbSheet } from "./components/kanban/communs.jsx";
+import { BandeauInvitation, BudgetPartage, EcranLecture, PlanningsEchanges, RaccourcisLecture } from "./components/Lecture.jsx";
+import { JETON_INVITE, JETON_VOIR, ONGLET_DE_SECTION, resumeBudget } from "./lib/partage.js";
+import { entete, lireProfil, ongletVisible } from "./lib/profil.js";
 import { Verrou } from "./components/Verrou.jsx";
 import { Graphiques } from "./components/graphiques/Graphiques.jsx";
 import { Accueil } from "./components/kanban/Accueil.jsx";
@@ -85,7 +89,75 @@ export function App() {
     [etatNotifs, setEtatNotifs] = React.useState(null),
     [pea, setPea] = React.useState([]),
     [bienvenue, setBienvenue] = React.useState(null),
-    [recharge, setRecharge] = React.useState(0);
+    [recharge, setRecharge] = React.useState(0),
+    // Partage : lien lu (?voir=), code saisi, invitation (?invite=), fenêtre Partager, plannings échangés
+    [lecture, setLecture] = React.useState(null),
+    [codeLecture, setCodeLecture] = React.useState(null),
+    [invitation, setInvitation] = React.useState(null),
+    [choixInvite, setChoixInviteBrut] = React.useState(() => {
+      try {
+        const v = JSON.parse(localStorage.getItem("vision_invite") || "null");
+        return v && v.jeton === JETON_INVITE ? v : { jeton: JETON_INVITE, modele: true, echange: true };
+      } catch (e) {
+        return { jeton: JETON_INVITE, modele: true, echange: true };
+      }
+    }),
+    [partagerOuvert, setPartagerOuvert] = React.useState(!1),
+    [partenaires, setPartenaires] = React.useState([]),
+    [echangePropose, setEchangePropose] = React.useState(!1);
+  // Plannings échangés (cours des personnes qui partagent le leur avec moi).
+  const chargerPartenaires = () =>
+    supabase
+      .rpc("vision_planning_partenaires")
+      .then(({ data }) => setPartenaires(data || []))
+      .catch(() => {});
+  function oublierInvitation() {
+    try {
+      localStorage.removeItem("vision_invite");
+      if (JETON_INVITE) history.replaceState(null, "", window.location.pathname);
+    } catch (e) {}
+  }
+  async function arreterEchange(p) {
+    if (!window.confirm("Arrêter l'échange de plannings avec " + p.prenom + " ?")) return;
+    const { error } = await supabase.from("vision_echanges").delete().eq("id", p.echange_id);
+    if (error) return notifier("Impossible d'arrêter : " + error.message);
+    notifier("Échange arrêté avec " + p.prenom);
+    chargerPartenaires();
+  }
+  async function accepterEchange() {
+    setEchangePropose(!1);
+    await supabase.rpc("vision_invitation_utilisee", { p_jeton: JETON_INVITE, p_echange: !0, p_nouveau: !1 });
+    oublierInvitation(), chargerPartenaires(), notifier("Plannings échangés 🔁");
+  }
+  function refuserEchange() {
+    setEchangePropose(!1), oublierInvitation();
+  }
+  // Compte déjà prêt + lien d'invitation : proposer l'échange (sinon on oublie le lien).
+  React.useEffect(() => {
+    if (MODE_PARTAGE || !t || bienvenue !== !1) return;
+    chargerPartenaires();
+    if (!JETON_INVITE || !invitation) return;
+    if (invitation.etat === "ok" && !invitation.proprio && invitation.echange) setEchangePropose(!0);
+    else oublierInvitation();
+  }, [t, bienvenue, invitation]);
+  const setChoixInvite = (v) => {
+    setChoixInviteBrut(v);
+    try {
+      localStorage.setItem("vision_invite", JSON.stringify(v));
+    } catch (e) {}
+  };
+  // Invitation : prénom de l'invitante, petit mot, échange proposé (lisible sans être connectée).
+  React.useEffect(() => {
+    if (!JETON_INVITE || MODE_PARTAGE) return;
+    supabase
+      .rpc("vision_partage_invitation", { p_jeton: JETON_INVITE })
+      .then(({ data }) => {
+        setInvitation(data || null);
+        if (data && data.etat === "ok" && !data.echange && choixInvite.echange) setChoixInvite({ ...choixInvite, echange: false });
+        if (!localStorage.getItem("vision_invite")) setChoixInvite(choixInvite);
+      })
+      .catch(() => {});
+  }, []);
   React.useEffect(() => affichageDepuisParams(c), [c]);
   React.useEffect(() => {
     MODE_PARTAGE ||
@@ -96,6 +168,29 @@ export function App() {
   const recRef = React.useRef(!1);
   const [txOk, setTxOk] = React.useState(!1);
   const [tachesOk, setTachesOk] = React.useState(!1);
+  // Résumé du budget pour les liens partagés : recalculé avec les mêmes formules que Budget mois,
+  // enregistré seulement s'il a changé.
+  const resumeRef = React.useRef("");
+  React.useEffect(() => {
+    if (MODE_PARTAGE || !t || !txOk || !l || !l.length) return;
+    const id = setTimeout(() => {
+      let r = null;
+      try {
+        r = resumeBudget({ budget: l, budgetMois: bm, transactions: tx, params: c, items: vi, poches, pea });
+      } catch (e) {
+        return;
+      }
+      if (!r) return;
+      const cle = JSON.stringify(r);
+      if (cle === resumeRef.current) return;
+      resumeRef.current = cle;
+      supabase
+        .from("vision_partage_resume")
+        .upsert({ user_id: t.user.id, budget: { ...r, maj: new Date().toISOString() }, maj: new Date().toISOString() }, { onConflict: "user_id" })
+        .then(() => {}, () => {});
+    }, 2000);
+    return () => clearTimeout(id);
+  }, [t, txOk, l, bm, tx, c, vi, poches, pea]);
   const alerteRef = React.useRef({});
   const epAutoRef = React.useRef(!1);
   const ctRef = React.useRef([]);
@@ -119,24 +214,28 @@ export function App() {
   }, []),
     React.useEffect(() => {
       if (MODE_PARTAGE) {
-        u(
-          BUDGET_DEFAUT.map((K, H) => ({
-            ...K,
-            id: "d" + H,
-          })),
-        ),
-          d(
-            PARAMS_DEFAUT.map((K) => ({
-              ...K,
-            })),
-          ),
-          m(
-            VOYAGES_DEFAUT.map((K, H) => ({
-              ...K,
-              id: "d" + H,
-            })),
-          ),
-          a({});
+        // Lecture seule : seulement ce que le lien autorise, renvoyé par la base.
+        u([]), d([]), m([]), a({}), k(!0);
+        if (!JETON_VOIR) {
+          setLecture({ etat: "invalide" });
+          return;
+        }
+        supabase
+          .rpc("vision_partage_lire", { p_jeton: JETON_VOIR, p_code: codeLecture })
+          .then(({ data: R, error: E }) => {
+            if (E || !R) return setLecture({ etat: "invalide" });
+            if (R.etat === "ok") {
+              const P = {},
+                Q = {};
+              (R.progress || []).forEach((x) => {
+                (P[x.item_key] = x.done), x.etape && (Q[x.item_key] = x.etape);
+              });
+              sct(R.contenu || []), a(P), setPe(Q), setHwRows(R.homework || []), setHwLoading(!1);
+              setSeances(R.seances || []), mi(R.items || []);
+            }
+            setLecture(R);
+          })
+          .catch(() => setLecture({ etat: "invalide" }));
         return;
       }
       if (!t) return;
@@ -312,7 +411,7 @@ export function App() {
       return () => {
         annule = !0;
       };
-    }, [t, recharge]);
+    }, [t, recharge, codeLecture]);
   function ctEdit(id, patch) {
     sct((p) =>
       p.map((x) =>
@@ -1480,19 +1579,24 @@ export function App() {
     };
   if (!supabaseConfigured) return <div className="warn">Configuration Supabase manquante.</div>;
   if (!r) return null;
-  if (!MODE_PARTAGE && !t) return <Connexion />;
+  if (!MODE_PARTAGE && !t)
+    return <Connexion bandeau={<BandeauInvitation info={invitation} choix={choixInvite} setChoix={setChoixInvite} />} />;
+  if (MODE_PARTAGE && (!lecture || lecture.etat !== "ok")) return <EcranLecture etat={lecture} onCode={setCodeLecture} />;
   if (!MODE_PARTAGE && bienvenue === !0)
     return (
       <Bienvenue
         supabase={supabase}
         uid={t.user.id}
+        invite={JETON_INVITE && invitation && invitation.etat === "ok" && !invitation.proprio ? { ...choixInvite, jeton: JETON_INVITE, prenom: invitation.prenom, echange: invitation.echange && choixInvite.echange } : null}
         onTermine={() => {
+          oublierInvitation();
           setBienvenue(null), setRecharge((x) => x + 1), i("apercu"), window.scrollTo(0, 0);
         }}
       />
     );
-  const visibles = ONGLETS.filter((x) => MODE_PARTAGE || ongletVisible(c, x.id)),
-    tete = MODE_PARTAGE ? entete([]) : entete(ct),
+  const ongletsLecture = MODE_PARTAGE ? ["apercu", ...((lecture && lecture.sections) || []).map((x) => ONGLET_DE_SECTION[x])] : null,
+    visibles = ONGLETS.filter((x) => (MODE_PARTAGE ? ongletsLecture.includes(x.id) : ongletVisible(c, x.id))),
+    tete = entete(ct),
     ong = visibles.some((x) => x.id === s) ? s : "apercu";
   set_VISION_BUDGET(l, bm, txOk ? tx : null);
   set_ICONES(l);
@@ -1579,18 +1683,20 @@ export function App() {
           <h1>{tete.titre}</h1>
           {MODE_PARTAGE ? (
             <>
-              <div className="who">Aperçu partagé</div>
-              <div className="topact">
-                <button className="logout" onClick={() => (window.location.href = window.location.origin + window.location.pathname)}>
-                  Mon compte
-                </button>
-              </div>
+              <div className="who">👁 Lecture seule</div>
+              {lecture && lecture.formule === "deux" && (
+                <div className="topact">
+                  <button className="logout" onClick={() => (window.location.href = window.location.origin + window.location.pathname + "?invite=" + encodeURIComponent(JETON_VOIR))}>
+                    ✨ Créer mon app
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <>
               <div className="who">{t.user.email}</div>
               <div className="topact">
-                <button className="logout" onClick={oe}>
+                <button className="logout" onClick={() => setPartagerOuvert(!0)}>
                   Partager
                 </button>
                 <button className="logout" onClick={() => supabase.auth.signOut()}>
@@ -1602,8 +1708,18 @@ export function App() {
         </div>
       </header>
       <main className="wrap">
-        {ong === "apercu" && (
+        {ong === "apercu" && MODE_PARTAGE && (
+          <RaccourcisLecture
+            sections={lecture && lecture.sections}
+            prenom={lireProfil(ct).prenom}
+            aller={(N) => {
+              i(N), window.scrollTo(0, 0);
+            }}
+          />
+        )}
+        {ong === "apercu" && (!MODE_PARTAGE || ((lecture && lecture.sections) || []).some((x) => ["suivi", "sport", "homework", "pieces"].includes(x))) && (
           <Accueil
+            ongletsLecture={MODE_PARTAGE ? ongletsLecture : null}
             budget={l}
             budgetMois={bm}
             transactions={tx}
@@ -1636,6 +1752,15 @@ export function App() {
             del={ctDel}
             move={ctMove}
             readOnly={MODE_PARTAGE}
+            echanges={
+              MODE_PARTAGE ? null : (
+                <PlanningsEchanges
+                  partenaires={partenaires}
+                  mesCours={ct.filter((x) => x.type === "cours")}
+                  onArreter={arreterEchange}
+                />
+              )
+            }
           />
         )}
         {ong === "suivi" && (
@@ -1651,7 +1776,9 @@ export function App() {
           />
         )}
         {ong === "budget" && <Formations items={vi} />}
+        {ong === "tresorerie" && MODE_PARTAGE && <BudgetPartage budget={lecture && lecture.budget} />}
         {ong === "tresorerie" &&
+          !MODE_PARTAGE &&
           gt(
             <>
               <BudgetMensuel
@@ -1820,6 +1947,32 @@ export function App() {
         />
       )}
       <ToastAnnuler toast={toast} onFermer={() => setToast(null)} />
+      {partagerOuvert && !MODE_PARTAGE && (
+        <Partager
+          supabase={supabase}
+          uid={t.user.id}
+          onClose={() => setPartagerOuvert(!1)}
+          notifier={(m) => notifier(m)}
+        />
+      )}
+      {echangePropose && invitation && (
+        <KbSheet label="Échanger nos plannings" onClose={refuserEchange}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>
+              🔁 {invitation.prenom || "On"} te propose d'échanger vos plannings
+            </div>
+            <div style={{ fontSize: 14, color: "var(--slate)" }}>Vous verrez les cours l'une de l'autre et vos créneaux libres en commun.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button type="button" className="btn-outline" onClick={refuserEchange}>
+                Non merci
+              </button>
+              <button type="button" className="btn" onClick={accepterEchange}>
+                Oui
+              </button>
+            </div>
+          </div>
+        </KbSheet>
+      )}
       <NavBas
         onglets={visibles}
         actif={ong}

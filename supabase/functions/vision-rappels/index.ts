@@ -7,6 +7,7 @@ import webpush from "npm:web-push@3";
 // rappel_sport (heures avant). Valeur négative ou nulle = rappel coupé.
 // Chaque rappel n'est envoyé qu'une fois (vision_rappels_envoyes).
 // Corps { "essai": true } : calcule les rappels du moment sans rien envoyer ni noter.
+// Corps { "file": true } : envoie seulement la file vision_notifs_file (lien ouvert, invitation utilisée).
 
 const VAPID_PUBLIC = "BOggBaZqp69kCtBQP8bsGgzMxUnlMMSqYwYkiDFcYovilILXH6Plxn7DuTkUvR8FABskn_Tu9UHe7iPdCVUv7qk";
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
@@ -36,6 +37,28 @@ Deno.serve(async (req: Request) => {
     if (e0 || !prive) throw new Error("clé VAPID introuvable");
     webpush.setVapidDetails("mailto:vision@marine-data.invalid", VAPID_PUBLIC, prive);
     const { data: abos } = await sb.from("vision_push").select("*");
+    const envoyer = async (uid: string, msg: { titre: string; corps: string; url: string }) => {
+      let n = 0;
+      for (const a of (abos || []).filter((x) => x.user_id === uid)) {
+        try {
+          await webpush.sendNotification({ endpoint: a.endpoint, keys: { p256dh: a.p256dh, auth: a.auth } }, JSON.stringify(msg));
+          n++;
+        } catch (err: any) {
+          if (err?.statusCode === 404 || err?.statusCode === 410) await sb.from("vision_push").delete().eq("id", a.id);
+          else console.error("push", err?.message || err);
+        }
+      }
+      return n;
+    };
+    // File des notifications de partage : envoyée à chaque appel (et tout de suite en mode « file »).
+    const { data: file } = essai ? { data: [] } : await sb.from("vision_notifs_file").select("*").eq("envoye", false).order("created_at").limit(50);
+    let envoyesFile = 0;
+    for (const f of file || []) {
+      const { data: pris } = await sb.from("vision_notifs_file").update({ envoye: true }).eq("id", f.id).eq("envoye", false).select("id");
+      if (!pris || !pris.length) continue; // déjà pris par un autre appel
+      envoyesFile += await envoyer(f.user_id, { titre: f.titre, corps: f.corps || "", url: f.url || "./" });
+    }
+    if (corpsReq && corpsReq.file) return new Response(JSON.stringify({ file: envoyesFile }), { headers: { "Content-Type": "application/json" } });
     const now = maintenantParis();
     let envoyes = 0;
     const apercu: unknown[] = [];
