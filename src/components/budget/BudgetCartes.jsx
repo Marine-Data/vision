@@ -1,5 +1,6 @@
 import React from "react";
 import { KbSheet } from "../kanban/communs.jsx";
+import { CarteMatelas, FeuilleMatelas } from "./Matelas.jsx";
 import { catIcone, euros, hwkFmt, num } from "../../lib/format.js";
 import { EP_AUTO_NOTE } from "../../lib/epargneAuto.js";
 
@@ -706,6 +707,18 @@ export function BudgetCartes(props) {
   const wOuvert = ouvert && ouvert.lid ? [...courantes, ...epargne].find((w) => w.lid === ouvert.lid) : null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 18 }}>
+      {props.matelas && moisSel === props.matelas.M && (
+        <CarteMatelas
+          etat={props.matelas}
+          readOnly={readOnly}
+          onOui={() =>
+            props.matelas.proposition === "basculer"
+              ? props.actions.basculerPEA(props.matelas)
+              : props.actions.recompleterMatelas(props.matelas)
+          }
+          onPlusTard={() => props.actions.matelasPlusTard(props.matelas.M)}
+        />
+      )}
       <section
         aria-label="Salaire du mois"
         style={{
@@ -829,24 +842,42 @@ export function BudgetCartes(props) {
             e0(epDispo),
             "Épargne" + (cible ? " · " + Math.round((epDispo / cible) * 100) + " % de l'objectif" : ""),
           ],
-        ].map(([i, v, l]) => (
-          <div key={l} style={{ ...carteStyle, padding: 12 }}>
-            <div aria-hidden="true" style={{ fontSize: 18 }}>
-              {i}
-            </div>
-            <div
+        ].map(([i, v, l]) => {
+          const matelas = i === "🎯" && props.matelas;
+          const Balise = matelas ? "button" : "div";
+          return (
+            <Balise
+              key={l}
+              type={matelas ? "button" : undefined}
+              onClick={matelas ? () => setOuvert({ type: "matelas" }) : undefined}
+              aria-label={matelas ? l + " : " + v + ", ouvrir Matelas et PEA" : undefined}
               style={{
-                fontFamily: "Georgia, serif",
-                fontSize: 22,
-                fontWeight: 700,
-                fontVariantNumeric: "tabular-nums",
+                ...carteStyle,
+                padding: 12,
+                border: 0,
+                textAlign: "left",
+                fontFamily: "inherit",
+                color: "var(--ink)",
+                cursor: matelas ? "pointer" : "default",
               }}
             >
-              {v}
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--slate)" }}>{l}</div>
-          </div>
-        ))}
+              <div aria-hidden="true" style={{ fontSize: 18 }}>
+                {i}
+              </div>
+              <div
+                style={{
+                  fontFamily: "Georgia, serif",
+                  fontSize: 22,
+                  fontWeight: 700,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {v}
+              </div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--slate)" }}>{l}</div>
+            </Balise>
+          );
+        })}
       </div>
 
       <div
@@ -1069,6 +1100,14 @@ export function BudgetCartes(props) {
           nomMois={nomMois}
           moisSel={moisSel}
           onClose={() => setOuvert(null)}
+        />
+      )}
+      {ouvert && ouvert.type === "matelas" && props.matelas && (
+        <FeuilleMatelas
+          etat={props.matelas}
+          readOnly={readOnly}
+          onClose={() => setOuvert(null)}
+          onNoterPEA={props.actions.peaNoter}
         />
       )}
       {ouvert && ouvert.type === "nouveau" && (

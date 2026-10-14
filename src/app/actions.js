@@ -2,7 +2,7 @@
 // réglages, mots-clés d'import). Une seule règle : la base d'abord, l'écran ensuite,
 // un message clair si ça échoue, et « Annuler » quand c'est possible.
 import { budgetDuMois, ligneBudgetId } from "../lib/calculs.js";
-import { num } from "../lib/format.js";
+import { num, param } from "../lib/format.js";
 import { anneeMoisDe, moisDepuisAncre, moisNow } from "../lib/mois.js";
 import { supabase } from "../lib/supabase.js";
 
@@ -74,7 +74,7 @@ export function creerActions(ctx) {
   // Modifier un poste : nom / icône partout (sauf mois clôturés), montant selon la portée.
   // portee : "mois" (ce mois seulement) ou "suite" (ce mois et les suivants).
   // garder : mois personnalisés à laisser tels quels quand portee = "suite".
-  async function posteModifier({ lid, depuis, poste, icone, montant, portee, garder }) {
+  async function posteModifier({ lid, depuis, poste, icone, montant, portee, garder, silencieux }) {
     const annulerLignes = [],
       annulerModele = [];
     try {
@@ -119,14 +119,15 @@ export function creerActions(ctx) {
       for (const a of annulerModele.reverse()) await majModele(a.id, a.patch).catch(() => {});
       throw e;
     }
-    notifier("Enregistré", async () => {
-      for (const a of [...annulerLignes].reverse()) await majLignesMois([a]);
-      for (const a of [...annulerModele].reverse()) await majModele(a.id, a.patch);
-    });
+    silencieux ||
+      notifier("Enregistré", async () => {
+        for (const a of [...annulerLignes].reverse()) await majLignesMois([a]);
+        for (const a of [...annulerModele].reverse()) await majModele(a.id, a.patch);
+      });
   }
 
   // Nouveau poste de dépense, à partir du mois « depuis ».
-  async function posteAjouter({ poste, icone, montant, depuis, kind = "charge" }) {
+  async function posteAjouter({ poste, icone, montant, depuis, kind = "charge", line_key, silencieux }) {
     const nom = (poste || "").trim();
     if (!nom) throw new Error("Donne un nom au poste.");
     if (
@@ -142,13 +143,13 @@ export function creerActions(ctx) {
         .from("vision_budget")
         .insert({
           user_id: uid(),
-          line_key: "x_" + Math.random().toString(36).slice(2, 10),
+          line_key: line_key || "x_" + Math.random().toString(36).slice(2, 10),
           kind,
           poste: nom,
           icone: icone || null,
           detail: "",
           montant: v,
-          type: "variable",
+          type: kind === "charge" ? "variable" : null,
           sort:
             Math.max(0, ...(get.budget() || []).filter((b) => b.kind === kind).map((b) => b.sort || 0)) + 1,
         })
@@ -176,7 +177,7 @@ export function creerActions(ctx) {
                 detail: "",
                 montant: v,
                 sort: modele.sort,
-                type: "variable",
+                type: modele.type,
                 est_override: false,
               };
             }),
@@ -185,20 +186,21 @@ export function creerActions(ctx) {
       );
       set.bm((p) => [...p, ...lignes]);
     }
-    notifier("« " + nom + " » ajouté", async () => {
-      ok(
-        await supabase
-          .from("vision_budget_mois")
-          .delete()
-          .in(
-            "id",
-            lignes.map((x) => x.id),
-          ),
-      );
-      set.bm((p) => p.filter((x) => !lignes.some((l) => l.id === x.id)));
-      ok(await supabase.from("vision_budget").delete().eq("id", modele.id));
-      set.budget((p) => p.filter((x) => x.id !== modele.id));
-    });
+    silencieux ||
+      notifier("« " + nom + " » ajouté", async () => {
+        ok(
+          await supabase
+            .from("vision_budget_mois")
+            .delete()
+            .in(
+              "id",
+              lignes.map((x) => x.id),
+            ),
+        );
+        set.bm((p) => p.filter((x) => !lignes.some((l) => l.id === x.id)));
+        ok(await supabase.from("vision_budget").delete().eq("id", modele.id));
+        set.budget((p) => p.filter((x) => x.id !== modele.id));
+      });
     return modele;
   }
 
@@ -432,7 +434,90 @@ export function creerActions(ctx) {
     });
   }
 
+  // ---- Matelas → PEA ----
+  // Basculer : dès le mois suivant, les livrets passent à 0 et le PEA reçoit leur total.
+  // Les montants des livrets sont gardés dans les réglages pour pouvoir recompléter.
+  async function basculerPEA(etat) {
+    const depuis = etat.suivant,
+      total = etat.versLivrets;
+    for (const l of etat.livrets) {
+      await reglage("avant_pea_" + l.line_key, l.montant);
+      await posteModifier({ lid: l.lid, depuis, montant: 0, portee: "suite", garder: [], silencieux: !0 });
+    }
+    const pea = (get.budget() || []).find((b) => /^e_pea/.test(b.line_key));
+    if (pea) {
+      if (pea.archive_depuis != null) await majModele(pea.id, { archive_depuis: null });
+      if (!lignesDuPoste(pea.id).some((x) => iMois(x) === depuis))
+        throw new Error("Le mois suivant n'est pas encore préparé : réessaie demain.");
+      await posteModifier({
+        lid: pea.id,
+        depuis,
+        montant: total,
+        portee: "suite",
+        garder: [],
+        silencieux: !0,
+      });
+    } else
+      await posteAjouter({
+        poste: "PEA Trade Republic",
+        icone: "📈",
+        montant: total,
+        depuis,
+        kind: "epargne",
+        line_key: "e_pea",
+        silencieux: !0,
+      });
+    notifier("Épargne basculée vers le PEA dès le mois prochain");
+  }
+  // Recompléter : le PEA repasse à 0, les livrets retrouvent leurs montants d'avant.
+  async function recompleterMatelas(etat) {
+    const depuis = etat.suivant,
+      total = etat.versPEA,
+      livrets = (get.budget() || []).filter(
+        (b) =>
+          b.kind === "epargne" &&
+          b.line_key !== "e_vacances" &&
+          !/^e_pea/.test(b.line_key) &&
+          b.archive_depuis == null,
+      );
+    const avant = livrets.map((b) => num(param(get.params(), "avant_pea_" + b.line_key, NaN)));
+    const connus = avant.every((v) => Number.isFinite(v)) && avant.reduce((a, b) => a + b, 0) > 0;
+    for (let k = 0; k < livrets.length; k++) {
+      const m = connus ? avant[k] : Math.round((total / livrets.length) * 100) / 100;
+      await posteModifier({
+        lid: livrets[k].id,
+        depuis,
+        montant: m,
+        portee: "suite",
+        garder: [],
+        silencieux: !0,
+      });
+    }
+    for (const p of etat.peaLignes)
+      await posteModifier({ lid: p.lid, depuis, montant: 0, portee: "suite", garder: [], silencieux: !0 });
+    notifier("Épargne remise sur les livrets dès le mois prochain");
+  }
+  async function matelasPlusTard(M) {
+    await reglage("matelas_plus_tard", M);
+  }
+  async function peaNoter({ date, valeur }) {
+    const v = Math.round(num(String(valeur).replace(",", ".")) * 100) / 100;
+    if (!(v >= 0)) throw new Error("Valeur invalide.");
+    const d = ok(
+      await supabase.from("vision_pea").insert({ user_id: uid(), date, valeur: v }).select().single(),
+    );
+    set.pea((p) => [...p, d]);
+    notifier("Valeur du PEA notée", async () => {
+      ok(await supabase.from("vision_pea").delete().eq("id", d.id));
+      set.pea((p) => p.filter((x) => x.id !== d.id));
+    });
+  }
+
   return {
+    basculerPEA,
+    recompleterMatelas,
+    matelasPlusTard,
+    peaNoter,
     conflits,
     posteModifier,
     posteAjouter,
