@@ -6,23 +6,23 @@ import { anneeMoisDe, moisDepuisAncre } from "../lib/mois.js";
 import { KbSheet, KB_SR, accIcone, kbBouton } from "./kanban/communs.jsx";
 
 const SPECIAUX = {
-  salaire: { l: "Salaire", sous: "→ salaire réel du mois", c: "#0b6e53" },
-  vacances: { l: "Vacances", sous: "→ poche vacances", c: "#c2702f" },
-  sport: { l: "Sport", sous: "→ paiement de l'enveloppe", c: "#b03a6e" },
-  ignorer: { l: "Virements entre tes comptes", sous: "ignorés", c: "#8fa6ab" },
+  salaire: { l: "Salaire", sous: "→ salaire réel du mois", c: "var(--t-vert)" },
+  vacances: { l: "Vacances", sous: "→ poche vacances", c: "var(--t-orange)" },
+  sport: { l: "Sport", sous: "→ paiement de l'enveloppe", c: "var(--t-rose)" },
+  ignorer: { l: "Virements entre tes comptes", sous: "ignorés", c: "var(--slate-light)" },
 };
 const COULEURS = [
-  "#0b7a5c",
-  "#3b5fc4",
-  "#b03a6e",
-  "#8a5a12",
-  "#5a4fa8",
-  "#086b78",
-  "#3d545c",
-  "#9a4515",
-  "#c2702f",
-  "#536b72",
-  "#0b6e53",
+  "var(--c-vert)",
+  "var(--c-bleu)",
+  "var(--c-rose)",
+  "var(--c-ambre)",
+  "var(--c-violet)",
+  "var(--c-teal)",
+  "var(--ink-soft)",
+  "var(--c-orange)",
+  "var(--c-orange)",
+  "var(--slate)",
+  "var(--c-vert)",
 ];
 const MOIS_LONGS = [
   "janvier",
@@ -113,11 +113,11 @@ export function ImportReleve({
         {fini ? (
           <div
             style={{
-              background: "#e3f4ed",
+              background: "var(--vert-doux)",
               borderRadius: 16,
               padding: 14,
               marginBottom: 16,
-              color: "#0b6e53",
+              color: "var(--t-vert)",
               fontWeight: 800,
               fontSize: 15,
             }}
@@ -138,7 +138,7 @@ export function ImportReleve({
             minHeight: 56,
             borderRadius: 16,
             border: "2px dashed #9ec9cf",
-            background: "#f3f8f9",
+            background: "var(--fond-doux)",
             color: "var(--teal-dark)",
             fontSize: 16,
             fontWeight: 800,
@@ -161,7 +161,7 @@ export function ImportReleve({
           />
         </label>
         {erreur && (
-          <p role="alert" style={{ margin: "0 0 12px", color: "#b8432a", fontWeight: 700 }}>
+          <p role="alert" style={{ margin: "0 0 12px", color: "var(--t-rouge)", fontWeight: 700 }}>
             {erreur}
           </p>
         )}
@@ -195,8 +195,8 @@ export function ImportReleve({
                     onClick={() => annuler(imp)}
                     style={{
                       minHeight: 44,
-                      color: "#b8432a",
-                      borderColor: confAnnul === imp.id ? "#b8432a" : "#f0d5ce",
+                      color: "var(--t-rouge)",
+                      borderColor: confAnnul === imp.id ? "var(--c-rouge)" : "var(--rouge-doux)",
                     }}
                   >
                     {confAnnul === imp.id ? "Confirmer l'annulation" : "Annuler l'import"}
@@ -374,9 +374,9 @@ export function ImportReleve({
         onClick={onPick}
         style={{
           minHeight: 64,
-          border: clair ? "2px solid #d6e3e5" : 0,
+          border: clair ? "2px solid var(--line)" : 0,
           borderRadius: 16,
-          background: clair ? "#ffffff" : "rgba(255,255,255,.16)",
+          background: clair ? "var(--surface)" : "rgba(255,255,255,.16)",
           color: clair ? "var(--ink)" : "#ffffff",
           display: "flex",
           flexDirection: "column",
@@ -398,7 +398,7 @@ export function ImportReleve({
     );
 
   const ligneOp = (o) => (
-    <div key={o.i} style={{ borderBottom: "1px solid #f3f8f9" }}>
+    <div key={o.i} style={{ borderBottom: "1px solid var(--fond-doux)" }}>
       <div
         style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 14px 4px 4px", minHeight: 52 }}
       >
@@ -425,8 +425,8 @@ export function ImportReleve({
               width: 22,
               height: 22,
               borderRadius: 7,
-              border: "2px solid " + (o.actif ? "var(--teal-dark)" : "#b9cfd3"),
-              background: o.actif ? "var(--teal-dark)" : "#ffffff",
+              border: "2px solid " + (o.actif ? "var(--teal-dark)" : "var(--line-strong)"),
+              background: o.actif ? "var(--teal-dark)" : "var(--surface)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
@@ -487,7 +487,7 @@ export function ImportReleve({
                 fontSize: 14.5,
                 fontWeight: 700,
                 fontVariantNumeric: "tabular-nums",
-                color: o.signe < 0 ? "#0b6e53" : undefined,
+                color: o.signe < 0 ? "var(--t-vert)" : undefined,
               }}
             >
               {eur(o.signe)}
@@ -500,7 +500,7 @@ export function ImportReleve({
                 marginLeft: 48,
                 fontSize: 12.5,
                 fontWeight: 800,
-                color: o.doublon ? "#9a4515" : "var(--slate)",
+                color: o.doublon ? "var(--t-orange)" : "var(--slate)",
               }}
             >
               {o.doublon
@@ -577,7 +577,7 @@ export function ImportReleve({
             marginBottom: -24,
             paddingBottom: 24,
             paddingTop: 10,
-            background: "#ffffff",
+            background: "var(--surface)",
           }}
         >
           {kbBouton("Retour au relevé", () => setDet(null), { h: 52, icone: "M15 6l-6 6 6 6" })}
@@ -606,8 +606,8 @@ export function ImportReleve({
             gap: 5,
             padding: "4px 10px",
             borderRadius: 99,
-            background: releve.controle === 0 ? "#e3f4ed" : "#fbe9e4",
-            color: releve.controle === 0 ? "#0b6e53" : "#b8432a",
+            background: releve.controle === 0 ? "var(--vert-doux)" : "var(--rouge-doux)",
+            color: releve.controle === 0 ? "var(--t-vert)" : "var(--t-rouge)",
             fontSize: 13,
             fontWeight: 800,
           }}
@@ -639,8 +639,8 @@ export function ImportReleve({
             margin: "0 0 12px",
             padding: "10px 12px",
             borderRadius: 14,
-            background: "#fff3e6",
-            color: "#7a3a12",
+            background: "var(--orange-doux)",
+            color: "var(--t-orange)",
             fontWeight: 800,
             fontSize: 14,
           }}
@@ -728,9 +728,9 @@ export function ImportReleve({
                 }
                 style={{
                   position: "relative",
-                  border: "2px solid " + (actifs ? "var(--teal-dark)" : "#d6e3e5"),
+                  border: "2px solid " + (actifs ? "var(--teal-dark)" : "var(--line)"),
                   borderRadius: 18,
-                  background: "#ffffff",
+                  background: "var(--surface)",
                   padding: 12,
                   minHeight: 108,
                   display: "flex",
@@ -763,7 +763,7 @@ export function ImportReleve({
                   {actifs}/{g.list.length} op.{app != null ? " · app " + eur(app) : ""}
                 </span>
                 {doublons > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "#9a4515" }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--t-orange)" }}>
                     ⚠ {doublons} déjà saisie{doublons > 1 ? "s" : ""} ?
                   </span>
                 )}
@@ -776,8 +776,8 @@ export function ImportReleve({
                     width: 24,
                     height: 24,
                     borderRadius: 8,
-                    background: actifs ? "var(--teal-dark)" : "#ffffff",
-                    border: "2px solid " + (actifs ? "var(--teal-dark)" : "#b9cfd3"),
+                    background: actifs ? "var(--teal-dark)" : "var(--surface)",
+                    border: "2px solid " + (actifs ? "var(--teal-dark)" : "var(--line-strong)"),
                     color: "#ffffff",
                     display: "flex",
                     alignItems: "center",
@@ -804,7 +804,7 @@ export function ImportReleve({
             padding: "0 14px",
             borderRadius: 16,
             border: 0,
-            background: "#eef3f4",
+            background: "var(--fond-gris)",
             color: "var(--ink-soft)",
             fontSize: 14,
             fontWeight: 700,
@@ -819,7 +819,7 @@ export function ImportReleve({
         </button>
       )}
       {erreur && (
-        <p role="alert" style={{ color: "#b8432a", fontWeight: 700 }}>
+        <p role="alert" style={{ color: "var(--t-rouge)", fontWeight: 700 }}>
           {erreur}
         </p>
       )}
@@ -830,7 +830,7 @@ export function ImportReleve({
           marginBottom: -24,
           paddingBottom: 24,
           paddingTop: 10,
-          background: "#ffffff",
+          background: "var(--surface)",
           boxShadow: "0 -10px 14px -10px rgba(14,58,66,.18)",
         }}
       >

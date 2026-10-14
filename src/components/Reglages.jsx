@@ -2,16 +2,17 @@ import React from "react";
 import { KbSheet } from "./kanban/communs.jsx";
 import { catIcone, euros, num, param } from "../lib/format.js";
 import { MOIS, moisNow } from "../lib/mois.js";
+import { TAILLES, THEMES, appliquerAffichage } from "../lib/affichage.js";
 
 // Réglages : jour de l'épargne automatique, seuil de l'alerte, dépenses récurrentes,
 // rappels sur le téléphone, mots-clés de l'import. Tout est enregistré dans la base.
 
 const TEAL = "var(--teal-dark)";
-const carte = { background: "#ffffff", borderRadius: 18, boxShadow: "0 1px 2px rgba(14,58,66,.06)" };
+const carte = { background: "var(--surface)", borderRadius: 18, boxShadow: "0 1px 2px rgba(14,58,66,.06)" };
 const champ = {
   height: 48,
   borderRadius: 14,
-  border: "2px solid #d6e3e5",
+  border: "2px solid var(--line)",
   padding: "0 12px",
   font: "inherit",
   fontSize: 16,
@@ -19,7 +20,7 @@ const champ = {
   color: "var(--ink)",
   boxSizing: "border-box",
   width: "100%",
-  background: "#ffffff",
+  background: "var(--surface)",
 };
 const etiquette = {
   display: "flex",
@@ -42,7 +43,7 @@ const petit = {
   height: 40,
   borderRadius: 12,
   border: 0,
-  background: "#eef3f4",
+  background: "var(--fond-gris)",
   color: "var(--ink)",
   fontSize: 18,
   fontWeight: 900,
@@ -214,7 +215,7 @@ function FeuilleRecurrente({ r, postes, onClose, onEnregistrer, onArreter }) {
               minHeight: 44,
               border: 0,
               background: "transparent",
-              color: "#b8432a",
+              color: "var(--t-rouge)",
               fontFamily: "inherit",
               fontSize: 14.5,
               fontWeight: 800,
@@ -226,6 +227,45 @@ function FeuilleRecurrente({ r, postes, onClose, onEnregistrer, onArreter }) {
         )}
       </div>
     </KbSheet>
+  );
+}
+
+// Rangée de choix (taille du texte, thème).
+function Segments({ label, choix, valeur, onChoisir }) {
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--slate)", margin: "0 2px 6px" }}>{label}</div>
+      <div role="radiogroup" aria-label={label} style={{ display: "flex", gap: 4, padding: 4, borderRadius: 14, background: "var(--fond-gris)" }}>
+        {choix.map(([v, l, , fs]) => {
+          const on = v === valeur;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={typeof l === "string" ? l : undefined}
+              onClick={() => onChoisir(v)}
+              style={{
+                flex: 1,
+                minHeight: 44,
+                border: 0,
+                borderRadius: 11,
+                background: on ? "var(--surface)" : "transparent",
+                boxShadow: on ? "0 1px 3px rgba(0,0,0,.18)" : "none",
+                color: on ? "var(--ink)" : "var(--slate)",
+                fontFamily: "inherit",
+                fontSize: fs || 14,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              {fs ? "A" : l}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -260,11 +300,32 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
       })),
     ],
     nbMots = (regles || []).length,
-    a = actions || {};
+    a = actions || {},
+    taille = Math.round(param(params, "affichage_taille", 2)),
+    theme = Math.round(param(params, "affichage_theme", 1)),
+    affichage = (cle, v, libelle) => {
+      appliquerAffichage(cle === "affichage_taille" ? v : taille, cle === "affichage_theme" ? v : theme);
+      if (!readOnly && a.reglage) a.reglage(cle, v, libelle);
+    };
   return (
     <section className="sec">
       <h2>Réglages</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ ...carte, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>🎨 Affichage</div>
+          <Segments
+            label="Taille du texte"
+            choix={TAILLES.map(([v, l], i) => [v, l, null, 13 + i * 4])}
+            valeur={taille}
+            onChoisir={(v) => affichage("affichage_taille", v, "Texte : " + TAILLES.find((t) => t[0] === v)[1].toLowerCase())}
+          />
+          <Segments
+            label="Thème"
+            choix={THEMES}
+            valeur={theme}
+            onChoisir={(v) => affichage("affichage_theme", v, "Thème : " + THEMES.find((t) => t[0] === v)[1].replace(/^\S+ /, "").toLowerCase())}
+          />
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
           <Reglette
             icone="🐷"
@@ -350,8 +411,8 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                   width: 40,
                   height: 40,
                   borderRadius: 12,
-                  background: "#e8e3f7",
-                  color: "#4b3a8a",
+                  background: "var(--violet-doux)",
+                  color: "var(--t-violet)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -389,10 +450,10 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                 width: "calc(100% - 24px)",
                 margin: "4px 12px 8px",
                 minHeight: 44,
-                border: "2px dashed #c9bdf0",
+                border: "2px dashed var(--bord-violet)",
                 borderRadius: 14,
                 background: "transparent",
-                color: "#4b3a8a",
+                color: "var(--t-violet)",
                 fontFamily: "inherit",
                 fontSize: 14,
                 fontWeight: 800,
@@ -409,7 +470,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
         </div>
         <section aria-label="Rappels" style={{ ...carte, padding: "4px 0" }}>
           {notifs && notifs.etat === "actives" && (
-            <div style={{ padding: "10px 14px", fontSize: 13.5, fontWeight: 800, color: "#0b6e53" }}>
+            <div style={{ padding: "10px 14px", fontSize: 13.5, fontWeight: 800, color: "var(--t-vert)" }}>
               ✓ Rappels actifs sur ce téléphone
             </div>
           )}
@@ -473,7 +534,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                       padding: "0 10px",
                       borderRadius: 10,
                       border: 0,
-                      background: "#eef3f4",
+                      background: "var(--fond-gris)",
                       color: "var(--ink)",
                       fontFamily: "inherit",
                       fontSize: 13,
@@ -499,7 +560,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                     height: 32,
                     borderRadius: 99,
                     border: 0,
-                    background: on ? "var(--teal-dark)" : "#c9d6d9",
+                    background: on ? "var(--teal-dark)" : "var(--line-strong)",
                     position: "relative",
                     padding: 0,
                     cursor: "pointer",
@@ -513,7 +574,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                       width: 26,
                       height: 26,
                       borderRadius: "50%",
-                      background: "#ffffff",
+                      background: "var(--surface)",
                       boxShadow: "0 1px 3px rgba(0,0,0,.2)",
                       transition: "left .15s",
                     }}
@@ -565,7 +626,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                     fontSize: 13,
                     fontWeight: 800,
                     color: "var(--slate)",
-                    background: "#eef3f4",
+                    background: "var(--fond-gris)",
                     borderRadius: 99,
                     padding: "3px 9px",
                   }}
@@ -586,8 +647,8 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                         alignItems: "center",
                         gap: 2,
                         borderRadius: 99,
-                        background: r.source === "appris" ? "#fbe3ee" : "#e3f0f2",
-                        color: r.source === "appris" ? "#8a2c57" : "#075f6b",
+                        background: r.source === "appris" ? "var(--rose-doux)" : "var(--teal-doux)",
+                        color: r.source === "appris" ? "var(--t-rose)" : "var(--t-teal)",
                         padding: "2px 2px 2px 12px",
                         fontSize: 13.5,
                         fontWeight: 800,
@@ -628,7 +689,7 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
                         alignItems: "center",
                         height: 40,
                         borderRadius: 99,
-                        border: "2px dashed #9fcbd1",
+                        border: "2px dashed var(--bord-teal)",
                         padding: "0 4px 0 12px",
                         gap: 4,
                       }}
@@ -679,8 +740,8 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
             display: "flex",
             gap: 10,
             alignItems: "center",
-            background: "#fbeee4",
-            color: "#7a3a12",
+            background: "var(--orange-doux)",
+            color: "var(--t-orange)",
             borderRadius: 16,
             padding: "12px 14px",
             fontSize: 13.5,
@@ -703,11 +764,11 @@ export function Reglages({ params, budget, budgetMois, recurrentes, regles, acti
           }}
         >
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 99, background: "#e3f0f2" }} />
+            <span style={{ width: 12, height: 12, borderRadius: 99, background: "var(--teal-doux)" }} />
             de base
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 99, background: "#fbe3ee" }} />
+            <span style={{ width: 12, height: 12, borderRadius: 99, background: "var(--rose-doux)" }} />
             appris à l'import
           </span>
         </div>

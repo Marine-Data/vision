@@ -345,7 +345,7 @@ function DevoirsPage({
                       [m]: !ouvert,
                     }),
                   ),
-                "#5a4fa8",
+                "var(--c-violet)",
               )
             : null}
           {actif && !liste.length ? (
@@ -394,8 +394,8 @@ function DevoirsPage({
                 height: 46,
                 border: "2px solid #c9d4f2",
                 borderRadius: 14,
-                background: "#ffffff",
-                color: "#3b5fc4",
+                background: "var(--surface)",
+                color: "var(--t-bleu)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -413,7 +413,7 @@ function DevoirsPage({
                 icone: KB_I.plus,
                 h: 46,
                 width: "auto",
-                bg: "#3b5fc4",
+                bg: "var(--c-bleu)",
               },
             )}
           </div>
@@ -423,7 +423,7 @@ function DevoirsPage({
         <p
           className="detail"
           style={{
-            color: "#b8432a",
+            color: "var(--t-rouge)",
           }}
         >
           {"Erreur : " + err}
@@ -440,7 +440,7 @@ function DevoirsPage({
             width: "100%",
             border: 0,
             borderRadius: 22,
-            background: eProchain.late ? "#a63a24" : "#3b5fc4",
+            background: eProchain.late ? "var(--c-rouge)" : "var(--c-bleu)",
             color: "#ffffff",
             padding: 14,
             display: "flex",
@@ -506,8 +506,8 @@ function DevoirsPage({
               flex: "none",
               padding: "6px 10px",
               borderRadius: 12,
-              background: "#ffffff",
-              color: eProchain.urgent ? "#b8432a" : "#3b5fc4",
+              background: "var(--surface)",
+              color: eProchain.urgent ? "var(--t-rouge)" : "var(--t-bleu)",
               fontSize: 15,
               fontWeight: 900,
             }}
@@ -559,7 +559,7 @@ function DevoirsPage({
             padding: "0 14px",
             border: 0,
             borderRadius: 99,
-            background: "var(--ink)",
+            background: "var(--entete)",
             color: "#ffffff",
             fontSize: 14,
             fontWeight: 800,
@@ -576,7 +576,7 @@ function DevoirsPage({
       {!matieres.length ? (
         <div
           style={{
-            background: "#ffffff",
+            background: "var(--surface)",
             borderRadius: 22,
             padding: 16,
             boxShadow: "var(--shadow)",
@@ -596,7 +596,7 @@ function DevoirsPage({
           {!readOnly &&
             kbBouton("Ajouter une matière", () => setMatOuvert(!0), {
               icone: KB_I.plus,
-              bg: "#3b5fc4",
+              bg: "var(--c-bleu)",
             })}
         </div>
       ) : (
@@ -638,8 +638,8 @@ function DevoirsPage({
                 style={{
                   padding: "3px 10px",
                   borderRadius: 99,
-                  background: accEcheance(sel.deadline).urgent ? "#fbe9e4" : "#eef3f4",
-                  color: accEcheance(sel.deadline).urgent ? "#b8432a" : "var(--ink-soft)",
+                  background: accEcheance(sel.deadline).urgent ? "var(--rouge-doux)" : "var(--fond-gris)",
+                  color: accEcheance(sel.deadline).urgent ? "var(--t-rouge)" : "var(--ink-soft)",
                   fontSize: 13,
                   fontWeight: 800,
                 }}
@@ -748,7 +748,7 @@ function DevoirsPage({
               margin: "6px 0 16px",
               fontSize: 13.5,
               fontWeight: 700,
-              color: enreg ? "#0b6e53" : "var(--slate)",
+              color: enreg ? "var(--t-vert)" : "var(--slate)",
             }}
           >
             {enreg ? accIcone(KB_I.check, 14, 2.8) : null}
@@ -756,8 +756,8 @@ function DevoirsPage({
           </p>
           {kbBouton(conf ? "Confirmer la suppression" : "Supprimer le devoir", () => supprimer(sel), {
             outline: !0,
-            fg: "#b8432a",
-            bd: conf ? "#b8432a" : "#f0d5ce",
+            fg: "var(--t-rouge)",
+            bd: conf ? "var(--c-rouge)" : "var(--rouge-doux)",
             h: 48,
           })}
         </KbSheet>
@@ -786,8 +786,8 @@ function DevoirsPage({
                   style={{
                     minHeight: 46,
                     borderRadius: 14,
-                    border: "2px solid " + (on ? col.c : "#c9d8db"),
-                    background: on ? col.soft : "#ffffff",
+                    border: "2px solid " + (on ? col.c : "var(--line-strong)"),
+                    background: on ? col.soft : "var(--surface)",
                     color: "var(--ink)",
                     fontSize: 14,
                     fontWeight: 800,
@@ -869,7 +869,7 @@ function DevoirsPage({
             icone: KB_I.plus,
             disabled: !(nTitre.trim() && nMat && nDate),
             h: 54,
-            bg: "#3b5fc4",
+            bg: "var(--c-bleu)",
           })}
         </KbSheet>
       )}
@@ -973,10 +973,10 @@ function DevoirsPage({
                       minWidth: 44,
                       minHeight: 44,
                       padding: "0 10px",
-                      border: "2px solid " + (enSuppr ? "#b8432a" : "#f0d5ce"),
+                      border: "2px solid " + (enSuppr ? "var(--c-rouge)" : "var(--rouge-doux)"),
                       borderRadius: 12,
-                      background: "#ffffff",
-                      color: "#b8432a",
+                      background: "var(--surface)",
+                      color: "var(--t-rouge)",
                       fontSize: 13.5,
                       fontWeight: 800,
                       fontFamily: "inherit",
@@ -1099,7 +1099,7 @@ function DevoirsPage({
                 height: 48,
                 border: 0,
                 borderRadius: 14,
-                background: "#3b5fc4",
+                background: "var(--c-bleu)",
                 color: "#ffffff",
                 display: "flex",
                 alignItems: "center",

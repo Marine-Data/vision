@@ -13,6 +13,7 @@ import { SaisieRapide } from "./components/SaisieRapide.jsx";
 import { SportPage } from "./components/SportPage.jsx";
 import { SuiviPage } from "./components/SuiviPage.jsx";
 import { Reglages } from "./components/Reglages.jsx";
+import { affichageDepuisParams } from "./lib/affichage.js";
 import { Verrou } from "./components/Verrou.jsx";
 import { Graphiques } from "./components/graphiques/Graphiques.jsx";
 import { Accueil } from "./components/kanban/Accueil.jsx";
@@ -81,6 +82,7 @@ export function App() {
     [recOk, setRecOk] = React.useState(!1),
     [etatNotifs, setEtatNotifs] = React.useState(null),
     [pea, setPea] = React.useState([]);
+  React.useEffect(() => affichageDepuisParams(c), [c]);
   React.useEffect(() => {
     MODE_PARTAGE ||
       etatNotifications()

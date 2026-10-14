@@ -303,7 +303,7 @@ export function SaisieRapide({
                 onClick={() => setOn(!on)}
                 style={{
                   margin: 0,
-                  background: on ? "var(--ink)" : undefined,
+                  background: on ? "var(--entete)" : undefined,
                   color: on ? "#ffffff" : undefined,
                   borderColor: on ? "var(--ink)" : undefined,
                 }}

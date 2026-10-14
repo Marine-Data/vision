@@ -36,7 +36,7 @@ export function ToastAnnuler({ toast, onFermer }) {
         minHeight: 52,
         boxSizing: "border-box",
         borderRadius: 16,
-        background: toast.erreur ? "#b8432a" : "var(--ink)",
+        background: toast.erreur ? "var(--c-rouge)" : "var(--entete)",
         color: "#ffffff",
         boxShadow: "0 10px 30px rgba(14,58,66,.3)",
         fontSize: 15,

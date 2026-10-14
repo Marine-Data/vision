@@ -962,8 +962,8 @@ export function BudgetMensuel({
               style={
                 cl
                   ? {
-                      borderColor: "#0b6e53",
-                      background: "#f2faf6",
+                      borderColor: "var(--c-vert)",
+                      background: "var(--vert-doux)",
                     }
                   : void 0
               }
@@ -974,7 +974,7 @@ export function BudgetMensuel({
                     style={{
                       margin: "0 0 10px",
                       fontWeight: 800,
-                      color: "#0b6e53",
+                      color: "var(--t-vert)",
                       fontSize: 15,
                     }}
                   >
@@ -1048,8 +1048,8 @@ export function BudgetMensuel({
                         width: "100%",
                         marginTop: 12,
                         minHeight: 46,
-                        color: clotEtape === "rouvrir" ? "#b8432a" : void 0,
-                        borderColor: clotEtape === "rouvrir" ? "#b8432a" : void 0,
+                        color: clotEtape === "rouvrir" ? "var(--t-rouge)" : void 0,
+                        borderColor: clotEtape === "rouvrir" ? "var(--c-rouge)" : void 0,
                       }}
                     >
                       {clotEtape === "rouvrir" ? "Confirmer : rouvrir " + mois[moisSel] : "Rouvrir ce mois"}
@@ -1115,7 +1115,7 @@ export function BudgetMensuel({
                   style={{
                     margin: "10px 0 0",
                     fontWeight: 700,
-                    color: clotMsg.startsWith("Échec") ? "#b8432a" : "#0b6e53",
+                    color: clotMsg.startsWith("Échec") ? "var(--t-rouge)" : "var(--t-vert)",
                   }}
                 >
                   {clotMsg}
@@ -1200,8 +1200,8 @@ export function BudgetMensuel({
                         style={{
                           flex: "none",
                           minHeight: 44,
-                          color: pasVerseId === x.id ? "#b8432a" : void 0,
-                          borderColor: pasVerseId === x.id ? "#b8432a" : void 0,
+                          color: pasVerseId === x.id ? "var(--t-rouge)" : void 0,
+                          borderColor: pasVerseId === x.id ? "var(--c-rouge)" : void 0,
                         }}
                         onClick={async () => {
                           if (pasVerseId !== x.id) {

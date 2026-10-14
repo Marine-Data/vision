@@ -4,7 +4,7 @@ import { isoAujourdhui } from "../../lib/mois.js";
 import { nomMoisLong } from "../../lib/matelas.js";
 
 const e0 = (v) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(v)) + " €";
-const VERT = "#0b6e53",
+const VERT = "var(--c-vert)",
   TEAL = "var(--teal-dark)";
 
 // Carte en haut de Budget mois : matelas atteint → basculer vers le PEA, ou l'inverse.
@@ -17,7 +17,7 @@ export function CarteMatelas({ etat, onOui, onPlusTard, readOnly }) {
     <section
       aria-label={bascule ? "Matelas atteint" : "Matelas sous l'objectif"}
       style={{
-        background: bascule ? VERT : "#9a4515",
+        background: bascule ? VERT : "var(--c-orange)",
         color: "#ffffff",
         borderRadius: 22,
         padding: 16,
@@ -66,8 +66,8 @@ export function CarteMatelas({ etat, onOui, onPlusTard, readOnly }) {
             minHeight: 48,
             border: 0,
             borderRadius: 14,
-            background: "#ffffff",
-            color: bascule ? VERT : "#9a4515",
+            background: "var(--surface)",
+            color: bascule ? VERT : "var(--c-orange)",
             fontFamily: "inherit",
             fontSize: 15,
             fontWeight: 800,
@@ -105,7 +105,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
     [saisie, setSaisie] = React.useState(!1);
   const atteint = etat.dispo >= etat.cible,
     pct = Math.max(0, Math.min(100, etat.pct)),
-    couleur = atteint ? VERT : "#0a7b8a",
+    couleur = atteint ? VERT : "var(--c-teal)",
     debut = Math.max(0, etat.M - 2),
     fin = Math.min(
       etat.serie.length - 1,
@@ -137,7 +137,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                 width: 92,
                 height: 92,
                 borderRadius: "50%",
-                background: `conic-gradient(${couleur} ${pct * 3.6}deg, #e3ebec 0deg)`,
+                background: `conic-gradient(${couleur} ${pct * 3.6}deg, var(--line) 0deg)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -148,7 +148,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                   width: 70,
                   height: 70,
                   borderRadius: "50%",
-                  background: "#ffffff",
+                  background: "var(--surface)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -185,7 +185,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                   flex: 1,
                   height: Math.max(3, Math.round((v / max) * 56)),
                   borderRadius: "4px 4px 0 0",
-                  background: debut + k <= etat.M ? couleur : v >= etat.cible ? "#9ed3c2" : "#d6e3e5",
+                  background: debut + k <= etat.M ? couleur : v >= etat.cible ? "#9ed3c2" : "var(--line)",
                 }}
               />
             ))}
@@ -205,7 +205,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
           {!atteint && (
             <div
               style={{
-                background: "#f3f8f9",
+                background: "var(--fond-doux)",
                 borderRadius: 16,
                 padding: 12,
                 display: "flex",
@@ -230,7 +230,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                       height: 40,
                       borderRadius: 11,
                       border: 0,
-                      background: extra === v ? "#0a7b8a" : "#ffffff",
+                      background: extra === v ? "var(--c-teal)" : "var(--surface)",
                       color: extra === v ? "#ffffff" : "var(--ink)",
                       fontFamily: "inherit",
                       fontSize: 13.5,
@@ -242,7 +242,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                   </button>
                 ))}
               </div>
-              <span role="status" style={{ fontSize: 14, fontWeight: 800, color: "#0a7b8a" }}>
+              <span role="status" style={{ fontSize: 14, fontWeight: 800, color: "var(--t-teal)" }}>
                 → atteint en {simu != null ? nomMoisLong(simu) : "plus de 20 ans"}
               </span>
             </div>
@@ -274,13 +274,13 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
             }}
           >
             {[
-              ["Versé", e0(etat.peaVerse), "var(--ink)", "#f3f8f9"],
-              ["Valeur", etat.peaValeur != null ? e0(etat.peaValeur) : "—", "var(--ink)", "#f3f8f9"],
+              ["Versé", e0(etat.peaVerse), "var(--ink)", "var(--fond-doux)"],
+              ["Valeur", etat.peaValeur != null ? e0(etat.peaValeur) : "—", "var(--ink)", "var(--fond-doux)"],
               [
                 "Gain",
                 gain != null ? (gain >= 0 ? "+" : "−") + e0(Math.abs(gain)) : "—",
-                gain == null ? "var(--ink)" : gain >= 0 ? VERT : "#b8432a",
-                gain == null ? "#f3f8f9" : gain >= 0 ? "#e3f4ed" : "#fbe9e4",
+                gain == null ? "var(--ink)" : gain >= 0 ? VERT : "var(--c-rouge)",
+                gain == null ? "var(--fond-doux)" : gain >= 0 ? "var(--vert-doux)" : "var(--rouge-doux)",
               ],
             ].map(([l, v, fg, bg]) => (
               <div key={l} style={{ background: bg, borderRadius: 14, padding: "10px 4px" }}>
@@ -322,7 +322,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                     minWidth: 0,
                     height: 48,
                     borderRadius: 14,
-                    border: "2px solid #d6e3e5",
+                    border: "2px solid var(--line)",
                     padding: "0 12px",
                     font: "inherit",
                     fontSize: 16,
@@ -338,7 +338,7 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                     minHeight: 48,
                     borderRadius: 14,
                     border: 0,
-                    background: valeur ? TEAL : "#eef3f4",
+                    background: valeur ? TEAL : "var(--fond-gris)",
                     color: valeur ? "#ffffff" : "var(--slate)",
                     fontFamily: "inherit",
                     fontSize: 15,
@@ -355,10 +355,10 @@ export function FeuilleMatelas({ etat, onClose, onNoterPEA, readOnly }) {
                 onClick={() => setSaisie(!0)}
                 style={{
                   minHeight: 48,
-                  border: "2px dashed #9fcbd1",
+                  border: "2px dashed var(--bord-teal)",
                   borderRadius: 14,
                   background: "transparent",
-                  color: "#0a7b8a",
+                  color: "var(--t-teal)",
                   fontFamily: "inherit",
                   fontSize: 14.5,
                   fontWeight: 800,

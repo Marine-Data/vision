@@ -11,26 +11,26 @@ import { EP_AUTO_NOTE } from "../../lib/epargneAuto.js";
 const e0 = (v) =>
   new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(num(v))) + " €";
 const nombre = (v) => Number(String(v).replace(/\s/g, "").replace(",", "."));
-const ROUGE = "#b8432a",
-  ORANGE = "#c2702f",
-  VERT = "#0b7a5c";
+const ROUGE = "var(--c-rouge)",
+  ORANGE = "var(--c-orange)",
+  VERT = "var(--c-vert)";
 
 const carteStyle = {
-  background: "#ffffff",
+  background: "var(--surface)",
   borderRadius: 18,
   boxShadow: "0 1px 2px rgba(14,58,66,.06)",
 };
 const champ = {
   height: 52,
   borderRadius: 14,
-  border: "2px solid #d6e3e5",
+  border: "2px solid var(--line)",
   padding: "0 12px",
   font: "inherit",
   fontSize: 16,
   fontWeight: 700,
   color: "var(--ink)",
   boxSizing: "border-box",
-  background: "#ffffff",
+  background: "var(--surface)",
   minWidth: 0,
 };
 const boutonPlein = (fond) => ({
@@ -66,7 +66,7 @@ function Segment({ valeur, options, onChange, label }) {
         display: "grid",
         gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
         gap: 4,
-        background: "#eef3f4",
+        background: "var(--fond-gris)",
         borderRadius: 14,
         padding: 4,
       }}
@@ -82,7 +82,7 @@ function Segment({ valeur, options, onChange, label }) {
             minHeight: 42,
             borderRadius: 11,
             border: 0,
-            background: valeur === v ? "#ffffff" : "transparent",
+            background: valeur === v ? "var(--surface)" : "transparent",
             boxShadow: valeur === v ? "0 1px 3px rgba(14,58,66,.15)" : "none",
             color: "var(--ink)",
             fontFamily: "inherit",
@@ -110,8 +110,8 @@ function Conflits({ liste, choix, setChoix, nomMois }) {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: "#fbeee4",
-            color: "#7a3a12",
+            background: "var(--orange-doux)",
+            color: "var(--t-orange)",
             borderRadius: 14,
             padding: "8px 8px 8px 12px",
             fontSize: 14,
@@ -135,8 +135,8 @@ function Conflits({ liste, choix, setChoix, nomMois }) {
                 padding: "0 10px",
                 borderRadius: 10,
                 border: 0,
-                background: choix[c.m] === v ? "#7a3a12" : "#ffffff",
-                color: choix[c.m] === v ? "#ffffff" : "#7a3a12",
+                background: choix[c.m] === v ? "var(--c-orange)" : "var(--surface)",
+                color: choix[c.m] === v ? "#ffffff" : "var(--t-orange)",
                 fontFamily: "inherit",
                 fontSize: 13,
                 fontWeight: 800,
@@ -160,7 +160,7 @@ function LigneMontant({ label, valeur, onChange, disabled, id }) {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        background: "#f3f8f9",
+        background: "var(--fond-doux)",
         borderRadius: 14,
         padding: "6px 6px 6px 14px",
         fontSize: 14.5,
@@ -306,7 +306,7 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
                   alignItems: "center",
                   gap: 8,
                   borderRadius: 14,
-                  background: "#f3f8f9",
+                  background: "var(--fond-doux)",
                   padding: "4px 4px 4px 12px",
                 }}
               >
@@ -348,8 +348,8 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
                       <span
                         style={{
                           borderRadius: 99,
-                          background: "#e8e3f7",
-                          color: "#4b3a8a",
+                          background: "var(--violet-doux)",
+                          color: "var(--t-violet)",
                           padding: "1px 8px",
                         }}
                       >
@@ -361,8 +361,8 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
                       <span
                         style={{
                           borderRadius: 99,
-                          background: "#fbeee4",
-                          color: "#7a3a12",
+                          background: "var(--orange-doux)",
+                          color: "var(--t-orange)",
                           padding: "1px 8px",
                         }}
                       >
@@ -390,7 +390,7 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
                       padding: "0 10px",
                       borderRadius: 10,
                       border: 0,
-                      background: "#ffffff",
+                      background: "var(--surface)",
                       color: VERT,
                       fontFamily: "inherit",
                       fontSize: 13,
@@ -413,7 +413,7 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
                       padding: "0 10px",
                       borderRadius: 10,
                       border: 0,
-                      background: "#ffffff",
+                      background: "var(--surface)",
                       color: pasVerseId === x.id ? ROUGE : "var(--ink-soft)",
                       fontFamily: "inherit",
                       fontSize: 13,
@@ -571,7 +571,7 @@ function FeuilleProjection({ p, nomMois, moisSel, onClose }) {
       }
       onClose={onClose}
     >
-      <div style={{ background: "#f3f8f9", borderRadius: 16, padding: "6px 14px" }}>
+      <div style={{ background: "var(--fond-doux)", borderRadius: 16, padding: "6px 14px" }}>
         {lignes.map(([l, v]) => (
           <div
             key={l}
@@ -596,7 +596,7 @@ function FeuilleProjection({ p, nomMois, moisSel, onClose }) {
             justifyContent: "space-between",
             gap: 10,
             padding: "10px 0",
-            borderTop: "2px solid #c9dadd",
+            borderTop: "2px solid var(--line-strong)",
             fontSize: 17,
             fontWeight: 800,
             fontVariantNumeric: "tabular-nums",
@@ -791,12 +791,12 @@ export function BudgetCartes(props) {
           }}
           aria-hidden="true"
         >
-          <span style={{ width: pct(depense), background: "#ffffff" }} />
+          <span style={{ width: pct(depense), background: "var(--surface)" }} />
           <span style={{ width: pct(epCompte), background: "rgba(255,255,255,.6)" }} />
         </div>
         <div style={{ display: "flex", gap: 14, fontSize: 13, fontWeight: 700, flexWrap: "wrap" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: "#ffffff" }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--surface)" }} />
             Dépensé {e0(depense)}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -923,7 +923,7 @@ export function BudgetCartes(props) {
               style={{
                 ...carteStyle,
                 border: "2px solid " + (over ? ROUGE : "transparent"),
-                background: over ? "#fff4f1" : "#ffffff",
+                background: over ? "var(--rouge-doux)" : "var(--surface)",
                 padding: 12,
                 minHeight: 112,
                 display: "flex",
@@ -977,7 +977,7 @@ export function BudgetCartes(props) {
                 </span>
               </span>
               {w.prevu ? (
-                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#4b3a8a" }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: "var(--t-violet)" }}>
                   dont {e0(w.prevu)} à venir
                 </span>
               ) : null}
@@ -986,7 +986,7 @@ export function BudgetCartes(props) {
                   width: "100%",
                   height: 7,
                   borderRadius: 99,
-                  background: "#eef3f4",
+                  background: "var(--fond-gris)",
                   overflow: "hidden",
                   marginTop: "auto",
                 }}
@@ -1010,7 +1010,7 @@ export function BudgetCartes(props) {
             type="button"
             onClick={() => setOuvert({ type: "nouveau" })}
             style={{
-              border: "2px dashed #b9cfd3",
+              border: "2px dashed var(--line-strong)",
               borderRadius: 18,
               background: "transparent",
               minHeight: 112,
@@ -1065,8 +1065,8 @@ export function BudgetCartes(props) {
                   width: 26,
                   height: 26,
                   borderRadius: "50%",
-                  background: verse ? "#e3f4ed" : "#eef3f4",
-                  color: verse ? "#0b6e53" : "var(--slate)",
+                  background: verse ? "var(--vert-doux)" : "var(--fond-gris)",
+                  color: verse ? "var(--t-vert)" : "var(--slate)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

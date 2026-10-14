@@ -194,7 +194,7 @@ export function PiecesPage({
             gap: 8,
             fontSize: 15,
             fontWeight: 800,
-            color: "#8a5a12",
+            color: "var(--t-ambre)",
             fontVariantNumeric: "tabular-nums",
           }}
         >
@@ -203,7 +203,7 @@ export function PiecesPage({
               width: 64,
               height: 8,
               borderRadius: 99,
-              background: "#f6ecd9",
+              background: "var(--ambre-doux)",
               overflow: "hidden",
             }}
           >
@@ -213,7 +213,7 @@ export function PiecesPage({
                 height: 8,
                 borderRadius: 99,
                 width: (total ? Math.round((valides / total) * 100) : 0) + "%",
-                background: "#8a5a12",
+                background: "var(--c-ambre)",
               }}
             />
           </span>
@@ -224,7 +224,7 @@ export function PiecesPage({
         <div
           style={{
             borderRadius: 22,
-            background: "#7a4f0f",
+            background: "var(--c-ambre)",
             color: "#ffffff",
             padding: 14,
             display: "flex",
@@ -287,8 +287,8 @@ export function PiecesPage({
                   flex: "none",
                   padding: "2px 8px",
                   borderRadius: 99,
-                  background: "#ffffff",
-                  color: "#7a4f0f",
+                  background: "var(--surface)",
+                  color: "var(--t-ambre)",
                   fontSize: 12.5,
                   fontWeight: 900,
                 }}
@@ -373,7 +373,7 @@ export function PiecesPage({
             <section
               aria-label={g.nom}
               style={{
-                background: "#ffffff",
+                background: "var(--surface)",
                 borderRadius: 22,
                 padding: 12,
                 display: "flex",
@@ -490,8 +490,8 @@ export function PiecesPage({
                       flex: "none",
                       padding: "4px 10px",
                       borderRadius: 99,
-                      background: "#e3f4ed",
-                      color: "#0b6e53",
+                      background: "var(--vert-doux)",
+                      color: "var(--t-vert)",
                       fontSize: 13,
                       fontWeight: 900,
                       display: "flex",
@@ -556,8 +556,8 @@ export function PiecesPage({
                       gap: 6,
                       padding: "6px 14px",
                       borderRadius: 22,
-                      border: "2px dashed #b9cfd3",
-                      background: "#ffffff",
+                      border: "2px dashed var(--line-strong)",
+                      background: "var(--surface)",
                       color: g.c,
                       fontSize: 14,
                       fontWeight: 800,
@@ -613,7 +613,7 @@ export function PiecesPage({
                 ev.preventDefault(), creerDossier();
               }}
               style={{
-                background: "#ffffff",
+                background: "var(--surface)",
                 borderRadius: 22,
                 padding: 12,
                 display: "flex",
@@ -648,7 +648,7 @@ export function PiecesPage({
                   height: 48,
                   border: 0,
                   borderRadius: 14,
-                  background: "#8a5a12",
+                  background: "var(--c-ambre)",
                   color: "#ffffff",
                   display: "flex",
                   alignItems: "center",
@@ -670,7 +670,7 @@ export function PiecesPage({
                 border: "2px dashed #c9ab78",
                 borderRadius: 22,
                 background: "transparent",
-                color: "#7a4f0f",
+                color: "var(--t-ambre)",
                 fontSize: 15.5,
                 fontWeight: 800,
                 display: "flex",
@@ -739,8 +739,8 @@ export function PiecesPage({
           </div>
           {kbBouton(conf ? "Confirmer la suppression" : "Supprimer la pièce", () => supprimer(sel), {
             outline: !0,
-            fg: "#b8432a",
-            bd: conf ? "#b8432a" : "#f0d5ce",
+            fg: "var(--t-rouge)",
+            bd: conf ? "var(--c-rouge)" : "var(--rouge-doux)",
             h: 46,
           })}
         </KbSheet>
@@ -773,7 +773,7 @@ export function PiecesPage({
             icone: KB_I.plus,
             disabled: !nom.trim(),
             h: 54,
-            bg: "#7a4f0f",
+            bg: "var(--c-ambre)",
           })}
         </KbSheet>
       )}

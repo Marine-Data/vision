@@ -4,7 +4,7 @@ import { KbSheet } from "./kanban/communs.jsx";
 // Mon parcours : une frise de septembre à juillet, la prochaine étape en avant,
 // les étapes en ligne de temps (les faites repliées). Un rond coche, le texte modifie.
 
-const BLEU = "#086b78";
+const BLEU = "var(--c-teal)";
 const MOIS_COURTS = [
   "Janv",
   "Févr",
@@ -36,7 +36,7 @@ export const dateEtape = (e) =>
 const champ = {
   height: 48,
   borderRadius: 14,
-  border: "2px solid #d6e3e5",
+  border: "2px solid var(--line)",
   padding: "0 12px",
   font: "inherit",
   fontSize: 16,
@@ -44,7 +44,7 @@ const champ = {
   color: "var(--ink)",
   boxSizing: "border-box",
   width: "100%",
-  background: "#ffffff",
+  background: "var(--surface)",
 };
 const etiquette = {
   display: "flex",
@@ -113,7 +113,7 @@ function FeuilleEtape({ etape, onClose, onEnregistrer, onSupprimer, onMonter, on
           />
         </label>
         {erreur && (
-          <div role="alert" style={{ color: "#b8432a", fontWeight: 700 }}>
+          <div role="alert" style={{ color: "var(--t-rouge)", fontWeight: 700 }}>
             {erreur}
           </div>
         )}
@@ -169,7 +169,7 @@ function FeuilleEtape({ etape, onClose, onEnregistrer, onSupprimer, onMonter, on
               minHeight: 44,
               border: 0,
               background: "transparent",
-              color: "#b8432a",
+              color: "var(--t-rouge)",
               fontFamily: "inherit",
               fontSize: 14.5,
               fontWeight: 800,
@@ -221,13 +221,13 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
             role="img"
             aria-label={"Frise du parcours, " + Math.round(part * 100) + " % du chemin"}
             style={{
-              background: "#ffffff",
+              background: "var(--surface)",
               borderRadius: 18,
               padding: "14px 12px 10px",
               boxShadow: "0 1px 2px rgba(14,58,66,.06)",
             }}
           >
-            <div style={{ position: "relative", height: 10, borderRadius: 99, background: "#dff2f4" }}>
+            <div style={{ position: "relative", height: 10, borderRadius: 99, background: "var(--teal-doux)" }}>
               <span
                 style={{
                   position: "absolute",
@@ -248,7 +248,7 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
                   height: 20,
                   marginLeft: -10,
                   borderRadius: "50%",
-                  background: "#ffffff",
+                  background: "var(--surface)",
                   border: "4px solid " + BLEU,
                   boxSizing: "border-box",
                 }}
@@ -314,8 +314,8 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
               minHeight: 48,
               border: 0,
               borderRadius: 16,
-              background: "#e3f4ed",
-              color: "#0b6e53",
+              background: "var(--vert-doux)",
+              color: "var(--t-vert)",
               display: "flex",
               alignItems: "center",
               gap: 10,
@@ -332,7 +332,7 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                background: "#0b6e53",
+                background: "var(--c-vert)",
                 color: "#ffffff",
                 display: "flex",
                 alignItems: "center",
@@ -359,7 +359,7 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
               bottom: 10,
               width: 3,
               borderRadius: 99,
-              background: "#c9e3e7",
+              background: "var(--teal-doux)",
             }}
           />
           {visibles.map((e) => {
@@ -409,8 +409,8 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
                     width: 40,
                     height: 40,
                     borderRadius: "50%",
-                    border: "3px solid " + (f ? "#0b6e53" : next ? BLEU : "#b9cfd3"),
-                    background: f ? "#0b6e53" : next ? BLEU : "#ffffff",
+                    border: "3px solid " + (f ? "var(--c-vert)" : next ? BLEU : "var(--line-strong)"),
+                    background: f ? "var(--c-vert)" : next ? BLEU : "var(--surface)",
                     color: "#ffffff",
                     display: "flex",
                     alignItems: "center",
@@ -433,7 +433,7 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
                     minWidth: 0,
                     textAlign: "left",
                     color: "var(--ink)",
-                    background: next ? "#dff2f4" : "#ffffff",
+                    background: next ? "var(--teal-doux)" : "var(--surface)",
                     borderRadius: 16,
                     padding: "10px 12px",
                     boxShadow: "0 1px 2px rgba(14,58,66,.06)",
@@ -467,7 +467,7 @@ export function SuiviPage({ rows, progress, readOnly, onToggle, onCtMaj, onCtCre
             onClick={() => setOuvert({ e: null })}
             style={{
               minHeight: 52,
-              border: "2px dashed #9fcbd1",
+              border: "2px dashed var(--bord-teal)",
               borderRadius: 18,
               background: "transparent",
               color: BLEU,

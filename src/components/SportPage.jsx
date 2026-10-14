@@ -9,8 +9,8 @@ import { MOIS, anneeMoisDe } from "../lib/mois.js";
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const COURT = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
-const ROSE = "#b03a6e",
-  ROSE_PALE = "#f8e6ef";
+const ROSE = "var(--c-rose)",
+  ROSE_PALE = "var(--rose-doux)";
 
 // « Vendredi 19h30–21h00 » ⇄ { jour: 4, debut: "19:30", fin: "21:00" }
 export function lireCreneau(detail) {
@@ -36,7 +36,7 @@ const jourSemaine = (d) => (d.getDay() + 6) % 7;
 const champ = {
   height: 48,
   borderRadius: 14,
-  border: "2px solid #d6e3e5",
+  border: "2px solid var(--line)",
   padding: "0 12px",
   font: "inherit",
   fontSize: 16,
@@ -44,7 +44,7 @@ const champ = {
   color: "var(--ink)",
   boxSizing: "border-box",
   width: "100%",
-  background: "#ffffff",
+  background: "var(--surface)",
 };
 const etiquette = {
   display: "flex",
@@ -78,7 +78,7 @@ const texte = (c) => ({
   cursor: "pointer",
 });
 const carte = {
-  background: "#ffffff",
+  background: "var(--surface)",
   borderRadius: 22,
   padding: 16,
   boxShadow: "0 1px 2px rgba(14,58,66,.06)",
@@ -131,7 +131,7 @@ function FeuilleCours({ cours, adresseDefaut, onClose, onEnregistrer, onSupprime
                 height: 44,
                 borderRadius: 12,
                 border: 0,
-                background: jour === k ? ROSE : "#f3f8f9",
+                background: jour === k ? ROSE : "var(--fond-doux)",
                 color: jour === k ? "#ffffff" : "var(--ink-soft)",
                 fontFamily: "inherit",
                 fontSize: 12,
@@ -167,7 +167,7 @@ function FeuilleCours({ cours, adresseDefaut, onClose, onEnregistrer, onSupprime
           />
         </label>
         {erreur && (
-          <div role="alert" style={{ color: "#b8432a", fontWeight: 700 }}>
+          <div role="alert" style={{ color: "var(--t-rouge)", fontWeight: 700 }}>
             {erreur}
           </div>
         )}
@@ -183,7 +183,7 @@ function FeuilleCours({ cours, adresseDefaut, onClose, onEnregistrer, onSupprime
                 await onSupprimer(), onClose();
               } catch (e) {}
             }}
-            style={texte("#b8432a")}
+            style={texte("var(--c-rouge)")}
           >
             {confirmer ? "Confirmer la suppression" : "Supprimer le cours"}
           </button>
@@ -272,8 +272,8 @@ function FeuilleAdhesion({ fiche, echeances, onClose, onFiche, onEcheance, ferme
                   minWidth: 76,
                   borderRadius: 12,
                   border: 0,
-                  background: l.paid ? "#e3f4ed" : "#fbeee4",
-                  color: l.paid ? "#0b6e53" : "#9a4515",
+                  background: l.paid ? "var(--vert-doux)" : "var(--orange-doux)",
+                  color: l.paid ? "var(--t-vert)" : "var(--t-orange)",
                   fontFamily: "inherit",
                   fontSize: 13,
                   fontWeight: 800,
@@ -297,8 +297,8 @@ function FeuilleAdhesion({ fiche, echeances, onClose, onFiche, onEcheance, ferme
             minHeight: 52,
             borderRadius: 14,
             border: 0,
-            background: certif ? "#e3f4ed" : "#fbeee4",
-            color: certif ? "#0b6e53" : "#9a4515",
+            background: certif ? "var(--vert-doux)" : "var(--orange-doux)",
+            color: certif ? "var(--t-vert)" : "var(--t-orange)",
             padding: "0 14px",
             fontFamily: "inherit",
             fontSize: 15,
@@ -479,13 +479,13 @@ export function SportPage({
                 key={l}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
               >
-                <span style={{ fontSize: 12, fontWeight: 800, color: on ? ROSE : "#8fa6ab" }}>{l[0]}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: on ? ROSE : "var(--slate-light)" }}>{l[0]}</span>
                 <span
                   style={{
                     width: 34,
                     height: 34,
                     borderRadius: 12,
-                    background: on ? ROSE : "#f3f8f9",
+                    background: on ? ROSE : "var(--fond-doux)",
                     color: "#ffffff",
                     display: "flex",
                     alignItems: "center",
@@ -576,7 +576,7 @@ export function SportPage({
             onClick={() => setOuvert({ type: "cours", c: null })}
             style={{
               minHeight: 52,
-              border: "2px dashed #e3b9cc",
+              border: "2px dashed var(--bord-rose)",
               borderRadius: 18,
               background: "transparent",
               color: ROSE,
@@ -604,7 +604,7 @@ export function SportPage({
                 height: 40,
                 borderRadius: 12,
                 border: 0,
-                background: "#f3f8f9",
+                background: "var(--fond-doux)",
                 fontSize: 16,
                 cursor: "pointer",
               }}
@@ -626,7 +626,7 @@ export function SportPage({
                 height: 40,
                 borderRadius: 12,
                 border: 0,
-                background: "#f3f8f9",
+                background: "var(--fond-doux)",
                 fontSize: 16,
                 cursor: "pointer",
               }}
@@ -656,9 +656,9 @@ export function SportPage({
                   style={{
                     minHeight: 58,
                     borderRadius: 14,
-                    border: "2px solid " + (on ? ROSE : o.futur ? "#e3ebec" : "#e3b9cc"),
-                    background: on ? ROSE : "#ffffff",
-                    color: on ? "#ffffff" : o.futur ? "#8fa6ab" : ROSE,
+                    border: "2px solid " + (on ? ROSE : o.futur ? "var(--line)" : "#e3b9cc"),
+                    background: on ? ROSE : "var(--surface)",
+                    color: on ? "#ffffff" : o.futur ? "var(--slate-light)" : ROSE,
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -733,7 +733,7 @@ export function SportPage({
                 placeholder="+ Séance libre · course, yoga…"
                 value={libre}
                 onChange={(e) => setLibre(e.target.value)}
-                style={{ ...champ, height: 44, flex: 1, border: "2px dashed #e3b9cc" }}
+                style={{ ...champ, height: 44, flex: 1, border: "2px dashed var(--bord-rose)" }}
               />
               <button
                 type="submit"
@@ -743,8 +743,8 @@ export function SportPage({
                   minHeight: 44,
                   borderRadius: 12,
                   border: 0,
-                  background: libre.trim() ? ROSE : "#f3f8f9",
-                  color: libre.trim() ? "#ffffff" : "#8fa6ab",
+                  background: libre.trim() ? ROSE : "var(--fond-doux)",
+                  color: libre.trim() ? "#ffffff" : "var(--slate-light)",
                   fontFamily: "inherit",
                   fontWeight: 800,
                   cursor: "pointer",
@@ -759,7 +759,7 @@ export function SportPage({
               style={{
                 borderRadius: 14,
                 background: ROSE_PALE,
-                color: "#8a2c57",
+                color: "var(--t-rose)",
                 padding: 10,
                 textAlign: "center",
               }}
@@ -773,7 +773,7 @@ export function SportPage({
               style={{
                 borderRadius: 14,
                 background: ROSE_PALE,
-                color: "#8a2c57",
+                color: "var(--t-rose)",
                 padding: 10,
                 textAlign: "center",
               }}
@@ -829,8 +829,8 @@ export function SportPage({
                 style={{
                   borderRadius: 14,
                   padding: 8,
-                  background: x.paid ? "#e3f4ed" : "#fbeee4",
-                  color: x.paid ? "#0b6e53" : "#9a4515",
+                  background: x.paid ? "var(--vert-doux)" : "var(--orange-doux)",
+                  color: x.paid ? "var(--t-vert)" : "var(--t-orange)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -852,8 +852,8 @@ export function SportPage({
             <div
               style={{
                 borderRadius: 14,
-                background: certifOk ? "#e3f4ed" : "#fbeee4",
-                color: certifOk ? "#0b6e53" : "#9a4515",
+                background: certifOk ? "var(--vert-doux)" : "var(--orange-doux)",
+                color: certifOk ? "var(--t-vert)" : "var(--t-orange)",
                 padding: 10,
                 fontSize: 13.5,
                 fontWeight: 800,
@@ -867,7 +867,7 @@ export function SportPage({
               <div
                 style={{
                   borderRadius: 14,
-                  background: "#f3f8f9",
+                  background: "var(--fond-doux)",
                   color: "var(--ink-soft)",
                   padding: 10,
                   fontSize: 13.5,
