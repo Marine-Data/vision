@@ -1561,7 +1561,14 @@ export function App() {
           <div className="kick">Reconversion · 2026 – 2027</div>
           <h1>{"Juriste Data, IA & Cyber"}</h1>
           {MODE_PARTAGE ? (
-            <div className="who">Aperçu partagé</div>
+            <>
+              <div className="who">Aperçu partagé</div>
+              <div className="topact">
+                <button className="logout" onClick={() => (window.location.href = window.location.origin + window.location.pathname)}>
+                  Mon compte
+                </button>
+              </div>
+            </>
           ) : (
             <>
               <div className="who">{t.user.email}</div>
