@@ -117,11 +117,17 @@ const APP_INSTALLEE = (() => {
   }
 })();
 
-export const MODE_PARTAGE =
+// Ancien lien « ?partage » (remplacé par les liens « ?voir= ») : affiche « lien plus valable ».
+export const MODE_ANCIEN_PARTAGE =
   typeof window < "u" &&
   !APP_INSTALLEE &&
+  !new URLSearchParams(window.location.search).get("voir") &&
   (new URLSearchParams(window.location.search).has("partage") ||
     (window.location.hash || "").includes("partage"));
+
+// Lecture seule : lien « ?voir=… » (ou ancien lien).
+export const MODE_PARTAGE =
+  typeof window < "u" && (!!new URLSearchParams(window.location.search).get("voir") || MODE_ANCIEN_PARTAGE);
 
 export const ONGLETS_VERROUILLES = ["tresorerie", "stats", "historique", "reglages"];
 

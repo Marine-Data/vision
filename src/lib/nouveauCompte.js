@@ -71,7 +71,8 @@ export function lignesNouveauCompte(r, uid) {
     vacances = 0;
   if (!passe.epargne)
     (r.epargnes || [])
-      .filter((p) => (p.l || "").trim())
+      // Épargnes proposées laissées à 0 : pas créées (celles ajoutées à la main le sont toujours).
+      .filter((p) => (p.l || "").trim() && (nombre(p.m) > 0 || !p.k))
       .forEach((p, i) => {
         const k = p.k && !cles.has(p.k) ? (cles.add(p.k), p.k) : cle(/pea/i.test(p.l) ? "e_pea_" : "e_", p.l, cles),
           m = nombre(p.m);

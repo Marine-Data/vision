@@ -52,6 +52,7 @@ export function Planning({
   del: ctDel,
   move: ctMove,
   readOnly: ro,
+  echanges,
 }) {
   const [mode, setMode] = React.useState(!1),
     jours = contenuDe(ctRows, "jour"),
@@ -97,6 +98,7 @@ export function Planning({
     <section className="sec">
       <h2>Emploi du temps</h2>
       <p className="sub">{sub ? sub.titre : resume}</p>
+      {echanges}
       {!ro && (
         <div
           style={{
