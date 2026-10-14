@@ -107,8 +107,19 @@ export const navIcon = (cle) => (
   </svg>
 );
 
+// App installée sur le téléphone : toujours le compte de la personne, jamais l'aperçu
+// partagé (Chrome garde parfois « ?partage » dans le raccourci s'il a été installé depuis ce lien).
+const APP_INSTALLEE = (() => {
+  try {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  } catch (e) {
+    return false;
+  }
+})();
+
 export const MODE_PARTAGE =
   typeof window < "u" &&
+  !APP_INSTALLEE &&
   (new URLSearchParams(window.location.search).has("partage") ||
     (window.location.hash || "").includes("partage"));
 
