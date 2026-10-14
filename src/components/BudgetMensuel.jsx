@@ -2,6 +2,7 @@ import React from "react";
 import { AlerteSalaire } from "./AlerteSalaire.jsx";
 import { BudgetMoisEditor } from "./BudgetMoisEditor.jsx";
 import { BudgetCartes } from "./budget/BudgetCartes.jsx";
+import { etatMatelas } from "../lib/matelas.js";
 import { alerteSalaire } from "../lib/alerteSalaire.js";
 import {
   VISION_DEFICITS,
@@ -52,6 +53,7 @@ export function BudgetMensuel({
   onRouvrir,
   onImport,
   actions,
+  pea,
 }) {
   const [exportEtat, setExportEtat] = React.useState(""),
     [clotEtape, setClotEtape] = React.useState(""),
@@ -111,7 +113,7 @@ export function BudgetMensuel({
     courantes = avecReel(lignes.filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport")).sort(
       (a, b) => (a.poste || "").localeCompare(b.poste || "", "fr"),
     ),
-    epargne = avecReel(lignes.filter((w) => catDe(w) === "epargne")),
+    epargne = avecReel(lignes.filter((w) => catDe(w) === "epargne")).filter((w) => w.b !== 0 || w.r !== 0),
     somme = (l, k) => l.reduce((s, w) => s + w[k], 0),
     totC = {
       b: somme(courantes, "b"),
@@ -457,6 +459,7 @@ export function BudgetMensuel({
         vacSolde={vacSolde}
         epDispo={epDispo}
         cible={getCible(params, budget)}
+        matelas={etatMatelas({ items, params, budget, budgetMois, poches, transactions, pea })}
         projection={
           moisSel === moisNow() ? projectionMois(budget, budgetMois, transactions, moisSel, new Date()) : null
         }

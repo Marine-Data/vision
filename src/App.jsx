@@ -79,7 +79,8 @@ export function App() {
     [seances, setSeances] = React.useState([]),
     [toast, setToast] = React.useState(null),
     [recOk, setRecOk] = React.useState(!1),
-    [etatNotifs, setEtatNotifs] = React.useState(null);
+    [etatNotifs, setEtatNotifs] = React.useState(null),
+    [pea, setPea] = React.useState([]);
   React.useEffect(() => {
     MODE_PARTAGE ||
       etatNotifications()
@@ -286,6 +287,10 @@ export function App() {
         (async () => {
           const { data: K } = await supabase.from("vision_seances").select("*").order("date");
           setSeances(K || []);
+        })(),
+        (async () => {
+          const { data: K } = await supabase.from("vision_pea").select("*").order("date");
+          setPea(K || []);
         })(),
         (async () => {
           const { data: K } = await supabase
@@ -1443,6 +1448,7 @@ export function App() {
       recurrentes: () => recurrentes,
       seances: () => seances,
       regles: () => reglesImport,
+      pea: () => pea,
     },
     set: {
       budget: u,
@@ -1451,6 +1457,7 @@ export function App() {
       recurrentes: setRecurrentes,
       seances: setSeances,
       regles: setReglesImport,
+      pea: setPea,
     },
   });
   // Une action déclenchée depuis un écran : erreur affichée, jamais avalée.
@@ -1468,7 +1475,7 @@ export function App() {
   if (!supabaseConfigured) return <div className="warn">Configuration Supabase manquante.</div>;
   if (!r) return null;
   if (!MODE_PARTAGE && !t) return <Connexion />;
-  set_VISION_BUDGET(l, bm);
+  set_VISION_BUDGET(l, bm, txOk ? tx : null);
   set_ICONES(l);
   set_ALERTE_SEUIL(param(c, "alerte_seuil", 50));
   set_VISION_DEFICITS(l ? deficitsParMois(l, bm, tx, MOIS.length) : []);
@@ -1645,6 +1652,7 @@ export function App() {
                 onCloturer={MODE_PARTAGE ? rienFaire : clotureFixer}
                 onRouvrir={MODE_PARTAGE ? rienFaire : clotureRouvrir}
                 onImport={MODE_PARTAGE ? null : () => setImportOuvert(true)}
+                pea={pea}
                 actions={
                   MODE_PARTAGE
                     ? null
@@ -1653,6 +1661,10 @@ export function App() {
                         posteModifier: agir(actions.posteModifier),
                         posteAjouter: agir(actions.posteAjouter),
                         posteArchiver: agir(actions.posteArchiver),
+                        basculerPEA: agir(actions.basculerPEA),
+                        recompleterMatelas: agir(actions.recompleterMatelas),
+                        matelasPlusTard: agir(actions.matelasPlusTard),
+                        peaNoter: agir(actions.peaNoter),
                       }
                 }
               />

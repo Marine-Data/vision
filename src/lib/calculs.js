@@ -1,6 +1,6 @@
 import { VISION_CONFIG } from "../config.js";
 import { num, param, paramOuDefaut, totalParType } from "./format.js";
-import { MOIS, anneeMoisDe } from "./mois.js";
+import { MOIS, anneeMoisDe, moisNow } from "./mois.js";
 
 export function margeMensuelle(t) {
   return totalParType(t, "revenu") - totalParType(t, "charge") - totalParType(t, "epargne");
@@ -34,9 +34,9 @@ export function statutLibelle(s) {
 // Source unique : le budget de chaque mois (vision_budget_mois, sinon le
 // modèle). L'app le déclare une fois par rendu ; tous les calculs le lisent.
 // ---------------------------------------------------------------
-let VISION_BUDGET = { modele: null, bmRows: null };
-export function set_VISION_BUDGET(modele, bmRows) {
-  VISION_BUDGET = { modele, bmRows };
+let VISION_BUDGET = { modele: null, bmRows: null, tx: null };
+export function set_VISION_BUDGET(modele, bmRows, tx) {
+  VISION_BUDGET = { modele, bmRows, tx: tx || null };
 }
 
 // Montant d'une dépense : un remboursement vient en déduction.
@@ -65,6 +65,9 @@ function montantLigne(i, filtre) {
   return l.length ? l.reduce((s, w) => s + num(w.montant), 0) : null;
 }
 const estVacancesLigne = (w) => w.line_key === "e_vacances";
+// Le PEA est une ligne d'épargne, mais pas un livret : il ne compte pas dans le matelas.
+export const estLignePEA = (w) => /^e_pea/.test((w && w.line_key) || "");
+const estLivret = (w) => w.kind === "epargne" && !estVacancesLigne(w) && !estLignePEA(w);
 
 // Provision vacances du mois i : la ligne « Provision vacances » du budget de ce mois.
 export function tauxVacances(params) {
@@ -77,7 +80,7 @@ export function tauxVacances(params) {
 // Épargne vers les livrets au mois i : les lignes d'épargne du budget, hors vacances.
 export function tauxLivrets(params) {
   return (i) => {
-    const v = montantLigne(i, (w) => w.kind === "epargne" && !estVacancesLigne(w));
+    const v = montantLigne(i, estLivret);
     return v != null ? v : paramOuDefaut(params, "epargne_mensuelle");
   };
 }
@@ -133,11 +136,30 @@ export function deficitsParMois(modele, bmRows, tx, n = MOIS.length) {
   return out;
 }
 
+// Versements vers les livrets au mois i : ce qui a vraiment été versé pour les mois
+// passés ; pour le mois en cours, le versé s'il existe, sinon le prévu (sauf « pas versé ») ;
+// pour les mois à venir, le budget prévu.
+export function versementsLivrets(e, i) {
+  const { modele, bmRows, tx } = VISION_BUDGET;
+  if (!modele || !tx) return tauxLivrets(e)(i);
+  const M = moisNow();
+  if (i > M) return tauxLivrets(e)(i);
+  return budgetDuMois(bmRows, modele, i)
+    .filter(estLivret)
+    .reduce((s, w) => {
+      const lid = ligneBudgetId(w),
+        verse = tx.filter((x) => num(x.mois_index) === i && x.budget_line_id === lid);
+      if (verse.length) return s + verse.reduce((t, x) => t + montantSigne(x), 0);
+      if (i < M) return s;
+      return param(e, "ep_auto_off_" + lid + "_" + i, 0) ? s : s + num(w.montant);
+    }, 0);
+}
+
 export function planEpargne(items, e, r = MOIS.length) {
-  // Calcule le solde des livrets PRÉVU mois par mois (avant déduction des provisions)
-  // Formule : plan_baseline + (épargne livrets du budget de chaque mois) - items épargne prévus
+  // Calcule le solde des livrets mois par mois (avant déduction des provisions)
+  // Formule : plan_baseline + versements livrets (réels puis prévus) - items épargne prévus
   const base = paramOuDefaut(e, "plan_baseline"),
-    taux = tauxLivrets(e),
+    taux = (i) => versementsLivrets(e, i),
     du = (items || []).filter((x) => x.pocket === "epargne" && itemCompte(x));
   const a = [];
   let cur = base,

@@ -24,3 +24,19 @@ $c$);
 -- 14/10/2026 : Planning sans doublons. Les cours s'affichent tout seuls dans la semaine ;
 -- les textes qui recopiaient les horaires des cours sont mis de côté (groupe « …_archive »),
 -- jamais supprimés. Strava résilié : récurrente ramenée à 48,58 € (Claude, Mediapart, Google One, YouTube).
+
+-- 14/10/2026 : valeur du PEA notée de temps en temps (historique complet).
+create table if not exists public.vision_pea (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  date date not null,
+  valeur numeric not null check (valeur >= 0),
+  note text,
+  created_at timestamptz not null default now()
+);
+alter table public.vision_pea enable row level security;
+create policy pea_own on public.vision_pea for all
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create index if not exists vision_pea_user on public.vision_pea(user_id, date);
+create trigger trg_vision_pea_historique after insert or update or delete on public.vision_pea
+  for each row execute function public.vision_log_row_change();
