@@ -132,6 +132,16 @@ function occupe(cours, j, de, a) {
     return x.debut < a && (x.fin || x.debut) > de;
   });
 }
+// Mêmes plages, en heures, pour les dessiner dans la grille : [{ jour, debut, fin, label }].
+export function plagesLibres(...listes) {
+  const h = (t) => Number(t.slice(0, 2)) + Number(t.slice(3)) / 60;
+  return PLAGES.filter(([j, de, a]) => listes.every((l) => !occupe(l, j, de, a))).map(([j, de, a, k]) => ({
+    jour: j,
+    debut: h(de),
+    fin: h(a),
+    label: COURTS[j] + " " + k,
+  }));
+}
 export function creneauxLibres(...listes) {
   return PLAGES.filter(([j, de, a]) => listes.every((l) => !occupe(l, j, de, a))).map(
     ([j, , , k]) => COURTS[j] + " " + k,

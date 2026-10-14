@@ -13,6 +13,7 @@ import { SaisieRapide } from "./components/SaisieRapide.jsx";
 import { SportPage } from "./components/SportPage.jsx";
 import { SuiviPage } from "./components/SuiviPage.jsx";
 import { Reglages } from "./components/Reglages.jsx";
+import { PlanningGrille } from "./components/PlanningGrille.jsx";
 import { affichageDepuisParams } from "./lib/affichage.js";
 import { Bienvenue } from "./components/Bienvenue.jsx";
 import { Partager } from "./components/Partager.jsx";
@@ -1744,14 +1745,17 @@ export function App() {
           />
         )}
         {ong === "planning" && (
-          <Planning
+          <PlanningGrille
             rows={ct}
-            edit={ctEdit}
-            save={ctSave}
-            add={ctAdd}
-            del={ctDel}
-            move={ctMove}
+            params={c}
+            seances={seances}
+            partenaires={MODE_PARTAGE ? [] : partenaires}
             readOnly={MODE_PARTAGE}
+            onCtCreer={agir(ctCreer)}
+            onCtMaj={agir(ctMaj)}
+            onCtSupprimer={agir(ctSupprimer)}
+            onSeance={agir(actions.seanceBasculer)}
+            onReglage={agir(actions.reglage)}
             echanges={
               MODE_PARTAGE ? null : (
                 <PlanningsEchanges
