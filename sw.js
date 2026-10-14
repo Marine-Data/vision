@@ -2,6 +2,12 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
+// Pas de cache : chaque demande part sur le réseau (Chrome exige un gestionnaire pour proposer l'installation).
+self.addEventListener("fetch", (e) => {
+  if (e.request.mode !== "navigate") return;
+  e.respondWith(fetch(e.request));
+});
+
 self.addEventListener("push", (e) => {
   let d = {};
   try {
