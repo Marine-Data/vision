@@ -1,6 +1,48 @@
 import React from "react";
 import { Fleches } from "./Fleches.jsx";
 import { contenuDe } from "../lib/contenu.js";
+import { lireCreneau } from "./SportPage.jsx";
+
+const JOURS_PL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+const COURTS_PL = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
+const h = (x) => (x ? x.replace(":", "h") : "");
+// Période d'un cours (« 30/09 → 09/12/2026 ») : [début, fin] en AAAA-MM-JJ, ou null.
+function periode(c) {
+  const t = c.complement || "",
+    m = t.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s*→\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  const fin = m[6] + "-" + m[5].padStart(2, "0") + "-" + m[4].padStart(2, "0"),
+    anDebut = m[3] || (Number(m[2]) > Number(m[5]) ? String(Number(m[6]) - 1) : m[6]);
+  return [anDebut + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0"), fin];
+}
+const nomCours = (t) => (t || "").replace(/^Sport\s*[—-]\s*/, "");
+// Créneaux des cours, lus dans « Quand » (même source que l'onglet Sport).
+export function creneauxCours(cours) {
+  const auj = new Date().toISOString().slice(0, 10);
+  return cours
+    .map((c) => ({ c, ...lireCreneau(c.detail), p: periode(c) }))
+    .filter((x) => x.jour >= 0)
+    .map((x) => ({
+      ...x,
+      actif: !x.p || (x.p[0] <= auj && x.p[1] >= auj) || x.p[0] > auj,
+      fini: !!(x.p && x.p[1] < auj),
+    }));
+}
+// Chevauchements : même jour, horaires qui se croisent, périodes qui se croisent.
+export function chevauchements(cr) {
+  const out = [];
+  cr.filter((x) => !x.fini).forEach((a, i, l) =>
+    l.slice(i + 1).forEach((b) => {
+      if (a.jour !== b.jour) return;
+      const heures = !a.debut || !b.debut || !a.fin || !b.fin || (a.debut < b.fin && b.debut < a.fin),
+        dates = !a.p || !b.p || (a.p[0] <= b.p[1] && b.p[0] <= a.p[1]);
+      heures &&
+        dates &&
+        out.push(JOURS_PL[a.jour] + " : " + nomCours(a.c.titre) + " et " + nomCours(b.c.titre));
+    }),
+  );
+  return out;
+}
 
 export function Planning({
   rows: ctRows,
@@ -16,6 +58,25 @@ export function Planning({
     cours = contenuDe(ctRows, "cours"),
     notes = contenuDe(ctRows, "note").filter((x) => x.groupe === "planning"),
     sub = contenuDe(ctRows, "note").find((x) => x.groupe === "planning_sub"),
+    cr = creneauxCours(cours),
+    conflits = chevauchements(cr),
+    duJour = (titreJour) => {
+      const k = JOURS_PL.indexOf((titreJour || "").trim().toLowerCase());
+      return cr
+        .filter((x) => x.jour === k && !x.fini)
+        .sort((a, b) => (a.debut || "").localeCompare(b.debut || ""));
+    },
+    ligneCours = (x) =>
+      nomCours(x.c.titre) + (x.debut ? " " + h(x.debut) + (x.fin ? "–" + h(x.fin) : "") : ""),
+    resume = cr.filter((x) => !x.fini).length
+      ? "Cours : " +
+        cr
+          .filter((x) => !x.fini)
+          .sort((a, b) => a.jour - b.jour)
+          .map((x) => nomCours(x.c.titre) + " (" + COURTS_PL[x.jour] + ")")
+          .join(", ") +
+        "."
+      : "",
     champ = (o, k, ph) => (
       <input
         className="bedit"
@@ -35,7 +96,7 @@ export function Planning({
   return (
     <section className="sec">
       <h2>Emploi du temps</h2>
-      <p className="sub">{sub ? sub.titre : ""}</p>
+      <p className="sub">{sub ? sub.titre : resume}</p>
       {!ro && (
         <div
           style={{
@@ -55,6 +116,10 @@ export function Planning({
       {mode ? (
         <div>
           <div className="h3">Semaine</div>
+          <div className="detail" style={{ marginBottom: 6 }}>
+            Les cours s'ajoutent tout seuls à leur jour, d'après « Détail des cours ». Ici, seulement le reste
+            (travail, repos…).
+          </div>
           <div className="card">
             {jours.map((o) => (
               <div
@@ -230,28 +295,45 @@ export function Planning({
                 </tr>
               </thead>
               <tbody>
-                {jours.map((t) => (
-                  <tr className={t.groupe === "fixe" ? "total" : ""} key={t.id}>
-                    <td>
-                      <b>{t.titre}</b>
-                    </td>
-                    <td>{t.detail}</td>
-                    <td
-                      style={
-                        t.groupe === "fixe"
-                          ? {
-                              color: "var(--oxblood)",
-                              fontWeight: 600,
-                            }
-                          : {}
-                      }
-                    >
-                      {t.extra}
-                    </td>
-                  </tr>
-                ))}
+                {jours.map((t) => {
+                  const l = duJour(t.titre),
+                    jour = l.filter((x) => !x.debut || x.debut < "17:00"),
+                    soir = l.filter((x) => x.debut && x.debut >= "17:00"),
+                    vide = (v) => !v || v === "—",
+                    cellule = (texte, liste) => (
+                      <>
+                        {!vide(texte) && <div>{texte}</div>}
+                        {liste.map((x) => (
+                          <div key={x.c.id} style={{ color: "var(--oxblood)", fontWeight: 600 }}>
+                            {ligneCours(x)}
+                            {x.p && !x.actif
+                              ? " (dès " + x.p[0].slice(8) + "/" + x.p[0].slice(5, 7) + ")"
+                              : ""}
+                          </div>
+                        ))}
+                        {vide(texte) && !liste.length && "—"}
+                      </>
+                    );
+                  return (
+                    <tr className={t.groupe === "fixe" || l.length ? "total" : ""} key={t.id}>
+                      <td>
+                        <b>{t.titre}</b>
+                      </td>
+                      <td>{cellule(t.detail, jour)}</td>
+                      <td>{cellule(t.extra, soir)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+          <div
+            className={"note" + (conflits.length ? " red" : "")}
+            role={conflits.length ? "alert" : undefined}
+          >
+            {conflits.length
+              ? "⚠️ Chevauchement — " + conflits.join(" · ") + "."
+              : "✓ Aucun chevauchement entre tes cours."}
           </div>
           {notes.map((t) => (
             <div className={"note" + (t.extra === "red" ? " red" : "")} key={t.id}>

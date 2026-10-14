@@ -20,3 +20,7 @@ $c$);
 
 -- Les détails des étapes du suivi qui ne faisaient que répéter la date ont été vidés
 -- (la date est désormais dans date_iso / date_fin ; l'ancien texte reste dans l'historique).
+
+-- 14/10/2026 : Planning sans doublons. Les cours s'affichent tout seuls dans la semaine ;
+-- les textes qui recopiaient les horaires des cours sont mis de côté (groupe « …_archive »),
+-- jamais supprimés. Strava résilié : récurrente ramenée à 48,58 € (Claude, Mediapart, Google One, YouTube).
