@@ -51,7 +51,7 @@ import { supabase, supabaseConfigured } from "./lib/supabase.js";
 export function App() {
   const [t, e] = React.useState(null),
     [r, n] = React.useState(!1),
-    [s, i] = React.useState(() => {
+    [s, setOngletEtat] = React.useState(() => {
       try {
         const q = new URLSearchParams(location.search).get("onglet");
         return q && ONGLETS.some((x) => x.id === q) ? q : "apercu";
@@ -195,6 +195,37 @@ export function App() {
   }, [t, txOk, l, bm, tx, c, vi, poches, pea]);
   const alerteRef = React.useRef({});
   const epAutoRef = React.useRef(!1);
+  // Navigation entre onglets : chaque changement s'inscrit dans l'historique du téléphone,
+  // pour que « Retour » (bouton de l'app ou du téléphone) ramène à l'écran d'avant.
+  const ongletRef = React.useRef(s),
+    pileOnglets = React.useRef([]);
+  const i = React.useCallback((N) => {
+    if (!N || N === ongletRef.current) return;
+    pileOnglets.current.push(ongletRef.current);
+    ongletRef.current = N;
+    try {
+      const q = new URLSearchParams(window.location.search);
+      q.set("onglet", N);
+      history.pushState({ onglet: N }, "", window.location.pathname + "?" + q.toString());
+    } catch (e) {}
+    setOngletEtat(N);
+  }, []);
+  React.useEffect(() => {
+    try {
+      history.replaceState({ ...(history.state || {}), onglet: ongletRef.current }, "");
+    } catch (e) {}
+    const onPop = (e) => {
+      const N = e.state && e.state.onglet;
+      if (!N || N === ongletRef.current) return; // fermeture d'une fenêtre : rien à faire ici
+      pileOnglets.current.pop();
+      ongletRef.current = N;
+      setOngletEtat(N);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const retour = () => (pileOnglets.current.length ? history.back() : (i("apercu"), window.scrollTo(0, 0)));
   const ctRef = React.useRef([]);
   ctRef.current = ct;
   const clotRef = React.useRef([]);
@@ -1784,6 +1815,11 @@ export function App() {
         }}
       >
         <div className="wrap">
+          {ong !== "apercu" && (
+            <button type="button" className="logout retour" onClick={retour} aria-label="Retour à l'écran précédent">
+              ‹ Retour
+            </button>
+          )}
           <div className="kick">{tete.kicker}</div>
           <h1>{tete.titre}</h1>
           {MODE_PARTAGE ? (
