@@ -4,7 +4,8 @@ import webpush from "npm:web-push@3";
 
 // Rappels de l'app Vision, appelée chaque heure par pg_cron (tâche « vision-rappels-horaire »).
 // Réglages (vision_params) : rappel_suivi, rappel_echeances, rappel_devoirs (jours avant),
-// rappel_sport (heures avant). Valeur négative ou nulle = rappel coupé.
+// rappel_sport (heures avant, réglage par défaut de TOUS les cours ; chaque cours peut avoir le sien).
+// Valeur négative ou nulle = rappel coupé.
 // Chaque rappel n'est envoyé qu'une fois (vision_rappels_envoyes).
 // Planning (vision_evenements) : rappel la veille d'un événement à date (si « Rappel la veille »),
 // et aucun rappel sport pendant une pause qui arrête le sport.
@@ -125,18 +126,34 @@ Deno.serve(async (req: Request) => {
             const emo = e.emoji || ({ rdv: "📌", formation: "🎓", sport: "🤸", autre: "🎉" } as Record<string, string>)[e.categorie] || "📌";
             rappels.push({ cle: "evt:" + e.id + ":" + demain, titre: emo + " " + e.titre + " demain", corps: [h[0] ? hTxt(h[0]) + (h[1] ? " – " + hTxt(h[1]) : "") : "", e.lieu || ""].filter(Boolean).join(" · "), url: "./?onglet=planning" });
           });
-      // Pause qui arrête le sport aujourd'hui : pas de rappel sport.
-      const sportEnPause = (evs || []).some((e) => e.genre === "pause" && String(e.date_debut) <= now.iso && String(e.date_fin) >= now.iso && (e.masque || []).includes("sport"));
-      // Cours annulés aujourd'hui (« Pas cette semaine » dans Planning) : pas de rappel.
-      const annules = hS > 0 ? new Set((((await sb.from("vision_seances").select("cours_id").eq("user_id", uid).eq("date", now.iso).eq("fait", false)).data) || []).map((x) => x.cours_id)) : new Set();
-      if (hS > 0 && !sportEnPause)
-        (contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport" && !annules.has(c.id) && actifLe(c, now.iso)).forEach((c) => {
-          const t = String(c.detail || "").toLowerCase();
-          if (!t.startsWith(JOURS[now.jour])) return;
-          const h = t.match(/(\d{1,2})h(\d{2})?/);
+      // Cours (tous) : rappel propre au cours (vision_contenu.rappel) ou réglage général rappel_sport (heures).
+      // Rien hors période, le jour d'une annulation (« Pas cette semaine », cours déplacé) ou pendant une pause.
+      const { data: annulesL } = await sb.from("vision_seances").select("cours_id, date").eq("user_id", uid).in("date", [now.iso, demain]).eq("fait", false);
+      const annules = new Set((annulesL || []).map((x) => x.date + ":" + x.cours_id));
+      const enPause = (iso: string, cle: string) => (evs || []).some((e) => e.genre === "pause" && String(e.date_debut) <= iso && String(e.date_fin) >= iso && (e.masque || []).includes(cle));
+      const parDefaut = hS > 0 ? Math.min(3, Math.round(hS)) + "h" : "aucun";
+      (contenu || [])
+        .filter((c) => c.type === "cours")
+        .forEach((c) => {
+          const mode = c.rappel || parDefaut;
+          if (mode === "aucun") return;
+          const sport = c.groupe === "sport",
+            cleP = sport ? "sport" : "cours",
+            t = String(c.detail || "").toLowerCase(),
+            h = t.match(/(\d{1,2})h(\d{2})?/),
+            nom = String(c.titre || "").replace(/^Sport\s*[—-]\s*/, ""),
+            emo = sport ? "🤸" : c.emoji || "📘";
           if (!h) return;
+          const heure = h[1] + "h" + (h[2] || "00");
+          if (mode === "veille") {
+            if (!essai && !(now.heure >= 18 && now.heure < 22)) return;
+            if (!t.startsWith(JOURS[(now.jour + 1) % 7]) || !actifLe(c, demain) || annules.has(demain + ":" + c.id) || enPause(demain, cleP)) return;
+            rappels.push({ cle: "cours:" + c.id + ":" + demain, titre: emo + " " + nom + " demain", corps: "Cours à " + heure + (c.extra ? " · " + c.extra : ""), url: sport ? "./?onglet=sport" : "./?onglet=planning" });
+            return;
+          }
+          if (!t.startsWith(JOURS[now.jour]) || !actifLe(c, now.iso) || annules.has(now.iso + ":" + c.id) || enPause(now.iso, cleP)) return;
           const minutes = Number(h[1]) * 60 + Number(h[2] || 0) - (now.heure * 60 + now.minute);
-          if (minutes > 0 && minutes <= hS * 60) rappels.push({ cle: "sport:" + c.id + ":" + now.iso, titre: "🤸 " + String(c.titre || "").replace(/^Sport\s*[—-]\s*/, ""), corps: "Cours à " + h[1] + "h" + (h[2] || "00") + (c.extra ? " · " + c.extra : ""), url: "./?onglet=sport" });
+          if (minutes > 0 && minutes <= parseInt(mode) * 60) rappels.push({ cle: (sport ? "sport:" : "cours:") + c.id + ":" + now.iso, titre: emo + " " + nom, corps: "Cours à " + heure + (c.extra ? " · " + c.extra : ""), url: sport ? "./?onglet=sport" : "./?onglet=planning" });
         });
       if (essai) {
         apercu.push({ uid, abonnements: mesAbos.length, rappels });

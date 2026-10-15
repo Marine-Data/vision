@@ -1,6 +1,7 @@
 import React from "react";
 import { KbSheet } from "./kanban/communs.jsx";
 import { CATEGORIES, MASQUES, emojiDe, listeDates } from "../lib/evenements.js";
+import { ChoixMatiere, propositionMatiere } from "./PlanningPrix.jsx";
 
 // Planning étape 2 : fiche d'un événement à certaines dates (calendrier à cocher)
 // et fiche d'une pause (du … au …, ce qui s'arrête).
@@ -114,7 +115,7 @@ function Calendrier({ choisies, setChoisies, couleur, depart }) {
 }
 
 // Fiche d'un événement à dates : ajout (depuis une case de la grille) ou modification.
-export function FicheEvenement({ ev, depart, couleurDe, onClose, onCreer, onMaj, onSupprimer, onRepetition }) {
+export function FicheEvenement({ ev, depart, couleurDe, onClose, onCreer, onMaj, onSupprimer, onRepetition, matieres = [], onNouvelleMatiere, prix }) {
   const [categorie, setCategorie] = React.useState(ev ? ev.categorie : "rdv"),
     [nom, setNom] = React.useState(ev ? ev.titre : ""),
     [emoji, setEmoji] = React.useState(ev ? ev.emoji || "" : ""),
@@ -125,6 +126,7 @@ export function FicheEvenement({ ev, depart, couleurDe, onClose, onCreer, onMaj,
     [parJour, setParJour] = React.useState(!!(ev && Object.keys(ev.horaires || {}).length)),
     [lieu, setLieu] = React.useState(ev ? ev.lieu || "" : ""),
     [rappel, setRappel] = React.useState(ev ? ev.rappel !== false : true),
+    [matiere, setMatiere] = React.useState(ev ? ev.matiere || (ev.categorie === "formation" ? propositionMatiere(ev.titre, matieres) : null) : null),
     [confirmer, setConfirmer] = React.useState(false),
     [erreur, setErreur] = React.useState("");
   const coul = couleurDe(categorie),
@@ -151,6 +153,7 @@ export function FicheEvenement({ ev, depart, couleurDe, onClose, onCreer, onMaj,
       horaires: h,
       lieu: lieu.trim() || null,
       rappel,
+      matiere: categorie === "sport" ? null : matiere || null,
       annulees: ev ? (ev.annulees || []).map(String).filter((x) => choisies.includes(x)) : [],
     };
     try {
@@ -209,6 +212,8 @@ export function FicheEvenement({ ev, depart, couleurDe, onClose, onCreer, onMaj,
           <input value={lieu} placeholder="Adresse, visio…" onChange={(e) => setLieu(e.target.value)} style={champ} />
         </label>
         <Interrupteur on={rappel} onClick={() => setRappel(!rappel)} label="🔔 Rappel la veille" couleur={coul[0]} />
+        {categorie !== "sport" && onNouvelleMatiere && <ChoixMatiere valeur={matiere} setValeur={setMatiere} matieres={matieres} couleur={coul} onNouvelle={onNouvelleMatiere} />}
+        {ev && prix ? prix(ev, coul) : !ev && <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--slate)" }}>💶 Le prix se relie au Budget après l'ajout (✏️ Toutes les dates).</span>}
         {erreur && (
           <div role="alert" style={{ fontSize: 13.5, fontWeight: 700, color: "var(--t-rouge)" }}>
             {erreur}

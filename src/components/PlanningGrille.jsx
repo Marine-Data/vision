@@ -8,6 +8,9 @@ import { plagesLibres } from "../lib/partage.js";
 import { ecrirePeriode, periode } from "../lib/periode.js";
 import { coursEnPause, emojiDe, estAnnulee, evenementsLe, horairesDe, listeDates, masqueLe, occupeLeJour, pausesLe, reperesDu } from "../lib/evenements.js";
 import { ChoixRepetition, FicheEvenement, FichePause, dateLongue } from "./PlanningDates.jsx";
+import { ChoixMatiere, ChoixRappel, FicheDeplacer, PrixCours, devoirsPour, propositionMatiere, rappelDefaut, texteRappel } from "./PlanningPrix.jsx";
+import { depensesDe, resumePrix } from "../lib/depenses.js";
+import { uneFois } from "../lib/periode.js";
 
 // Planning en grille (étape 1) : semaine en colonnes, blocs de couleur par type,
 // carte au toucher, ajout court, « J'y suis allée », couleurs et horaires du travail.
@@ -108,7 +111,7 @@ function JoursChoix({ jours, setJours, couleur, multiple }) {
 }
 
 // Fiche d'un cours : ajout (court, plusieurs jours) ou modification (un jour).
-function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, onSupprimer, onRepetition }) {
+function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, onSupprimer, onRepetition, matieres, onNouvelleMatiere, prix }) {
   const c = cours ? lireCreneau(cours.detail) : null,
     p = cours ? periode(cours) : null,
     [nom, setNom] = React.useState(cours ? nomCours(cours.titre) : ""),
@@ -121,6 +124,8 @@ function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, o
     [lieu, setLieu] = React.useState(cours ? cours.extra || "" : ""),
     [de, setDe] = React.useState(p ? p[0] : ""),
     [a, setA] = React.useState(p ? p[1] : ""),
+    [matiere, setMatiere] = React.useState(cours ? cours.matiere || (cours.groupe === "sport" ? null : propositionMatiere(cours.titre, matieres)) : null),
+    [rappel, setRappel] = React.useState(cours ? cours.rappel || null : null),
     [confirmer, setConfirmer] = React.useState(false),
     [erreur, setErreur] = React.useState("");
   const coul = couleurType(params, type);
@@ -141,6 +146,8 @@ function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, o
       extra: lieu.trim() || null,
       complement: ecrirePeriode(de, a) || (cours && !p ? cours.complement : null),
       emoji: emoji.trim() || null,
+      matiere: type === "sport" ? null : matiere || null,
+      rappel: rappel || null,
     });
     try {
       if (cours) await onMaj(cours.id, champs(jours[0]), "Cours modifié");
@@ -178,7 +185,7 @@ function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, o
           <input type="time" aria-label="Fin" value={fin} onChange={(e) => setFin(e.target.value)} style={{ ...champ, textAlign: "center" }} />
         </div>
         <button type="button" onClick={() => setPlus(!plus)} style={{ border: 0, background: "transparent", padding: 0, textAlign: "left", font: "inherit", fontSize: 14, fontWeight: 800, color: "var(--t-teal)", cursor: "pointer" }}>
-          {plus ? "▾ Moins d'options" : "▸ Plus d'options (emoji, lieu, période)"}
+          {plus ? "▾ Moins d'options" : "▸ Plus d'options (lieu, période, matière, rappel, prix)"}
         </button>
         {plus && (
           <>
@@ -197,6 +204,9 @@ function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, o
               </label>
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--slate)", marginTop: -6 }}>Sans période, le cours revient toutes les semaines.</span>
+            {type !== "sport" && <ChoixMatiere valeur={matiere} setValeur={setMatiere} matieres={matieres} couleur={coul} onNouvelle={onNouvelleMatiere} />}
+            <ChoixRappel valeur={rappel} setValeur={setRappel} heuresDefaut={param(params, "rappel_sport", 0)} />
+            {cours ? prix(cours, coul) : <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--slate)" }}>💶 Le prix se relie au Budget après l'ajout (✏️ Modifier).</span>}
           </>
         )}
         {erreur && (
@@ -331,7 +341,7 @@ function lireLaisses() {
   }
 }
 
-export function PlanningGrille({ rows, params, seances, partenaires, evenements, homework, transactions, progress, goTab, echanges, readOnly, onCtCreer, onCtMaj, onCtSupprimer, onSeance, onAnnuler, onReglage, onEvCreer, onEvMaj, onEvSupprimer }) {
+export function PlanningGrille({ rows, params, seances, partenaires, evenements, homework, transactions, progress, goTab, echanges, readOnly, onCtCreer, onCtMaj, onCtSupprimer, onSeance, onAnnuler, onReglage, onEvCreer, onEvMaj, onEvSupprimer, items, budget, onItemCreer, onItemMaj, onTxAjouter, onTxModifier, onDeplacer }) {
   const [laisses, setLaisses] = React.useState(lireLaisses),
     [listeOuverte, setListeOuverte] = React.useState(false);
   const laisser = (cle) => {
@@ -344,6 +354,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
   const [semaine, setSemaine] = React.useState(0),
     [sel, setSel] = React.useState(null),
     [fiche, setFiche] = React.useState(null),
+    [deplacer, setDeplacer] = React.useState(null),
     [reglagesOuverts, setReglagesOuverts] = React.useState(false),
     [terminesOuverts, setTerminesOuverts] = React.useState(false);
   const auj = new Date(),
@@ -364,6 +375,12 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
     couleurDe = (cat) => (cat === "sport" ? cSport : cEv),
     jours = contenuDe(rows, "jour"),
     cours = contenuDe(rows, "cours"),
+    matieres = [...new Set([...contenuDe(rows, "matiere").map((m) => (m.titre || "").trim()), ...(homework || []).map((h) => (h.subject || "").trim())].filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr")),
+    plus7 = (dIso) => {
+      const d = new Date(dIso + "T12:00:00");
+      d.setDate(d.getDate() + 7);
+      return iso(d);
+    },
     notes = contenuDe(rows, "note").filter((x) => x.groupe === "planning"),
     conflits = chevauchements(creneauxCours(cours)),
     actifLe = (c, dIso) => {
@@ -406,13 +423,13 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
     cours
       .map((c) => ({ c, ...lireCreneau(c.detail) }))
       .filter((x) => x.jour === j && x.debut && actifLe(x.c, dIso) && !coursEnPause(evs, dIso, x.c.groupe === "sport"))
-      .forEach((x) => blocs.push({ cle: "c" + x.c.id, type: x.c.groupe === "sport" ? "sport" : "cours", ref: x.c, de: heureNum(x.debut), a: heureNum(x.fin) || heureNum(x.debut) + 1, titre: nomCours(x.c.titre), emoji: x.c.emoji, hd: x.debut, off: annule(dIso, x.c.id) }));
+      .forEach((x) => blocs.push({ cle: "c" + x.c.id, type: x.c.groupe === "sport" ? "sport" : "cours", ref: x.c, de: heureNum(x.debut), a: heureNum(x.fin) || heureNum(x.debut) + 1, titre: nomCours(x.c.titre), emoji: x.c.emoji, hd: x.debut, off: annule(dIso, x.c.id), devoirs: devoirsPour(x.c.matiere, dIso, uneFois(x.c) ? null : plus7(dIso), homework) }));
     // Événements à dates : sans heure, ils se placent en haut de la journée.
     evenementsLe(evs, dIso).forEach((e) => {
       const [hd, hf] = horairesDe(e, dIso),
         de = hd ? heureNum(hd) : h0,
         a = hf ? heureNum(hf) : de + 1;
-      blocs.push({ cle: "e" + e.id, type: e.categorie === "sport" ? "sport" : "evenement", ref: e, ev: e, de, a: a > de ? a : de + 1, titre: e.titre, emoji: emojiDe(e), hd, off: estAnnulee(e, dIso) });
+      blocs.push({ cle: "e" + e.id, type: e.categorie === "sport" ? "sport" : "evenement", ref: e, ev: e, de, a: a > de ? a : de + 1, titre: e.titre, emoji: emojiDe(e), hd, off: estAnnulee(e, dIso), devoirs: devoirsPour(e.matiere, dIso, listeDates(e).find((x) => x > dIso) || null, homework) });
     });
     blocs.sort((a, b) => a.de - b.de);
     // voies : un bloc qui en croise un autre se met à côté
@@ -466,6 +483,8 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
         ev: e,
         dIso,
         annule: off,
+        devoirs: sel.devoirs || [],
+        prix: depensesDe(e, items, transactions, budget),
         sport: e.categorie === "sport",
       };
     }
@@ -490,10 +509,44 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
         sport: sel.type === "sport",
         dIso: isos[sel.jour],
         annule: annule(isos[sel.jour], c.id),
+        devoirs: sel.devoirs || [],
+        prix: depensesDe(c, items, transactions, budget),
+        rappel: c.rappel || rappelDefaut(param(params, "rappel_sport", 0)),
+        origine: c.origine ? cours.find((o) => o.id === c.origine) || null : null,
+        deplaceVers: cours.find((o) => o.origine === c.id && String(o.item_key || "").startsWith("rattrapage:" + isos[sel.jour])) || null,
+        debut: x.debut,
+        fin: x.fin,
       };
-      if (detail.annule) detail.titre = detail.titre + " · annulé";
+      if (detail.deplaceVers) {
+        const p2 = periode(detail.deplaceVers);
+        detail.titre = detail.titre + " · déplacé";
+        detail.texte = "Déplacé au " + (p2 ? dateLongue(p2[0]) : "") + " " + hTexte(lireCreneau(detail.deplaceVers.detail).debut);
+      } else if (detail.annule) detail.titre = detail.titre + " · annulé";
+      if (detail.origine) detail.barre = null;
     }
   }
+
+  // Bloc « prix » d'un cours ou d'un événement (toujours la version à jour de la ligne).
+  const blocPrix = (x, coul, jour) => (
+    <PrixCours
+      x={x}
+      couleur={coul}
+      contenu={rows}
+      evenements={evs}
+      items={items}
+      transactions={transactions}
+      budget={budget}
+      seances={seances}
+      jour={jour}
+      onLiens={(l, msg) => (x.genre ? onEvMaj(x.id, { depenses: l }, msg) : onCtMaj(x.id, { depenses: l }, msg))}
+      onItemCreer={onItemCreer}
+      onItemMaj={onItemMaj}
+      onTxAjouter={onTxAjouter}
+      onTxModifier={onTxModifier}
+    />
+  ),
+    actuel = (x) => (x ? (x.genre ? evs.find((e) => e.id === x.id) : cours.find((c) => c.id === x.id)) || x : null),
+    nouvelleMatiere = (t) => (matieres.some((m) => m.toLowerCase() === t.toLowerCase()) ? null : onCtCreer("matiere", null, { titre: t }, "Matière ajoutée"));
 
   const titreSemaine = semaine === 0 ? "Ma semaine" : semaine === 1 ? "Semaine prochaine" : semaine === -1 ? "Semaine dernière" : "Semaine du " + dateCourte(dates[0]);
   const boutonNav = (l, aria, f) => (
@@ -607,7 +660,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
                   <button
                     key={b.cle}
                     type="button"
-                    aria-label={b.titre + ", " + JOURS[j] + (b.hd ? " " + hTexte(b.hd) : "") + (coche ? ", fait" : "") + (off ? ", annulé" : "") + (conflit ? ", en conflit" : "")}
+                    aria-label={b.titre + ", " + JOURS[j] + (b.hd ? " " + hTexte(b.hd) : "") + (coche ? ", fait" : "") + (off ? ", annulé" : "") + (conflit ? ", en conflit" : "") + ((b.devoirs || []).length ? ", devoir à rendre" : "")}
                     onClick={() => setSel({ ...b, jour: j })}
                     style={{
                       position: "absolute",
@@ -637,6 +690,11 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
                     <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1.15, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "100%" }}>{nomGrille(b.titre)}</span>
                     <span style={{ fontSize: 10, fontWeight: 800, opacity: 0.92 }}>{hTexte(b.hd)}</span>
                     {coche && <span style={{ fontSize: 12, fontWeight: 900 }}>✓</span>}
+                    {(b.devoirs || []).length > 0 && !off && (
+                      <span aria-hidden="true" style={{ position: "absolute", top: 1, right: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--surface)", boxShadow: "0 1px 3px rgba(0,0,0,.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, textDecoration: "none" }}>
+                        📚
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -685,6 +743,27 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
               <span style={{ fontSize: 13, fontWeight: 800 }}>{detail.barre.fin}</span>
             </div>
           )}
+          {(detail.cours || detail.ev) && ((detail.devoirs || []).length > 0 || (detail.prix || []).length > 0 || detail.cours || detail.origine) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, background: "rgba(255,255,255,.15)", borderRadius: 14, padding: "10px 12px", fontSize: 14, fontWeight: 800 }}>
+              {detail.origine && <span>🔁 Rattrapage de {nomCours(detail.origine.titre)} ({dateLongue(String(detail.cours.item_key || "").split(":")[1] || detail.dIso)})</span>}
+              {(detail.devoirs || []).map((h) => (
+                <span key={h.id}>
+                  📚 {h.title || h.titre || "Devoir"} · à rendre {String(h.deadline).slice(0, 10) === detail.dIso ? (detail.dIso === aujIso ? "aujourd'hui" : "ce jour-là") : dateLongue(String(h.deadline).slice(0, 10))}
+                </span>
+              ))}
+              {(detail.prix || []).length > 0 &&
+                (() => {
+                  const r = resumePrix(detail.prix);
+                  return (
+                    <span>
+                      💶 {Math.round(r.total)} € · {r.payees === r.nb ? "tout payé" : r.payees + "/" + r.nb + " payé" + (r.payees > 1 ? "s" : "")}
+                      {r.abandon ? " · ⚠️ abandonné dans Budget" : ""}
+                    </span>
+                  );
+                })()}
+              {detail.cours && <span>🔔 {texteRappel(detail.rappel)}</span>}
+            </div>
+          )}
           {detail.reperes &&
             detail.reperes.map((r, k) => (
               <button key={k} type="button" disabled={!goTab} onClick={() => goTab && goTab(r.onglet)} style={{ display: "flex", alignItems: "center", gap: 10, border: 0, borderRadius: 14, background: "var(--fond-doux)", padding: "10px 12px", textAlign: "left", font: "inherit", color: "var(--ink)", cursor: goTab ? "pointer" : "default" }}>
@@ -713,7 +792,26 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
           )}
           {!readOnly && (detail.cours || detail.travail) && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-              {detail.cours && (
+              {detail.cours && !detail.origine && !detail.annule && onDeplacer && (
+                <button type="button" onClick={() => setDeplacer({ cours: detail.cours, dIso: detail.dIso, debut: detail.debut, fin: detail.fin, couleur: detail.couleur })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: "rgba(255,255,255,.22)", color: "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  🔁 Déplacer cette fois
+                </button>
+              )}
+              {detail.origine && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const orig = String(detail.cours.item_key || "").split(":")[1];
+                    await onCtSupprimer(detail.cours.id, "Déplacement annulé");
+                    if (orig && annule(orig, detail.origine.id)) await onAnnuler({ date: orig, cours_id: detail.origine.id, titre: nomCours(detail.origine.titre) });
+                    setSel(null);
+                  }}
+                  style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: "rgba(255,255,255,.22)", color: "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
+                >
+                  ↩︎ Annuler le déplacement
+                </button>
+              )}
+              {detail.cours && !detail.origine && !detail.deplaceVers && (
                 <button type="button" onClick={() => onAnnuler({ date: detail.dIso, cours_id: detail.cours.id, titre: nomCours(detail.cours.titre) })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: detail.annule ? "#ffffff" : "rgba(255,255,255,.22)", color: detail.annule ? detail.couleur[0] : "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                   {detail.annule ? "↩︎ Remettre ce jour-là" : "🚫 Pas cette semaine"}
                 </button>
@@ -842,6 +940,9 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
           onMaj={onEvMaj}
           onSupprimer={onEvSupprimer}
           onRepetition={() => setFiche({ ...fiche, mode: "semaine" })}
+          matieres={matieres}
+          onNouvelleMatiere={nouvelleMatiere}
+          prix={(e, coul) => onItemCreer && blocPrix(actuel(e), coul, -1)}
         />
       )}
       {fiche && !fiche.ev && !fiche.pause && fiche.mode !== "dates" && fiche.mode !== "pause" && (
@@ -855,8 +956,12 @@ export function PlanningGrille({ rows, params, seances, partenaires, evenements,
           onMaj={onCtMaj}
           onSupprimer={onCtSupprimer}
           onRepetition={onEvCreer ? () => setFiche({ ...fiche, mode: "dates" }) : null}
+          matieres={matieres}
+          onNouvelleMatiere={nouvelleMatiere}
+          prix={(c, coul) => onItemCreer && blocPrix(actuel(c), coul, lireCreneau(c.detail).jour)}
         />
       )}
+      {deplacer && <FicheDeplacer cours={deplacer.cours} dateIso={deplacer.dIso} debut={deplacer.debut} fin={deplacer.fin} couleur={deplacer.couleur} onClose={() => (setDeplacer(null), setSel(null))} onDeplacer={onDeplacer} />}
     </section>
   );
 }
