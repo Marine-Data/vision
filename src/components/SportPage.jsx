@@ -1,5 +1,6 @@
 import React from "react";
 import { masqueLe } from "../lib/evenements.js";
+import { actifLe, periode, termine, uneFois } from "../lib/periode.js";
 import { KbSheet } from "./kanban/communs.jsx";
 import { euros, num } from "../lib/format.js";
 import { MOIS, anneeMoisDe } from "../lib/mois.js";
@@ -345,13 +346,16 @@ export function SportPage({
     cotisation = echeances.reduce((s, x) => s + num(x.montant_prevu), 0),
     auj = new Date(),
     aujIso = isoDe(auj),
-    creneaux = cours.map((c) => ({ c, ...lireCreneau(c.detail) })).filter((x) => x.jour >= 0);
+    creneaux = cours.map((c) => ({ c, ...lireCreneau(c.detail) })).filter((x) => x.jour >= 0),
+    // Semaine type : cours réguliers encore en cours (ni terminés, ni rattrapages d'une seule fois).
+    reguliers = creneaux.filter((x) => !termine(x.c, aujIso) && !uneFois(x.c)),
+    coursVisibles = cours.filter((c) => !termine(c, aujIso));
   // Prochain cours : premier créneau à venir (aujourd'hui compris si l'heure n'est pas passée).
   let prochain = null;
   for (let k = 0; k < 70 && !prochain; k++) {
     const d = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() + k),
       l = creneaux
-        .filter((x) => x.jour === jourSemaine(d))
+        .filter((x) => x.jour === jourSemaine(d) && actifLe(x.c, isoDe(d)))
         // cours annulé ce jour-là (« Pas cette semaine » dans Planning) : on passe au suivant
         .filter((x) => !(seances || []).some((s) => s.date === isoDe(d) && s.cours_id === x.c.id && s.fait === false))
         // sport en pause ce jour-là (🏖 Pause dans Planning)
@@ -374,7 +378,7 @@ export function SportPage({
     const d = new Date(ref.a, ref.m, j);
     if (masqueLe(evenements, isoDe(d)).has("sport")) continue;
     creneaux
-      .filter((x) => x.jour === jourSemaine(d))
+      .filter((x) => x.jour === jourSemaine(d) && actifLe(x.c, isoDe(d)))
       .forEach((x) => occurrences.push({ date: isoDe(d), j, c: x.c, futur: isoDe(d) > aujIso }));
   }
   const fait = (date, id) => (seances || []).some((s) => s.date === date && s.cours_id === id && s.fait),
@@ -468,7 +472,7 @@ export function SportPage({
           role="img"
           aria-label={
             "Semaine type : " +
-            (creneaux.length ? creneaux.map((x) => JOURS[x.jour]).join(", ") : "aucun cours")
+            (reguliers.length ? reguliers.map((x) => JOURS[x.jour]).join(", ") : "aucun cours")
           }
           style={{
             ...carte,
@@ -480,7 +484,7 @@ export function SportPage({
           }}
         >
           {COURT.map((l, k) => {
-            const on = creneaux.some((x) => x.jour === k);
+            const on = reguliers.some((x) => x.jour === k);
             return (
               <span
                 key={l}
@@ -507,8 +511,9 @@ export function SportPage({
           })}
         </div>
 
-        {cours.map((c) => {
-          const x = lireCreneau(c.detail);
+        {coursVisibles.map((c) => {
+          const x = lireCreneau(c.detail),
+            fois = uneFois(c) ? periode(c)[0] : null;
           return (
             <button
               key={c.id}
@@ -550,9 +555,10 @@ export function SportPage({
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 15.5, fontWeight: 800 }}>{nomCours(c.titre)}</span>
                 <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: "var(--slate)" }}>
-                  {x.debut
+                  {(x.debut
                     ? x.debut.replace(":", "h") + (x.fin ? " – " + x.fin.replace(":", "h") : "")
-                    : c.detail}
+                    : c.detail) +
+                    (fois ? " · une fois, le " + Number(fois.slice(8)) + "/" + fois.slice(5, 7) : "")}
                 </span>
               </span>
             </button>

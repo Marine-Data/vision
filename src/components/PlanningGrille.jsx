@@ -5,6 +5,7 @@ import { chevauchements, creneauxCours } from "./Planning.jsx";
 import { contenuDe } from "../lib/contenu.js";
 import { param } from "../lib/format.js";
 import { plagesLibres } from "../lib/partage.js";
+import { ecrirePeriode, periode } from "../lib/periode.js";
 import { coursEnPause, emojiDe, estAnnulee, evenementsLe, horairesDe, listeDates, masqueLe, occupeLeJour, pausesLe, reperesDu } from "../lib/evenements.js";
 import { ChoixRepetition, FicheEvenement, FichePause, dateLongue } from "./PlanningDates.jsx";
 
@@ -44,19 +45,6 @@ export function nomGrille(t) {
   return m.length > 9 ? m.slice(0, 8) + "." : m;
 }
 const dateCourte = (d) => d.getDate() + " " + MOIS_C[d.getMonth()];
-// Période « 30/09 → 09/12/2026 » → [début, fin] (AAAA-MM-JJ), ou null.
-function periode(c) {
-  const m = String(c.complement || "").match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s*→\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (!m) return null;
-  const fin = m[6] + "-" + m[5].padStart(2, "0") + "-" + m[4].padStart(2, "0"),
-    an = m[3] || (Number(m[2]) > Number(m[5]) ? String(Number(m[6]) - 1) : m[6]);
-  return [an + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0"), fin];
-}
-const ecrirePeriode = (de, a) => {
-  if (!de || !a) return null;
-  const f = (x, an) => x.slice(8, 10) + "/" + x.slice(5, 7) + (an ? "/" + x.slice(0, 4) : "");
-  return f(de, de.slice(0, 4) !== a.slice(0, 4)) + " → " + f(a, true);
-};
 function lundiDe(d) {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7));

@@ -30,6 +30,14 @@ const quand = (d: number) => (d === 0 ? "aujourd'hui" : d === 1 ? "demain" : "da
 const euros = (v: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(v);
 const plusUnJour = (iso: string) => new Date(Date.parse(iso + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
 const hTxt = (t: string | null) => (t ? String(t).replace(/^0/, "").replace(":00", "h").replace(":", "h") : "");
+// Période d'un cours (« 30/09 → 09/12/2026 » ou « 15/10 → 15/10/2026 ») : hors période, pas de rappel.
+function actifLe(c: { complement?: string | null }, iso: string) {
+  const m = String(c.complement || "").match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s*→\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return true;
+  const fin = m[6] + "-" + m[5].padStart(2, "0") + "-" + m[4].padStart(2, "0"),
+    an = m[3] || (Number(m[2]) > Number(m[5]) ? String(Number(m[6]) - 1) : m[6]);
+  return an + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0") <= iso && fin >= iso;
+}
 const ancre = (m: number) => ({ annee: 2026 + Math.floor((7 + m) / 12), mois: (7 + m) % 12 });
 
 Deno.serve(async (req: Request) => {
@@ -122,7 +130,7 @@ Deno.serve(async (req: Request) => {
       // Cours annulés aujourd'hui (« Pas cette semaine » dans Planning) : pas de rappel.
       const annules = hS > 0 ? new Set((((await sb.from("vision_seances").select("cours_id").eq("user_id", uid).eq("date", now.iso).eq("fait", false)).data) || []).map((x) => x.cours_id)) : new Set();
       if (hS > 0 && !sportEnPause)
-        (contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport" && !annules.has(c.id)).forEach((c) => {
+        (contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport" && !annules.has(c.id) && actifLe(c, now.iso)).forEach((c) => {
           const t = String(c.detail || "").toLowerCase();
           if (!t.startsWith(JOURS[now.jour])) return;
           const h = t.match(/(\d{1,2})h(\d{2})?/);
