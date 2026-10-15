@@ -254,7 +254,7 @@ export function Partager({ supabase, uid, onClose, notifier }) {
           <div style={{ display: "grid", gridTemplateColumns: lecture ? "1fr 1.4fr" : "1fr", gap: 8 }}>
             {lecture && (
               <button type="button" disabled={enCours || !f.sections.length} onClick={() => creer(true)} style={{ height: 50, borderRadius: 14, border: "2px solid var(--bord-teal)", background: "var(--surface)", color: "var(--t-teal)", font: "inherit", fontSize: 14.5, fontWeight: 800, cursor: "pointer" }}>
-                👁 Voir comme elle
+                👁 Aperçu du lien
               </button>
             )}
             <button type="button" disabled={enCours || (lecture && !f.sections.length)} onClick={() => creer(false)} style={{ height: 50, borderRadius: 14, border: 0, background: "var(--c-teal)", color: "#ffffff", font: "inherit", fontSize: 15.5, fontWeight: 800, cursor: "pointer" }}>

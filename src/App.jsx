@@ -85,6 +85,7 @@ export function App() {
   const [pe, setPe] = React.useState({});
   const [recurrentes, setRecurrentes] = React.useState([]),
     [seances, setSeances] = React.useState([]),
+    [evenements, setEvenements] = React.useState([]),
     [toast, setToast] = React.useState(null),
     [recOk, setRecOk] = React.useState(!1),
     [etatNotifs, setEtatNotifs] = React.useState(null),
@@ -232,7 +233,7 @@ export function App() {
                 (P[x.item_key] = x.done), x.etape && (Q[x.item_key] = x.etape);
               });
               sct(R.contenu || []), a(P), setPe(Q), setHwRows(R.homework || []), setHwLoading(!1);
-              setSeances(R.seances || []), mi(R.items || []);
+              setSeances(R.seances || []), setEvenements(R.evenements || []), mi(R.items || []);
             }
             setLecture(R);
           })
@@ -370,6 +371,10 @@ export function App() {
         (async () => {
           const { data: K } = await supabase.from("vision_seances").select("*").order("date");
           setSeances(K || []);
+        })(),
+        (async () => {
+          const { data: K } = await supabase.from("vision_evenements").select("*").order("created_at");
+          setEvenements(K || []);
         })(),
         (async () => {
           const { data: K } = await supabase.from("vision_pea").select("*").order("date");
@@ -627,6 +632,47 @@ export function App() {
       : setPoches((x) => x.filter((y) => y.id !== p.id));
   }
   // Contenu (cours, étapes, fiche d'adhésion) : écriture immédiate, erreur affichée, « Annuler ».
+  // Planning : événements à dates et pauses (vision_evenements), avec « Annuler ».
+  const evRef = React.useRef([]);
+  evRef.current = evenements;
+  async function evCreer(champs, msg) {
+    const { data: K, error: E } = await supabase.from("vision_evenements").insert({ user_id: t.user.id, ...champs }).select().single();
+    if (E) throw E;
+    setEvenements((p) => [...p, K]);
+    notifier(msg || "Ajouté", async () => {
+      const { error: E2 } = await supabase.from("vision_evenements").delete().eq("id", K.id);
+      if (E2) throw E2;
+      setEvenements((p) => p.filter((x) => x.id !== K.id));
+    });
+    return K;
+  }
+  async function evMaj(id, patch, msg) {
+    const avant = evRef.current.find((x) => x.id === id);
+    const ecrire = async (p2) => {
+      const { data: K, error: E } = await supabase
+        .from("vision_evenements")
+        .update({ ...p2, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (E) throw E;
+      setEvenements((p) => p.map((x) => (x.id === id ? K : x)));
+    };
+    await ecrire(patch);
+    avant && notifier(msg || "Enregistré", () => ecrire(Object.fromEntries(Object.keys(patch).map((k) => [k, avant[k] ?? null]))));
+  }
+  async function evSupprimer(id, msg) {
+    const avant = evRef.current.find((x) => x.id === id);
+    const { error: E } = await supabase.from("vision_evenements").delete().eq("id", id);
+    if (E) throw E;
+    setEvenements((p) => p.filter((x) => x.id !== id));
+    avant &&
+      notifier(msg || "Supprimé", async () => {
+        const { data: K, error: E2 } = await supabase.from("vision_evenements").insert({ ...avant }).select().single();
+        if (E2) throw E2;
+        setEvenements((p) => [...p, K]);
+      });
+  }
   async function ctMaj(id, patch, msg) {
     const avant = ctRef.current.find((x) => x.id === id);
     const ecrire = async (p2) => {
@@ -1750,6 +1796,20 @@ export function App() {
             params={c}
             seances={seances}
             partenaires={MODE_PARTAGE ? [] : partenaires}
+            evenements={evenements}
+            homework={hwRows}
+            transactions={MODE_PARTAGE ? [] : tx}
+            progress={o}
+            goTab={
+              MODE_PARTAGE
+                ? null
+                : (N) => {
+                    i(N), window.scrollTo(0, 0);
+                  }
+            }
+            onEvCreer={agir(evCreer)}
+            onEvMaj={agir(evMaj)}
+            onEvSupprimer={agir(evSupprimer)}
             readOnly={MODE_PARTAGE}
             onCtCreer={agir(ctCreer)}
             onCtMaj={agir(ctMaj)}
@@ -1848,6 +1908,7 @@ export function App() {
             rows={ct}
             items={vi}
             seances={seances}
+            evenements={evenements}
             readOnly={MODE_PARTAGE}
             ferme={actions.ferme}
             onCtMaj={agir(ctMaj)}
@@ -1966,7 +2027,7 @@ export function App() {
             <div style={{ fontSize: 17, fontWeight: 800 }}>
               🔁 {invitation.prenom || "On"} te propose d'échanger vos plannings
             </div>
-            <div style={{ fontSize: 14, color: "var(--slate)" }}>Vous verrez les cours l'une de l'autre et vos créneaux libres en commun.</div>
+            <div style={{ fontSize: 14, color: "var(--slate)" }}>Vos cours seront visibles des deux côtés, avec vos créneaux libres en commun.</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <button type="button" className="btn-outline" onClick={refuserEchange}>
                 Non merci

@@ -195,7 +195,7 @@ export function Bienvenue({ supabase, uid, onTermine, invite }) {
           <>
             {invite && (
               <div style={{ ...carte, background: "var(--teal-doux)", boxShadow: "none", fontSize: 14, fontWeight: 700, color: "var(--t-teal)" }}>
-                👋 Invitée par {invite.prenom || "une amie"}
+                👋 Invitation de {invite.prenom || "ton binôme"}
                 {invite.modele ? " · son modèle est prérempli, sans ses montants" : ""}
               </div>
             )}
