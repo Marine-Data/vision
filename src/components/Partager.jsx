@@ -111,7 +111,7 @@ export function Partager({ supabase, uid, onClose, notifier }) {
       expire_le: expirationDe(f.duree),
       prevenir: f.prevenir,
       echange: f.formule !== "montrer" && f.echange,
-      mot: f.formule !== "montrer" && f.mot.trim() ? f.mot.trim() : null,
+      mot: f.mot.trim() || null,
     };
     const { data: L, error } = await supabase.from("vision_partages").insert(ligne).select().single();
     setEnCours(false);
@@ -236,7 +236,7 @@ export function Partager({ supabase, uid, onClose, notifier }) {
             </div>
           </div>
 
-          {f.formule !== "montrer" && (
+          {(
             <input
               aria-label="Petit mot"
               placeholder="Petit mot (facultatif)"

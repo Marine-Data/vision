@@ -109,13 +109,26 @@ export const navIcon = (cle) => (
 
 // App installée sur le téléphone : toujours le compte de la personne, jamais l'aperçu
 // partagé (Chrome garde parfois « ?partage » dans le raccourci s'il a été installé depuis ce lien).
-const APP_INSTALLEE = (() => {
+export const APP_INSTALLEE = (() => {
   try {
     return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
   } catch (e) {
     return false;
   }
 })();
+
+// Lien de lecture gardé sur l'écran d'accueil : l'app installée s'ouvre sur ce lien
+// tant que personne n'est connecté sur ce téléphone (la propriétaire, elle, l'est).
+try {
+  const q = new URLSearchParams(window.location.search),
+    voir = q.get("voir");
+  if (voir) localStorage.setItem("vision_voir", voir);
+  else if (APP_INSTALLEE && !window.location.search) {
+    const garde = localStorage.getItem("vision_voir"),
+      session = Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k));
+    if (garde && !session) window.location.replace(window.location.pathname + "?voir=" + encodeURIComponent(garde));
+  }
+} catch (e) {}
 
 // Ancien lien « ?partage » (remplacé par les liens « ?voir= ») : affiche « lien plus valable ».
 export const MODE_ANCIEN_PARTAGE =

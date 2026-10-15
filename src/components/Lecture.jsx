@@ -1,6 +1,9 @@
 import React from "react";
 import { STYLE_CARTE_CONNEXION, STYLE_ECRAN_CONNEXION } from "./Connexion.jsx";
 import { creneauxLibres } from "../lib/partage.js";
+import { emojiDe, estAnnulee, evenementsLe, horairesDe, masqueLe } from "../lib/evenements.js";
+import { actifLe } from "../lib/periode.js";
+import { lireCreneau } from "./SportPage.jsx";
 
 // Écrans de la personne qui reçoit un lien, budget résumé, plannings échangés.
 
@@ -223,5 +226,143 @@ export function RaccourcisLecture({ sections, aller, prenom }) {
         ))}
       </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------
+// Écran d'arrivée d'un lien de lecture : peu de mots, l'essentiel tout de suite.
+// ---------------------------------------------------------------
+let invitationInstall = null;
+try {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    invitationInstall = e;
+  });
+} catch (e) {}
+
+const JOURS_L = ["L", "M", "M", "J", "V", "S", "D"];
+const JOURS_C = ["Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam.", "Dim."];
+const isoJ = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const hCourt = (t) => (t ? t.replace(/^0/, "").replace(":00", "h").replace(":", "h") : "");
+const nomCourt = (t) => String(t || "").replace(/^Sport\s*[—-]\s*/, "").replace(/^Free Style\s+/i, "").split(/\s+[—-]\s+/)[0];
+
+// Ce qui a lieu un jour donné : cours de la semaine (période, annulation, pause) et événements à dates.
+function programmeDu(d, { contenu, seances, evenements, sportSeul }) {
+  const dIso = isoJ(d),
+    j = (d.getDay() + 6) % 7,
+    masque = masqueLe(evenements, dIso),
+    l = [];
+  (contenu || [])
+    .filter((c) => c.type === "cours" && (!sportSeul || c.groupe === "sport"))
+    .forEach((c) => {
+      const x = lireCreneau(c.detail),
+        sport = c.groupe === "sport";
+      if (x.jour !== j || !x.debut || !actifLe(c, dIso) || masque.has(sport ? "sport" : "cours")) return;
+      if ((seances || []).some((s) => s.date === dIso && s.cours_id === c.id && s.fait === false)) return;
+      l.push({ h: x.debut, nom: nomCourt(c.titre), em: sport ? "🤸" : c.emoji || "📘" });
+    });
+  if (!sportSeul)
+    evenementsLe(evenements, dIso)
+      .filter((e) => !estAnnulee(e, dIso))
+      .forEach((e) => l.push({ h: horairesDe(e, dIso)[0] || "00:00", nom: e.titre, em: emojiDe(e) }));
+  return { liste: l.sort((a, b) => a.h.localeCompare(b.h)), pause: masque.size > 0 };
+}
+
+function Anneau({ pct, texte, fond, centre }) {
+  const deg = Math.max(0, Math.min(100, pct)) * 3.6;
+  return (
+    <span aria-hidden="true" style={{ flex: "none", width: 96, height: 96, borderRadius: "50%", background: `conic-gradient(#ffffff 0 ${deg}deg, rgba(255,255,255,.22) ${deg}deg 360deg)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span style={{ width: 74, height: 74, borderRadius: "50%", background: centre, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif", fontSize: 25, fontWeight: 700, color: "#ffffff" }}>{texte}</span>
+    </span>
+  );
+}
+
+export function LectureAccueil({ lecture, contenu, seances, evenements, titreDefaut, image, installee, aller, onCreer }) {
+  const [astuce, setAstuce] = React.useState(false);
+  const sections = (lecture && lecture.sections) || [],
+    planning = sections.includes("planning"),
+    sport = sections.includes("sport"),
+    budget = sections.includes("budget") && lecture.budget && lecture.budget.pct,
+    prenom = (lecture && lecture.prenom) || "",
+    auj = new Date(),
+    lundi = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() - ((auj.getDay() + 6) % 7)),
+    opts = { contenu, seances, evenements, sportSeul: !planning };
+  // Prochain moment (7 jours) : « Ce soir : Tricks 20h ».
+  let prochain = null;
+  for (let k = 0; k < 8 && !prochain && (planning || sport); k++) {
+    const d = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() + k),
+      maintenant = String(auj.getHours()).padStart(2, "0") + ":" + String(auj.getMinutes()).padStart(2, "0"),
+      x = programmeDu(d, opts).liste.find((p) => k > 0 || p.h >= maintenant);
+    if (x) prochain = { ...x, quand: k === 0 ? (x.h >= "17:00" ? "Ce soir" : "Aujourd'hui") : k === 1 ? "Demain" : JOURS_C[(d.getDay() + 6) % 7] };
+  }
+  const semaine = Array.from({ length: 7 }, (_, k) => {
+    const d = new Date(lundi.getFullYear(), lundi.getMonth(), lundi.getDate() + k),
+      p = programmeDu(d, opts),
+      x = p.liste[0];
+    return { l: JOURS_L[k], em: x ? x.em : p.pause ? "🏖" : "", auj: isoJ(d) === isoJ(auj), sport: x && x.em === "🤸", pause: !x && p.pause };
+  });
+  const idsSport = new Set((contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport").map((c) => c.id)),
+    nbSeances = (seances || []).filter((s) => s.fait && (!s.cours_id || idsSport.has(s.cours_id))).length,
+    carteStyle = { border: 0, width: "100%", font: "inherit", textAlign: "left", cursor: "pointer" };
+  return (
+    <div className="lecture-bord">
+      <header style={{ padding: "34px 22px 40px", color: "#ffffff", display: "flex", flexDirection: "column", gap: 14, backgroundImage: `linear-gradient(180deg, rgba(9,42,49,.35), rgba(9,42,49,.8)), url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }}>
+        <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", opacity: 0.85 }}>{"Bonjour" + (lecture.nom ? " " + lecture.nom : "") + " 👋"}</span>
+        <span style={{ fontFamily: "Georgia, serif", fontSize: prenom ? 48 : 34, fontWeight: 700, lineHeight: 1 }}>{prenom || titreDefaut}</span>
+        {lecture.mot && <span style={{ alignSelf: "flex-start", maxWidth: 300, background: "#ffffff", color: "#0e3a42", borderRadius: "20px 20px 20px 6px", padding: "12px 14px", fontSize: 16, fontWeight: 700, lineHeight: 1.35, boxShadow: "0 10px 30px rgba(0,0,0,.25)" }}>{lecture.mot}</span>}
+        <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>👁 Lecture seule</span>
+      </header>
+      <div style={{ marginTop: -16, borderRadius: "26px 26px 0 0", background: "var(--paper)", padding: "18px 12px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {(planning || sport) && (
+          <button type="button" onClick={() => aller(planning ? "planning" : "sport")} aria-label={(prochain ? prochain.quand + " : " + prochain.nom + " " + hCourt(prochain.h) : "Rien de prévu") + ", ouvrir"} style={{ ...carteStyle, borderRadius: 24, background: "var(--surface)", padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 2px 10px rgba(14,58,66,.08)", color: "var(--ink)" }}>
+            <span style={{ fontFamily: "Georgia, serif", fontSize: 25, fontWeight: 700, lineHeight: 1.15 }}>{prochain ? prochain.quand + " : " + prochain.nom + " " + hCourt(prochain.h) : "Semaine calme"}</span>
+            <span aria-hidden="true" style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 5 }}>
+              {semaine.map((j, k) => (
+                <span key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "7px 0", borderRadius: 14, background: j.auj ? "var(--entete)" : j.pause ? "var(--ambre-doux)" : j.sport ? "var(--rose-doux)" : j.em ? "var(--teal-doux)" : "var(--fond-doux)", color: j.auj ? "#ffffff" : "var(--ink-soft)" }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 900 }}>{j.l}</span>
+                  <span style={{ fontSize: 17, height: 22, lineHeight: "22px" }}>{j.em}</span>
+                </span>
+              ))}
+            </span>
+          </button>
+        )}
+        {budget ? (
+          <button type="button" onClick={() => aller("tresorerie")} aria-label={budget.reste + " % du salaire restant, épargne " + budget.objectif + " %, ouvrir"} style={{ ...carteStyle, borderRadius: 24, background: "linear-gradient(140deg, #0a7b8a, #0e5a66)", color: "#ffffff", padding: 18, display: "flex", alignItems: "center", gap: 16, boxShadow: "0 8px 22px rgba(10,123,138,.3)" }}>
+            <Anneau pct={budget.reste ?? 0} texte={(budget.reste ?? 0) + " %"} centre="#0b6a76" />
+            <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700 }}>du salaire restant</span>
+              {budget.objectif != null && <span style={{ fontSize: 14, fontWeight: 800, opacity: 0.9 }}>🎯 Épargne : {budget.objectif} %</span>}
+            </span>
+          </button>
+        ) : (
+          sport && (
+            <button type="button" onClick={() => aller("sport")} aria-label={nbSeances + " séances depuis septembre, ouvrir"} style={{ ...carteStyle, borderRadius: 24, background: "linear-gradient(140deg, #c2477f, #8f2d5a)", color: "#ffffff", padding: 18, display: "flex", alignItems: "center", gap: 16, boxShadow: "0 8px 22px rgba(194,71,127,.3)" }}>
+              <Anneau pct={100} texte={String(nbSeances)} centre="#a8386c" />
+              <span style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700 }}>séances depuis sept.</span>
+            </button>
+          )
+        )}
+        {lecture.formule === "deux" && (
+          <button type="button" onClick={onCreer} style={{ height: 56, borderRadius: 18, border: 0, background: "linear-gradient(140deg, #0e3a42, #0a7b8a)", color: "#ffffff", font: "inherit", fontSize: 16, fontWeight: 900, cursor: "pointer" }}>
+            ✨ Créer la mienne
+          </button>
+        )}
+        {!installee && (
+          <button
+            type="button"
+            onClick={async () => {
+              if (invitationInstall) {
+                invitationInstall.prompt();
+                invitationInstall = null;
+              } else setAstuce(true);
+            }}
+            style={{ alignSelf: "center", minHeight: 44, padding: "0 18px", border: "2px dashed var(--line-strong)", borderRadius: 99, background: "transparent", color: "var(--ink)", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
+          >
+            📲 Garder sur mon écran
+          </button>
+        )}
+        {astuce && <span style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: "var(--slate)" }}>Menu ⋮ du navigateur → « Ajouter à l'écran d'accueil »</span>}
+      </div>
+    </div>
   );
 }
