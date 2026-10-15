@@ -218,11 +218,11 @@ function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, o
         {cours &&
           (confirmer ? (
             <button type="button" onClick={async () => (await onSupprimer(cours.id, "Cours supprimé"), onClose())} style={{ height: 46, borderRadius: 14, border: 0, background: "var(--c-rouge)", color: "#ffffff", font: "inherit", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
-              Oui, supprimer ce cours
+              Oui, supprimer pour toutes les semaines
             </button>
           ) : (
             <button type="button" onClick={() => setConfirmer(true)} style={{ height: 44, borderRadius: 14, border: 0, background: "transparent", color: "var(--t-rouge)", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
-              Supprimer le cours
+              Supprimer le cours (toutes les semaines)
             </button>
           ))}
       </div>
@@ -329,7 +329,7 @@ function NoteEdit({ n, onCtMaj, onCtSupprimer }) {
   );
 }
 
-export function PlanningGrille({ rows, params, seances, partenaires, echanges, readOnly, onCtCreer, onCtMaj, onCtSupprimer, onSeance, onReglage }) {
+export function PlanningGrille({ rows, params, seances, partenaires, echanges, readOnly, onCtCreer, onCtMaj, onCtSupprimer, onSeance, onAnnuler, onReglage }) {
   const [semaine, setSemaine] = React.useState(0),
     [sel, setSel] = React.useState(null),
     [fiche, setFiche] = React.useState(null),
@@ -401,6 +401,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
   });
 
   const fait = (dIso, id) => (seances || []).some((s) => s.date === dIso && s.cours_id === id && s.fait),
+    annule = (dIso, id) => (seances || []).some((s) => s.date === dIso && s.cours_id === id && s.fait === false),
     styleDe = (t) => (t === "sport" ? cSport : t === "travail" ? cTravail : cCours);
 
   // Carte du bloc touché
@@ -429,7 +430,9 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
         cours: c,
         sport: sel.type === "sport",
         dIso: isos[sel.jour],
+        annule: annule(isos[sel.jour], c.id),
       };
+      if (detail.annule) detail.titre = detail.titre + " · annulé";
     }
   }
 
@@ -521,12 +524,13 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
               {col.blocs.map((b) => {
                 const st = styleDe(b.type),
                   on = sel && sel.cle === b.cle && sel.jour === j,
-                  coche = b.type === "sport" && fait(isos[j], b.ref.id);
+                  coche = b.type === "sport" && fait(isos[j], b.ref.id),
+                  off = annule(isos[j], b.ref.id);
                 return (
                   <button
                     key={b.cle}
                     type="button"
-                    aria-label={b.titre + ", " + JOURS[j] + " " + hTexte(lireCreneau(b.ref.detail).debut) + (coche ? ", fait" : "")}
+                    aria-label={b.titre + ", " + JOURS[j] + " " + hTexte(lireCreneau(b.ref.detail).debut) + (coche ? ", fait" : "") + (off ? ", annulé" : "")}
                     onClick={() => setSel({ ...b, jour: j })}
                     style={{
                       position: "absolute",
@@ -544,7 +548,9 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
                       alignItems: "center",
                       gap: 1,
                       overflow: "hidden",
-                      boxShadow: "0 3px 8px rgba(0,0,0,.18)",
+                      boxShadow: off ? "none" : "0 3px 8px rgba(0,0,0,.18)",
+                      opacity: off ? 0.4 : 1,
+                      textDecoration: off ? "line-through" : "none",
                       cursor: "pointer",
                       boxSizing: "border-box",
                       zIndex: 2,
@@ -603,7 +609,12 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
           )}
           {!readOnly && (detail.cours || detail.travail) && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-              {detail.sport && detail.dIso <= aujIso && (
+              {detail.cours && (
+                <button type="button" onClick={() => onAnnuler({ date: detail.dIso, cours_id: detail.cours.id, titre: nomCours(detail.cours.titre) })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: detail.annule ? "#ffffff" : "rgba(255,255,255,.22)", color: detail.annule ? detail.couleur[0] : "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  {detail.annule ? "↩︎ Remettre ce jour-là" : "🚫 Pas cette semaine"}
+                </button>
+              )}
+              {detail.sport && !detail.annule && detail.dIso <= aujIso && (
                 <button type="button" onClick={() => onSeance({ date: detail.dIso, cours_id: detail.cours.id })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: fait(detail.dIso, detail.cours.id) ? "#ffffff" : "rgba(255,255,255,.22)", color: fait(detail.dIso, detail.cours.id) ? cSport[0] : "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                   {fait(detail.dIso, detail.cours.id) ? "✓ J'y suis allée" : "J'y suis allée ?"}
                 </button>

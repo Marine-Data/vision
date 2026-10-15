@@ -1755,6 +1755,7 @@ export function App() {
             onCtMaj={agir(ctMaj)}
             onCtSupprimer={agir(ctSupprimer)}
             onSeance={agir(actions.seanceBasculer)}
+            onAnnuler={agir(actions.coursAnnulerJour)}
             onReglage={agir(actions.reglage)}
             echanges={
               MODE_PARTAGE ? null : (

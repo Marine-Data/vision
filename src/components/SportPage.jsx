@@ -350,6 +350,8 @@ export function SportPage({
     const d = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() + k),
       l = creneaux
         .filter((x) => x.jour === jourSemaine(d))
+        // cours annulé ce jour-là (« Pas cette semaine » dans Planning) : on passe au suivant
+        .filter((x) => !(seances || []).some((s) => s.date === isoDe(d) && s.cours_id === x.c.id && s.fait === false))
         .filter(
           (x) =>
             k > 0 ||

@@ -102,8 +102,10 @@ Deno.serve(async (req: Request) => {
           const j = String(h.deadline).slice(0, 10), d = ecart(now.iso, j);
           if (d >= 0 && d <= nD) rappels.push({ cle: "devoir:" + h.id + ":" + j, titre: "📚 " + (h.title || h.titre || "Devoir"), corps: (h.subject ? h.subject + " · " : "") + "à rendre " + quand(d) + ".", url: "./?onglet=homework" });
         });
+      // Cours annulés aujourd'hui (« Pas cette semaine » dans Planning) : pas de rappel.
+      const annules = hS > 0 ? new Set((((await sb.from("vision_seances").select("cours_id").eq("user_id", uid).eq("date", now.iso).eq("fait", false)).data) || []).map((x) => x.cours_id)) : new Set();
       if (hS > 0)
-        (contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport").forEach((c) => {
+        (contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport" && !annules.has(c.id)).forEach((c) => {
           const t = String(c.detail || "").toLowerCase();
           if (!t.startsWith(JOURS[now.jour])) return;
           const h = t.match(/(\d{1,2})h(\d{2})?/);

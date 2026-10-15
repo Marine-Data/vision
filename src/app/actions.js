@@ -367,6 +367,12 @@ export function creerActions(ctx) {
         (x.cours_id || null) === (cours_id || null) &&
         (cours_id || x.activite === activite),
     );
+    // Cours annulé ce jour-là (« Pas cette semaine ») puis « J'y suis allée » : la séance devient faite.
+    if (ex && ex.fait === false) {
+      const d = ok(await supabase.from("vision_seances").update({ fait: true }).eq("id", ex.id).select().single());
+      set.seances((p) => p.map((x) => (x.id === ex.id ? d : x)));
+      return;
+    }
     if (ex) {
       ok(await supabase.from("vision_seances").delete().eq("id", ex.id));
       set.seances((p) => p.filter((x) => x.id !== ex.id));
@@ -390,6 +396,31 @@ export function creerActions(ctx) {
         .single(),
     );
     set.seances((p) => [...p, d]);
+  }
+
+  // « Pas cette semaine » : un cours n'a pas lieu à une date (séance « fait = non »).
+  // Le cours reste pour les autres semaines. Rappelé une seconde fois : on remet le cours.
+  async function coursAnnulerJour({ date, cours_id, titre }) {
+    const ex = (get.seances() || []).find((x) => x.date === date && x.cours_id === cours_id);
+    if (ex && ex.fait === false) {
+      ok(await supabase.from("vision_seances").delete().eq("id", ex.id));
+      set.seances((p) => p.filter((x) => x.id !== ex.id));
+      notifier((titre || "Cours") + " remis ce jour-là");
+      return;
+    }
+    const d = ex
+      ? ok(await supabase.from("vision_seances").update({ fait: false }).eq("id", ex.id).select().single())
+      : ok(await supabase.from("vision_seances").insert({ user_id: uid(), date, cours_id, fait: false }).select().single());
+    set.seances((p) => (ex ? p.map((x) => (x.id === ex.id ? d : x)) : [...p, d]));
+    notifier((titre || "Cours") + " annulé ce jour-là", async () => {
+      if (ex) {
+        const r = ok(await supabase.from("vision_seances").update({ fait: ex.fait }).eq("id", ex.id).select().single());
+        set.seances((p) => p.map((x) => (x.id === ex.id ? r : x)));
+      } else {
+        ok(await supabase.from("vision_seances").delete().eq("id", d.id));
+        set.seances((p) => p.filter((x) => x.id !== d.id));
+      }
+    });
   }
 
   // ---- Mots-clés de l'import ----
@@ -526,6 +557,7 @@ export function creerActions(ctx) {
     recurrenteEnregistrer,
     recurrenteArreter,
     seanceBasculer,
+    coursAnnulerJour,
     regleAjouter,
     regleSupprimer,
     ferme,
