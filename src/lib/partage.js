@@ -35,9 +35,9 @@ export const SECTIONS_PARTAGE = [
 export const ONGLET_DE_SECTION = { planning: "planning", suivi: "suivi", sport: "sport", homework: "homework", pieces: "pieces", budget: "tresorerie" };
 
 export const FORMULES = [
-  ["montrer", "👁 Montrer", "Elle voit ton app, sans rien modifier."],
-  ["inviter", "✉️ Inviter", "Elle crée la sienne. Rien de toi n'est visible."],
-  ["deux", "✨ Les deux", "Elle voit ton app + « Créer mon app »."],
+  ["montrer", "👁 Montrer", "Ton app en lecture, sans rien modifier."],
+  ["inviter", "✉️ Inviter", "Crée sa propre app. Rien de toi n'est visible."],
+  ["deux", "✨ Les deux", "Ton app en lecture + « Créer mon app »."],
 ];
 export const DUREES = [
   ["sem", "1 sem.", 7],

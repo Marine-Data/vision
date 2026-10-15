@@ -151,7 +151,7 @@ export function BandeauInvitation({ info, choix, setChoix }) {
         <p style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 12, background: "var(--teal-doux)", fontStyle: "italic" }}>« {info.mot} »</p>
       )}
       {ligne("modele", "📋", "Partir du modèle de " + (info.prenom || "ton invitante"), "Ses postes et onglets, sans ses montants")}
-      {info.echange && ligne("echange", "🔁", "Échanger nos plannings", "Vous voyez les cours l'une de l'autre")}
+      {info.echange && ligne("echange", "🔁", "Échanger nos plannings", "Vos cours visibles des deux côtés")}
     </div>
   );
 }

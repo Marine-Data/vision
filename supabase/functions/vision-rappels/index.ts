@@ -6,6 +6,8 @@ import webpush from "npm:web-push@3";
 // Réglages (vision_params) : rappel_suivi, rappel_echeances, rappel_devoirs (jours avant),
 // rappel_sport (heures avant). Valeur négative ou nulle = rappel coupé.
 // Chaque rappel n'est envoyé qu'une fois (vision_rappels_envoyes).
+// Planning (vision_evenements) : rappel la veille d'un événement à date (si « Rappel la veille »),
+// et aucun rappel sport pendant une pause qui arrête le sport.
 // Corps { "essai": true } : calcule les rappels du moment sans rien envoyer ni noter.
 // Corps { "file": true } : envoie seulement la file vision_notifs_file (lien ouvert, invitation utilisée).
 
@@ -26,6 +28,8 @@ function maintenantParis() {
 const ecart = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5);
 const quand = (d: number) => (d === 0 ? "aujourd'hui" : d === 1 ? "demain" : "dans " + d + " jours");
 const euros = (v: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(v);
+const plusUnJour = (iso: string) => new Date(Date.parse(iso + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
+const hTxt = (t: string | null) => (t ? String(t).replace(/^0/, "").replace(":00", "h").replace(":", "h") : "");
 const ancre = (m: number) => ({ annee: 2026 + Math.floor((7 + m) / 12), mois: (7 + m) % 12 });
 
 Deno.serve(async (req: Request) => {
@@ -67,7 +71,7 @@ Deno.serve(async (req: Request) => {
       : [...new Set((abos || []).map((a) => a.user_id))];
     for (const uid of utilisateurs) {
       const mesAbos = (abos || []).filter((a) => a.user_id === uid);
-      const [{ data: params }, { data: contenu }, { data: progress }, { data: tx }, { data: items }, { data: hw }, { data: budget }] = await Promise.all([
+      const [{ data: params }, { data: contenu }, { data: progress }, { data: tx }, { data: items }, { data: hw }, { data: budget }, { data: evs }] = await Promise.all([
         sb.from("vision_params").select("param_key, montant").eq("user_id", uid),
         sb.from("vision_contenu").select("*").eq("user_id", uid),
         sb.from("vision_progress").select("item_key, done").eq("user_id", uid),
@@ -75,6 +79,7 @@ Deno.serve(async (req: Request) => {
         sb.from("vision_items").select("*").eq("user_id", uid).eq("paid", false),
         sb.from("vision_homework").select("*").eq("user_id", uid),
         sb.from("vision_budget").select("id, poste").eq("user_id", uid),
+        sb.from("vision_evenements").select("*").eq("user_id", uid),
       ]);
       const reg = (k: string) => Number(((params || []).find((p) => p.param_key === k) || {}).montant || 0);
       const fait = new Set((progress || []).filter((p) => p.done).map((p) => p.item_key));
@@ -102,9 +107,21 @@ Deno.serve(async (req: Request) => {
           const j = String(h.deadline).slice(0, 10), d = ecart(now.iso, j);
           if (d >= 0 && d <= nD) rappels.push({ cle: "devoir:" + h.id + ":" + j, titre: "📚 " + (h.title || h.titre || "Devoir"), corps: (h.subject ? h.subject + " · " : "") + "à rendre " + quand(d) + ".", url: "./?onglet=homework" });
         });
+      // Événements à dates : rappel la veille (matin ou soir, une seule fois).
+      const demain = plusUnJour(now.iso);
+      if (matin)
+        (evs || [])
+          .filter((e) => e.genre === "evenement" && e.rappel !== false && (e.dates || []).map(String).includes(demain) && !(e.annulees || []).map(String).includes(demain))
+          .forEach((e) => {
+            const h = (e.horaires || {})[demain] || [e.heure_debut, e.heure_fin];
+            const emo = e.emoji || ({ rdv: "📌", formation: "🎓", sport: "🤸", autre: "🎉" } as Record<string, string>)[e.categorie] || "📌";
+            rappels.push({ cle: "evt:" + e.id + ":" + demain, titre: emo + " " + e.titre + " demain", corps: [h[0] ? hTxt(h[0]) + (h[1] ? " – " + hTxt(h[1]) : "") : "", e.lieu || ""].filter(Boolean).join(" · "), url: "./?onglet=planning" });
+          });
+      // Pause qui arrête le sport aujourd'hui : pas de rappel sport.
+      const sportEnPause = (evs || []).some((e) => e.genre === "pause" && String(e.date_debut) <= now.iso && String(e.date_fin) >= now.iso && (e.masque || []).includes("sport"));
       // Cours annulés aujourd'hui (« Pas cette semaine » dans Planning) : pas de rappel.
       const annules = hS > 0 ? new Set((((await sb.from("vision_seances").select("cours_id").eq("user_id", uid).eq("date", now.iso).eq("fait", false)).data) || []).map((x) => x.cours_id)) : new Set();
-      if (hS > 0)
+      if (hS > 0 && !sportEnPause)
         (contenu || []).filter((c) => c.type === "cours" && c.groupe === "sport" && !annules.has(c.id)).forEach((c) => {
           const t = String(c.detail || "").toLowerCase();
           if (!t.startsWith(JOURS[now.jour])) return;

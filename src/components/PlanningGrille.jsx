@@ -5,6 +5,8 @@ import { chevauchements, creneauxCours } from "./Planning.jsx";
 import { contenuDe } from "../lib/contenu.js";
 import { param } from "../lib/format.js";
 import { plagesLibres } from "../lib/partage.js";
+import { coursEnPause, emojiDe, estAnnulee, evenementsLe, horairesDe, listeDates, masqueLe, occupeLeJour, pausesLe, reperesDu } from "../lib/evenements.js";
+import { ChoixRepetition, FicheEvenement, FichePause, dateLongue } from "./PlanningDates.jsx";
 
 // Planning en grille (étape 1) : semaine en colonnes, blocs de couleur par type,
 // carte au toucher, ajout court, « J'y suis allée », couleurs et horaires du travail.
@@ -26,6 +28,7 @@ const TYPES = [
   ["cours", "📚 Cours", 0],
   ["sport", "🤸 Sport", 1],
   ["travail", "💼 Travail", 6],
+  ["evenement", "📌 À dates", 2],
 ];
 const PX = 34; // hauteur d'une heure
 
@@ -37,7 +40,7 @@ const nomCours = (t) => (t || "").replace(/^Sport\s*[—-]\s*/, "");
 const MOTS_VIDES = ["free", "style", "cours", "atelier", "sport", "le", "la", "les", "de", "du"];
 export function nomGrille(t) {
   const mots = nomCours(t).split(/\s+[—-]\s+/)[0].split(/\s+/).filter(Boolean),
-    m = mots.find((x) => !MOTS_VIDES.includes(x.toLowerCase())) || mots[0] || "";
+    m = mots.find((x) => !MOTS_VIDES.includes(x.toLowerCase()) || (x.length > 1 && x === x.toUpperCase())) || mots[0] || "";
   return m.length > 9 ? m.slice(0, 8) + "." : m;
 }
 const dateCourte = (d) => d.getDate() + " " + MOIS_C[d.getMonth()];
@@ -117,7 +120,7 @@ function JoursChoix({ jours, setJours, couleur, multiple }) {
 }
 
 // Fiche d'un cours : ajout (court, plusieurs jours) ou modification (un jour).
-function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, onSupprimer }) {
+function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, onSupprimer, onRepetition }) {
   const c = cours ? lireCreneau(cours.detail) : null,
     p = cours ? periode(cours) : null,
     [nom, setNom] = React.useState(cours ? nomCours(cours.titre) : ""),
@@ -162,6 +165,7 @@ function FicheCours({ cours, depart, recents, params, onClose, onCreer, onMaj, o
   return (
     <KbSheet label={cours ? "Modifier" : "Ajouter · " + JOURS[depart.jour]} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {!cours && onRepetition && <ChoixRepetition valeur="semaine" onChoisir={(v) => v === "dates" && onRepetition()} />}
         <div style={{ display: "flex", gap: 8 }}>
           {plus && (
             <input aria-label="Emoji" value={emoji} placeholder="🙂" maxLength={4} onChange={(e) => setEmoji(e.target.value)} style={{ ...champ, width: 54, textAlign: "center", fontSize: 22, padding: 0 }} />
@@ -329,7 +333,26 @@ function NoteEdit({ n, onCtMaj, onCtSupprimer }) {
   );
 }
 
-export function PlanningGrille({ rows, params, seances, partenaires, echanges, readOnly, onCtCreer, onCtMaj, onCtSupprimer, onSeance, onAnnuler, onReglage }) {
+// Conflits « Laisser » : retenus sur cet appareil.
+const LAISSES = "vision_conflits_laisses";
+function lireLaisses() {
+  try {
+    return JSON.parse(localStorage.getItem(LAISSES) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+export function PlanningGrille({ rows, params, seances, partenaires, evenements, homework, transactions, progress, goTab, echanges, readOnly, onCtCreer, onCtMaj, onCtSupprimer, onSeance, onAnnuler, onReglage, onEvCreer, onEvMaj, onEvSupprimer }) {
+  const [laisses, setLaisses] = React.useState(lireLaisses),
+    [listeOuverte, setListeOuverte] = React.useState(false);
+  const laisser = (cle) => {
+    const l = [...laisses, cle].slice(-200);
+    setLaisses(l);
+    try {
+      localStorage.setItem(LAISSES, JSON.stringify(l));
+    } catch (e) {}
+  };
   const [semaine, setSemaine] = React.useState(0),
     [sel, setSel] = React.useState(null),
     [fiche, setFiche] = React.useState(null),
@@ -348,6 +371,9 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
     cTravail = couleurType(params, "travail"),
     cCours = couleurType(params, "cours"),
     cSport = couleurType(params, "sport"),
+    cEv = couleurType(params, "evenement"),
+    evs = evenements || [],
+    couleurDe = (cat) => (cat === "sport" ? cSport : cEv),
     jours = contenuDe(rows, "jour"),
     cours = contenuDe(rows, "cours"),
     notes = contenuDe(rows, "note").filter((x) => x.groupe === "planning"),
@@ -367,12 +393,18 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
       .slice(0, 4),
     y = (h) => (Math.max(h0, Math.min(h1, h)) - h0) * PX;
 
+  const fait = (dIso, id) => (seances || []).some((s) => s.date === dIso && s.cours_id === id && s.fait),
+    annule = (dIso, id) => (seances || []).some((s) => s.date === dIso && s.cours_id === id && s.fait === false),
+    // Événement « Sport » : la séance est notée dans Sport (séance libre au nom de l'événement).
+    faitEv = (dIso, e) => (seances || []).some((s) => s.date === dIso && !s.cours_id && s.activite === e.titre && s.fait !== false);
+
   // Blocs de chaque jour : travail en fond, cours et sport par-dessus (côte à côte s'ils se croisent).
   const colonnes = dates.map((d, j) => {
     const dIso = isos[j],
       fond = [],
       blocs = [];
-    if (travailVisible)
+    const masque = masqueLe(evs, dIso);
+    if (travailVisible && !masque.has("travail"))
       jours
         .filter((x) => (x.titre || "").trim().toLowerCase() === JOURS[j].toLowerCase() && x.heure_debut && x.heure_fin)
         .forEach((x) =>
@@ -380,13 +412,20 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
         );
     (partenaires || []).forEach((p) =>
       plagesLibres(cours, p.cours)
-        .filter((l) => l.jour === j)
+        .filter((l) => l.jour === j && !occupeLeJour(evs, dIso, l.debut, l.fin) && !occupeLeJour(p.evenements, dIso, l.debut, l.fin))
         .forEach((l) => fond.push({ cle: "l" + p.echange_id + l.label, type: "libre", ref: p, de: l.debut, a: l.fin, titre: "Libre", label: l.label })),
     );
     cours
       .map((c) => ({ c, ...lireCreneau(c.detail) }))
-      .filter((x) => x.jour === j && x.debut && actifLe(x.c, dIso))
-      .forEach((x) => blocs.push({ cle: "c" + x.c.id, type: x.c.groupe === "sport" ? "sport" : "cours", ref: x.c, de: heureNum(x.debut), a: heureNum(x.fin) || heureNum(x.debut) + 1, titre: nomCours(x.c.titre), emoji: x.c.emoji }));
+      .filter((x) => x.jour === j && x.debut && actifLe(x.c, dIso) && !coursEnPause(evs, dIso, x.c.groupe === "sport"))
+      .forEach((x) => blocs.push({ cle: "c" + x.c.id, type: x.c.groupe === "sport" ? "sport" : "cours", ref: x.c, de: heureNum(x.debut), a: heureNum(x.fin) || heureNum(x.debut) + 1, titre: nomCours(x.c.titre), emoji: x.c.emoji, hd: x.debut, off: annule(dIso, x.c.id) }));
+    // Événements à dates : sans heure, ils se placent en haut de la journée.
+    evenementsLe(evs, dIso).forEach((e) => {
+      const [hd, hf] = horairesDe(e, dIso),
+        de = hd ? heureNum(hd) : h0,
+        a = hf ? heureNum(hf) : de + 1;
+      blocs.push({ cle: "e" + e.id, type: e.categorie === "sport" ? "sport" : "evenement", ref: e, ev: e, de, a: a > de ? a : de + 1, titre: e.titre, emoji: emojiDe(e), hd, off: estAnnulee(e, dIso) });
+    });
     blocs.sort((a, b) => a.de - b.de);
     // voies : un bloc qui en croise un autre se met à côté
     const fins = [];
@@ -397,19 +436,51 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
       b.voie = v;
     });
     blocs.forEach((b) => (b.voies = Math.max(1, ...blocs.filter((o) => o.de < b.a && o.a > b.de).map((o) => o.voie + 1))));
-    return { fond, blocs };
+    // Conflits de ce jour : un événement à date qui croise un cours (aucun des deux annulé).
+    const conflits = [];
+    blocs
+      .filter((b) => b.ev && !b.off)
+      .forEach((e) =>
+        blocs
+          .filter((c) => !c.ev && !c.off && c.de < e.a && c.a > e.de)
+          .forEach((c) => {
+            const cle = dIso + ":" + e.ev.id + ":" + c.ref.id;
+            if (!laisses.includes(cle)) conflits.push({ cle, j, dIso, ev: e.ev, cours: c.ref, cles: [e.cle, c.cle] });
+          }),
+      );
+    return { fond, blocs, conflits, pause: masque.size > 0, reperes: reperesDu(dIso, { homework, contenu: rows, progress, transactions }) };
   });
+  const conflitsSemaine = colonnes.flatMap((c) => c.conflits),
+    enConflit = (j, cle) => colonnes[j].conflits.some((x) => x.cles.includes(cle)),
+    pausesSemaine = evs.filter((e) => e.genre === "pause" && String(e.date_debut) <= isos[6] && String(e.date_fin) >= isos[0]),
+    datesEtPauses = [...evs].sort((a, b) => String(a.genre === "pause" ? a.date_debut : listeDates(a)[0] || "").localeCompare(String(b.genre === "pause" ? b.date_debut : listeDates(b)[0] || "")));
 
-  const fait = (dIso, id) => (seances || []).some((s) => s.date === dIso && s.cours_id === id && s.fait),
-    annule = (dIso, id) => (seances || []).some((s) => s.date === dIso && s.cours_id === id && s.fait === false),
-    styleDe = (t) => (t === "sport" ? cSport : t === "travail" ? cTravail : cCours);
+  const styleDe = (t) => (t === "sport" ? cSport : t === "travail" ? cTravail : t === "evenement" ? cEv : cCours);
 
   // Carte du bloc touché
   let detail = null;
   if (sel && sel.type !== "vide") {
     const d = dates[sel.jour],
       quand = JOURS[sel.jour] + " " + dateCourte(d);
-    if (sel.type === "libre") detail = { couleur: ["var(--vert-doux)", "var(--t-vert)"], quand, titre: "🔁 Libre avec " + sel.ref.prenom, texte: "Aucune de vous deux n'a cours " + sel.label.split(" ")[1] + "." };
+    if (sel.type === "repere") detail = { couleur: ["var(--surface)", "var(--ink)"], quand, titre: "Ce jour-là", reperes: colonnes[sel.jour].reperes };
+    else if (sel.type === "libre") detail = { couleur: ["var(--vert-doux)", "var(--t-vert)"], quand, titre: "🔁 Libre avec " + sel.ref.prenom, texte: "Créneau libre pour vous deux (" + sel.label.split(" ")[1] + ")." };
+    else if (sel.ev) {
+      const e = sel.ev,
+        dIso = isos[sel.jour],
+        [hd, hf] = horairesDe(e, dIso),
+        l = listeDates(e),
+        off = estAnnulee(e, dIso);
+      detail = {
+        couleur: couleurDe(e.categorie),
+        quand,
+        titre: emojiDe(e) + " " + e.titre + (off ? " · annulé" : ""),
+        texte: [hd ? hTexte(hd) + (hf ? " – " + hTexte(hf) : "") : "", e.lieu ? "📍 " + e.lieu : "", l.length > 1 ? "date " + (l.indexOf(dIso) + 1) + " sur " + l.length : ""].filter(Boolean).join(" · "),
+        ev: e,
+        dIso,
+        annule: off,
+        sport: e.categorie === "sport",
+      };
+    }
     else if (sel.type === "travail") detail = { couleur: cTravail, quand, titre: sel.ref.detail || "Travail", texte: hTexte(sel.ref.heure_debut) + " – " + hTexte(sel.ref.heure_fin), travail: true };
     else {
       const c = sel.ref,
@@ -460,13 +531,30 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
       <div style={{ ...carte, padding: "10px 8px 12px 0", boxShadow: "0 2px 10px rgba(14,58,66,.08)" }} aria-label="Agenda de la semaine">
         <div style={{ display: "grid", gridTemplateColumns: "34px repeat(7, minmax(0, 1fr))", gap: 3, marginBottom: 6 }}>
           <span />
-          {dates.map((d, j) => (
-            <span key={j} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 0", borderRadius: 12, background: j === jourAuj ? "var(--entete)" : "transparent", color: j === jourAuj ? "#ffffff" : "var(--ink)" }}>
-              <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".04em" }}>{COURTS[j]}</span>
-              <span style={{ fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700, lineHeight: 1.1 }}>{d.getDate()}</span>
-            </span>
-          ))}
+          {dates.map((d, j) => {
+            const rp = colonnes[j].reperes,
+              emojis = [...new Set(rp.map((r) => r.em))].join("");
+            return (
+              <button
+                key={j}
+                type="button"
+                disabled={!rp.length}
+                aria-label={JOURS[j] + " " + dateCourte(d) + (rp.length ? ", " + rp.length + " repère" + (rp.length > 1 ? "s" : "") : "")}
+                onClick={() => setSel(sel && sel.type === "repere" && sel.jour === j ? null : { type: "repere", cle: "r" + j, jour: j })}
+                style={{ border: 0, font: "inherit", display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 0 2px", borderRadius: 12, background: j === jourAuj ? "var(--entete)" : "transparent", color: j === jourAuj ? "#ffffff" : "var(--ink)", cursor: rp.length ? "pointer" : "default", opacity: 1 }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".04em" }}>{COURTS[j]}</span>
+                <span style={{ fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700, lineHeight: 1.1 }}>{d.getDate()}</span>
+                <span style={{ fontSize: 11, height: 15, lineHeight: "15px", letterSpacing: "-2px", whiteSpace: "nowrap" }}>{emojis}</span>
+              </button>
+            );
+          })}
         </div>
+        {pausesSemaine.map((p) => (
+          <button key={p.id} type="button" disabled={readOnly} onClick={() => setFiche({ pause: p })} style={{ display: "flex", width: "calc(100% - 40px)", margin: "0 0 8px 40px", border: 0, borderRadius: 12, background: "var(--ambre-doux)", color: "var(--t-ambre)", padding: "8px 10px", font: "inherit", fontSize: 13, fontWeight: 800, textAlign: "left", cursor: readOnly ? "default" : "pointer" }}>
+            🏖 {p.titre} · {dateCourte(new Date(p.date_debut + "T12:00:00"))} → {dateCourte(new Date(p.date_fin + "T12:00:00"))} · {(p.masque || []).join(", ")} en pause
+          </button>
+        ))}
         <div style={{ position: "relative", display: "grid", gridTemplateColumns: "34px repeat(7, minmax(0, 1fr))", columnGap: 3, height: (h1 - h0) * PX }}>
           <div style={{ position: "relative" }}>
             {Array.from({ length: Math.floor((h1 - h0) / 2) + 1 }, (_, k) => h0 + k * 2).map((h) => (
@@ -476,7 +564,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
             ))}
           </div>
           {colonnes.map((col, j) => (
-            <div key={j} style={{ position: "relative", borderRadius: 10, background: j === jourAuj ? "var(--teal-doux)" : "var(--fond-doux)" }}>
+            <div key={j} style={{ position: "relative", borderRadius: 10, background: col.pause ? "var(--ambre-doux)" : j === jourAuj ? "var(--teal-doux)" : "var(--fond-doux)" }}>
               {!readOnly &&
                 Array.from({ length: h1 - h0 }, (_, k) => h0 + k).map((h) => (
                   <button
@@ -524,13 +612,14 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
               {col.blocs.map((b) => {
                 const st = styleDe(b.type),
                   on = sel && sel.cle === b.cle && sel.jour === j,
-                  coche = b.type === "sport" && fait(isos[j], b.ref.id),
-                  off = annule(isos[j], b.ref.id);
+                  coche = b.type === "sport" && (b.ev ? faitEv(isos[j], b.ev) : fait(isos[j], b.ref.id)),
+                  off = b.off,
+                  conflit = enConflit(j, b.cle);
                 return (
                   <button
                     key={b.cle}
                     type="button"
-                    aria-label={b.titre + ", " + JOURS[j] + " " + hTexte(lireCreneau(b.ref.detail).debut) + (coche ? ", fait" : "") + (off ? ", annulé" : "")}
+                    aria-label={b.titre + ", " + JOURS[j] + (b.hd ? " " + hTexte(b.hd) : "") + (coche ? ", fait" : "") + (off ? ", annulé" : "") + (conflit ? ", en conflit" : "")}
                     onClick={() => setSel({ ...b, jour: j })}
                     style={{
                       position: "absolute",
@@ -539,7 +628,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
                       top: y(b.de) + 1,
                       height: Math.max(18, y(b.a) - y(b.de) - 2),
                       borderRadius: 9,
-                      border: on ? "3px solid var(--ink)" : "1px solid var(--surface)",
+                      border: on ? "3px solid var(--ink)" : conflit ? "2px solid var(--c-rouge)" : "1px solid var(--surface)",
                       background: st[0],
                       color: st[1],
                       padding: "4px 0",
@@ -557,8 +646,8 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
                     }}
                   >
                     {b.emoji && <span style={{ fontSize: 13, lineHeight: 1 }}>{b.emoji}</span>}
-                    <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1.15, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "100%" }}>{nomGrille(b.ref.titre)}</span>
-                    <span style={{ fontSize: 10, fontWeight: 800, opacity: 0.92 }}>{hTexte(lireCreneau(b.ref.detail).debut)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1.15, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "100%" }}>{nomGrille(b.titre)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, opacity: 0.92 }}>{hTexte(b.hd)}</span>
                     {coche && <span style={{ fontSize: 12, fontWeight: 900 }}>✓</span>}
                   </button>
                 );
@@ -576,6 +665,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
             ["Travail", cTravail[0], false, travailVisible],
             ["Cours", cCours[0], false, true],
             ["Sport", cSport[0], false, true],
+            ["À dates", cEv[0], false, evs.some((e) => e.genre !== "pause")],
             ["Libre ensemble", "var(--c-vert)", true, (partenaires || []).length > 0],
           ]
             .filter((x) => x[3])
@@ -595,16 +685,42 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
       )}
 
       {detail && (
-        <div style={{ marginTop: 12, borderRadius: 22, padding: 16, display: "flex", flexDirection: "column", gap: 6, background: detail.couleur[0], color: detail.couleur[1] }}>
+        <div style={{ marginTop: 12, borderRadius: 22, padding: 16, display: "flex", flexDirection: "column", gap: detail.reperes ? 8 : 6, background: detail.couleur[0], color: detail.couleur[1], border: detail.reperes ? "2px solid var(--line)" : 0 }}>
           <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.9 }}>{detail.quand}</span>
           <span style={{ fontFamily: "Georgia, serif", fontSize: 23, fontWeight: 700 }}>{detail.titre}</span>
-          <span style={{ fontSize: 15, fontWeight: 700, opacity: 0.95 }}>{detail.texte}</span>
+          {detail.texte && <span style={{ fontSize: 15, fontWeight: 700, opacity: 0.95 }}>{detail.texte}</span>}
           {detail.barre && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
               <span style={{ flex: 1, height: 8, borderRadius: 99, background: "rgba(255,255,255,.3)", overflow: "hidden" }}>
                 <span style={{ display: "block", height: 8, width: detail.barre.pct + "%", background: "#ffffff", borderRadius: 99 }} />
               </span>
               <span style={{ fontSize: 13, fontWeight: 800 }}>{detail.barre.fin}</span>
+            </div>
+          )}
+          {detail.reperes &&
+            detail.reperes.map((r, k) => (
+              <button key={k} type="button" disabled={!goTab} onClick={() => goTab && goTab(r.onglet)} style={{ display: "flex", alignItems: "center", gap: 10, border: 0, borderRadius: 14, background: "var(--fond-doux)", padding: "10px 12px", textAlign: "left", font: "inherit", color: "var(--ink)", cursor: goTab ? "pointer" : "default" }}>
+                <span style={{ fontSize: 20 }}>{r.em}</span>
+                <span style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: 14.5, fontWeight: 800 }}>{r.t}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--slate)" }}>{r.s}</span>
+                </span>
+                {goTab && <span style={{ fontSize: 13, fontWeight: 800, color: "var(--t-teal)" }}>{r.ou} ›</span>}
+              </button>
+            ))}
+          {!readOnly && detail.ev && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+              <button type="button" onClick={() => onEvMaj(detail.ev.id, { annulees: detail.annule ? (detail.ev.annulees || []).map(String).filter((x) => x !== detail.dIso) : [...(detail.ev.annulees || []).map(String), detail.dIso] }, detail.annule ? "Date remise" : "Pas cette date : " + dateLongue(detail.dIso))} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: detail.annule ? "#ffffff" : "rgba(255,255,255,.22)", color: detail.annule ? detail.couleur[0] : "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                {detail.annule ? "↩︎ Remettre cette date" : "🚫 Pas cette date"}
+              </button>
+              {detail.sport && !detail.annule && detail.dIso <= aujIso && (
+                <button type="button" onClick={() => onSeance({ date: detail.dIso, cours_id: null, activite: detail.ev.titre })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: faitEv(detail.dIso, detail.ev) ? "#ffffff" : "rgba(255,255,255,.22)", color: faitEv(detail.dIso, detail.ev) ? cSport[0] : "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  {faitEv(detail.dIso, detail.ev) ? "✓ J'y suis allée" : "J'y suis allée ?"}
+                </button>
+              )}
+              <button type="button" onClick={() => setFiche({ ev: detail.ev })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: "rgba(255,255,255,.22)", color: "inherit", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                ✏️ Toutes les dates
+              </button>
             </div>
           )}
           {!readOnly && (detail.cours || detail.travail) && (
@@ -629,6 +745,26 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
 
       {echanges}
 
+      {!readOnly &&
+        conflitsSemaine.map((x) => {
+          const n = nomCours(x.cours.titre);
+          return (
+            <div key={x.cle} role="alert" style={{ marginTop: 12, background: "var(--orange-doux)", borderRadius: 18, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              <span style={{ fontSize: 15, fontWeight: 800, color: "var(--t-orange)" }}>
+                ⚠️ {COURTS[x.j].charAt(0) + COURTS[x.j].slice(1).toLowerCase()}. {dates[x.j].getDate()} : {x.ev.titre} et {n} en même temps
+              </span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => onAnnuler({ date: x.dIso, cours_id: x.cours.id, titre: n })} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: 0, background: "var(--c-rouge)", color: "#ffffff", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  🚫 {n} pas ce jour-là
+                </button>
+                <button type="button" onClick={() => laisser(x.cle)} style={{ height: 42, padding: "0 14px", borderRadius: 12, border: "2px solid var(--line-strong)", background: "transparent", color: "var(--t-orange)", font: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  Laisser
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
       {conflits.length > 0 && (
         <div role="alert" style={{ marginTop: 12, background: "var(--rouge-doux)", borderRadius: 18, padding: "12px 14px", display: "flex", gap: 10, alignItems: "center" }}>
           <span style={{ fontSize: 22 }}>⚠️</span>
@@ -643,13 +779,18 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
       ))}
 
       {!readOnly && (
-        <button type="button" onClick={() => setFiche({ depart: { jour: jourAuj >= 0 ? jourAuj : 0, heure: 19 } })} style={{ width: "100%", marginTop: 12, height: 54, borderRadius: 18, border: 0, background: cCours[0], color: cCours[1], font: "inherit", fontSize: 16, fontWeight: 800, boxShadow: "0 6px 16px rgba(10,123,138,.22)", cursor: "pointer" }}>
-          + Ajouter un cours
-        </button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginTop: 12 }}>
+          <button type="button" onClick={() => setFiche({ depart: { jour: jourAuj >= 0 ? jourAuj : 0, heure: 19 } })} style={{ height: 54, borderRadius: 18, border: 0, background: cCours[0], color: cCours[1], font: "inherit", fontSize: 16, fontWeight: 800, boxShadow: "0 6px 16px rgba(10,123,138,.22)", cursor: "pointer" }}>
+            + Ajouter
+          </button>
+          <button type="button" onClick={() => setFiche({ mode: "pause", depart: { jour: 0 } })} style={{ height: 54, padding: "0 18px", borderRadius: 18, border: "2px solid var(--c-ambre)", background: "var(--ambre-doux)", color: "var(--t-ambre)", font: "inherit", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+            🏖 Pause
+          </button>
+        </div>
       )}
 
       {!readOnly && (
-        <div style={{ display: "grid", gridTemplateColumns: termines.length ? "1fr 1fr" : "1fr", gap: 8, marginTop: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (1 + (termines.length ? 1 : 0) + (datesEtPauses.length ? 1 : 0)) + ", minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
           <button type="button" aria-expanded={reglagesOuverts} onClick={() => setReglagesOuverts(!reglagesOuverts)} style={{ ...carte, border: 0, height: 46, font: "inherit", fontSize: 13.5, fontWeight: 800, color: "var(--ink-soft)", cursor: "pointer" }}>
             ⚙️ Réglages du planning
           </button>
@@ -658,6 +799,29 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
               🗂 Cours terminés ({termines.length})
             </button>
           )}
+          {datesEtPauses.length > 0 && (
+            <button type="button" aria-expanded={listeOuverte} onClick={() => setListeOuverte(!listeOuverte)} style={{ ...carte, border: 0, height: 46, font: "inherit", fontSize: 13.5, fontWeight: 800, color: "var(--ink-soft)", cursor: "pointer" }}>
+              📌 Dates et pauses ({datesEtPauses.length})
+            </button>
+          )}
+        </div>
+      )}
+      {!readOnly && listeOuverte && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+          {datesEtPauses.map((e) => {
+            const l = listeDates(e),
+              pause = e.genre === "pause";
+            return (
+              <button key={e.id} type="button" onClick={() => setFiche(pause ? { pause: e } : { ev: e })} style={{ ...carte, border: 0, borderLeft: "6px solid " + (pause ? "var(--c-ambre)" : couleurDe(e.categorie)[0]), padding: "12px 14px", textAlign: "left", font: "inherit", color: "var(--ink)", cursor: "pointer" }}>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>{(pause ? "🏖 " : emojiDe(e) + " ") + e.titre}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--slate)" }}>
+                  {pause
+                    ? dateLongue(String(e.date_debut)) + " → " + dateLongue(String(e.date_fin)) + " · " + (e.masque || []).join(", ")
+                    : l.length + " date" + (l.length > 1 ? "s" : "") + (l.length ? " · " + dateLongue(l[0]) + (l.length > 1 ? " → " + dateLongue(l[l.length - 1]) : "") : "")}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
       {!readOnly && reglagesOuverts && (
@@ -678,7 +842,21 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
         </div>
       )}
 
-      {fiche && (
+      {fiche && fiche.mode === "pause" && !fiche.pause && <FichePause depart={isos[0] >= aujIso ? isos[0] : aujIso} onClose={() => setFiche(null)} onCreer={onEvCreer} onMaj={onEvMaj} onSupprimer={onEvSupprimer} />}
+      {fiche && fiche.pause && <FichePause pause={fiche.pause} onClose={() => (setFiche(null), setSel(null))} onCreer={onEvCreer} onMaj={onEvMaj} onSupprimer={onEvSupprimer} />}
+      {fiche && (fiche.ev || fiche.mode === "dates") && (
+        <FicheEvenement
+          ev={fiche.ev || null}
+          depart={fiche.depart ? { date: isos[fiche.depart.jour], heure: fiche.depart.heure } : {}}
+          couleurDe={couleurDe}
+          onClose={() => (setFiche(null), setSel(null))}
+          onCreer={onEvCreer}
+          onMaj={onEvMaj}
+          onSupprimer={onEvSupprimer}
+          onRepetition={() => setFiche({ ...fiche, mode: "semaine" })}
+        />
+      )}
+      {fiche && !fiche.ev && !fiche.pause && fiche.mode !== "dates" && fiche.mode !== "pause" && (
         <FicheCours
           cours={fiche.cours || null}
           depart={fiche.depart || { jour: 0, heure: 19 }}
@@ -688,6 +866,7 @@ export function PlanningGrille({ rows, params, seances, partenaires, echanges, r
           onCreer={onCtCreer}
           onMaj={onCtMaj}
           onSupprimer={onCtSupprimer}
+          onRepetition={onEvCreer ? () => setFiche({ ...fiche, mode: "dates" }) : null}
         />
       )}
     </section>

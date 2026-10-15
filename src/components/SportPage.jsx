@@ -1,4 +1,5 @@
 import React from "react";
+import { masqueLe } from "../lib/evenements.js";
 import { KbSheet } from "./kanban/communs.jsx";
 import { euros, num } from "../lib/format.js";
 import { MOIS, anneeMoisDe } from "../lib/mois.js";
@@ -322,6 +323,7 @@ export function SportPage({
   rows,
   items,
   seances,
+  evenements,
   readOnly,
   ferme,
   onCtMaj,
@@ -346,12 +348,14 @@ export function SportPage({
     creneaux = cours.map((c) => ({ c, ...lireCreneau(c.detail) })).filter((x) => x.jour >= 0);
   // Prochain cours : premier créneau à venir (aujourd'hui compris si l'heure n'est pas passée).
   let prochain = null;
-  for (let k = 0; k < 8 && !prochain; k++) {
+  for (let k = 0; k < 70 && !prochain; k++) {
     const d = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() + k),
       l = creneaux
         .filter((x) => x.jour === jourSemaine(d))
         // cours annulé ce jour-là (« Pas cette semaine » dans Planning) : on passe au suivant
         .filter((x) => !(seances || []).some((s) => s.date === isoDe(d) && s.cours_id === x.c.id && s.fait === false))
+        // sport en pause ce jour-là (🏖 Pause dans Planning)
+        .filter(() => !masqueLe(evenements, isoDe(d)).has("sport"))
         .filter(
           (x) =>
             k > 0 ||
@@ -368,6 +372,7 @@ export function SportPage({
     occurrences = [];
   for (let j = 1; j <= jours; j++) {
     const d = new Date(ref.a, ref.m, j);
+    if (masqueLe(evenements, isoDe(d)).has("sport")) continue;
     creneaux
       .filter((x) => x.jour === jourSemaine(d))
       .forEach((x) => occurrences.push({ date: isoDe(d), j, c: x.c, futur: isoDe(d) > aujIso }));
