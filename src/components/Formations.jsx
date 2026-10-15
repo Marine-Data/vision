@@ -1,7 +1,8 @@
 import { eurosCourt, num } from "../lib/format.js";
 import { MOIS } from "../lib/mois.js";
+import { nomsRelies } from "../lib/depenses.js";
 
-export function Formations({ items: gi = [] }) {
+export function Formations({ items: gi = [], contenu = [], evenements = [] }) {
   // Tout vient de vision_items (formation + sport) : annuler / payer / modifier un poste met à jour cet onglet.
   const gList = (gi || [])
       .filter((x) => (x.pocket === "formation" || x.pocket === "sport") && num(x.montant_prevu) > 0)
@@ -82,7 +83,13 @@ export function Formations({ items: gi = [] }) {
             {gList.map((t, e) => (
               <tr key={t.id || e}>
                 <td>{MOIS[num(t.mois_index)]}</td>
-                <td>{(t.paid ? "✓ " : "") + t.label}</td>
+                <td>
+                  {(t.paid ? "✓ " : "") + t.label}
+                  {(() => {
+                    const n = nomsRelies({ t: "item", id: t.id }, contenu, evenements);
+                    return n ? <div style={{ fontSize: 12, fontWeight: 700, color: "var(--t-teal)" }}>🔗 Planning · {n}</div> : null;
+                  })()}
+                </td>
                 <td className="num">{eurosCourt(num(t.montant_prevu))}</td>
               </tr>
             ))}

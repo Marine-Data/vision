@@ -10,7 +10,7 @@ import { Historique } from "./components/Historique.jsx";
 import { NavBas } from "./components/NavBas.jsx";
 import { Planning } from "./components/Planning.jsx";
 import { SaisieRapide } from "./components/SaisieRapide.jsx";
-import { SportPage } from "./components/SportPage.jsx";
+import { SportPage, ecrireCreneau } from "./components/SportPage.jsx";
 import { SuiviPage } from "./components/SuiviPage.jsx";
 import { Reglages } from "./components/Reglages.jsx";
 import { PlanningGrille } from "./components/PlanningGrille.jsx";
@@ -734,7 +734,7 @@ export function App() {
       });
   }
   // Échéances d'adhésion / enveloppe (vision_items) depuis les écrans.
-  async function itemMaj(id, patch) {
+  async function itemMaj(id, patch, msg) {
     const avant = vi.find((x) => x.id === id);
     const ecrire = async (p2) => {
       const { data: K, error: E } = await supabase
@@ -748,9 +748,66 @@ export function App() {
     };
     await ecrire(patch);
     avant &&
-      notifier("Enregistré", () =>
+      notifier(msg || "Enregistré", () =>
         ecrire(Object.fromEntries(Object.keys(patch).map((k) => [k, avant[k] ?? null]))),
       );
+  }
+  // Planning : nouvelle dépense d'enveloppe (formation / sport) créée depuis un cours.
+  async function itemCreer(champs) {
+    const memes = vi.filter((x) => x.pocket === champs.pocket);
+    const { data: K, error: E } = await supabase
+      .from("vision_items")
+      .insert({ user_id: t.user.id, paid: false, statut: "actif", sort: (memes.length ? Math.max(...memes.map((x) => x.sort || 0)) : 0) + 1, ...champs })
+      .select()
+      .single();
+    if (E) throw E;
+    mi((p) => [...p, K]);
+    return K;
+  }
+  // Planning : « Déplacer cette fois » = ce jour-là annulé + le même cours une seule fois au nouveau moment.
+  async function coursDeplacer({ cours, date, nouvelle, debut, fin }) {
+    const jour = (new Date(nouvelle + "T12:00:00").getDay() + 6) % 7,
+      jj = nouvelle.slice(8, 10) + "/" + nouvelle.slice(5, 7),
+      copie = {
+        user_id: t.user.id,
+        type: "cours",
+        groupe: cours.groupe,
+        item_key: "rattrapage:" + date + ":" + Date.now(),
+        sort: (cours.sort || 0) + 0.5,
+        titre: cours.titre,
+        detail: ecrireCreneau({ jour, debut, fin }),
+        complement: jj + " → " + jj + "/" + nouvelle.slice(0, 4),
+        extra: cours.extra || null,
+        emoji: cours.emoji || null,
+        matiere: cours.matiere || null,
+        rappel: cours.rappel || null,
+        depenses: cours.depenses || [],
+        origine: cours.id,
+      };
+    const { data: K, error: E } = await supabase.from("vision_contenu").insert(copie).select().single();
+    if (E) throw E;
+    sct((p) => [...p, K]);
+    const ex = seances.find((x) => x.date === date && x.cours_id === cours.id);
+    let S = null;
+    if (!ex || ex.fait !== false) {
+      const r = ex
+        ? await supabase.from("vision_seances").update({ fait: false }).eq("id", ex.id).select().single()
+        : await supabase.from("vision_seances").insert({ user_id: t.user.id, date, cours_id: cours.id, fait: false }).select().single();
+      if (r.error) throw r.error;
+      S = r.data;
+      setSeances((p) => (ex ? p.map((x) => (x.id === ex.id ? S : x)) : [...p, S]));
+    }
+    notifier("Déplacé au " + jj + " · " + debut.replace(":", "h"), async () => {
+      await supabase.from("vision_contenu").delete().eq("id", K.id);
+      sct((p) => p.filter((x) => x.id !== K.id));
+      if (S && ex) {
+        const r = await supabase.from("vision_seances").update({ fait: ex.fait }).eq("id", ex.id).select().single();
+        r.data && setSeances((p) => p.map((x) => (x.id === ex.id ? r.data : x)));
+      } else if (S) {
+        await supabase.from("vision_seances").delete().eq("id", S.id);
+        setSeances((p) => p.filter((x) => x.id !== S.id));
+      }
+    });
   }
   async function ctDel(id) {
     if (!window.confirm("Supprimer cette ligne ?")) return;
@@ -1810,6 +1867,21 @@ export function App() {
             onEvCreer={agir(evCreer)}
             onEvMaj={agir(evMaj)}
             onEvSupprimer={agir(evSupprimer)}
+            items={vi}
+            budget={l}
+            onItemCreer={MODE_PARTAGE ? null : agir(itemCreer)}
+            onItemMaj={agir(itemMaj)}
+            onTxAjouter={agir(async (ligne) => {
+              const K = await txAdd(ligne);
+              notifier("Dépense prévue ajoutée dans Budget", () => txDelete(K.id));
+              return K;
+            })}
+            onTxModifier={agir(async (id, patch) => {
+              const avant = tx.find((x) => x.id === id);
+              await txUpdate(id, patch);
+              avant && notifier("Modifié dans Budget", () => txUpdate(id, Object.fromEntries(Object.keys(patch).map((k) => [k, avant[k]]))));
+            })}
+            onDeplacer={MODE_PARTAGE ? null : agir(coursDeplacer)}
             readOnly={MODE_PARTAGE}
             onCtCreer={agir(ctCreer)}
             onCtMaj={agir(ctMaj)}
@@ -1840,7 +1912,7 @@ export function App() {
             onMove={agir(ctMove)}
           />
         )}
-        {ong === "budget" && <Formations items={vi} />}
+        {ong === "budget" && <Formations items={vi} contenu={ct} evenements={evenements} />}
         {ong === "tresorerie" && MODE_PARTAGE && <BudgetPartage budget={lecture && lecture.budget} />}
         {ong === "tresorerie" &&
           !MODE_PARTAGE &&

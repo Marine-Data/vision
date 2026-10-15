@@ -61,7 +61,7 @@ const RAPPELS = [
   ["rappel_suivi", "🧭", "Étapes du suivi", "j"],
   ["rappel_echeances", "💳", "Échéances à payer", "j"],
   ["rappel_devoirs", "📚", "Devoirs", "j"],
-  ["rappel_sport", "🤸", "Cours de sport", "h"],
+  ["rappel_sport", "🔔", "Cours (par défaut)", "h"],
 ];
 const DELAIS = { j: [1, 2, 3, 7, 14], h: [1, 2, 3] };
 
