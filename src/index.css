@@ -52,6 +52,7 @@ p{margin:0 0 12px}
 
 /* ---------- Layout ---------- */
 .wrap{max-width:720px;margin:0 auto;padding:0 16px}
+.lecture-bord{margin:0 -16px}
 .sec{padding:18px 0 12px}
 .sec h2{font-size:1.35rem;margin:0 0 6px;color:var(--teal-dark);letter-spacing:-.01em}
 .sec h2 + .sub{margin-top:0}
@@ -503,6 +504,7 @@ details.collapsible > .inner{padding:0 16px 16px;border-top:1px solid var(--line
 /* Sur petit écran, on resserre un peu plus */
 @media (max-width:380px){
   .wrap{padding:0 12px}
+  .lecture-bord{margin:0 -12px}
   .nav button{font-size:11px;padding:8px 2px 9px}
   .top h1{font-size:1.35rem}
   .sec h2{font-size:1.2rem}

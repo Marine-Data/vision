@@ -1,6 +1,6 @@
 import React from "react";
 import { ImportReleve } from "./components/ImportReleve.jsx";
-import { MODE_PARTAGE, ONGLETS, ONGLETS_VERROUILLES, rienFaire } from "./app/onglets.jsx";
+import { APP_INSTALLEE, MODE_PARTAGE, ONGLETS, ONGLETS_VERROUILLES, rienFaire } from "./app/onglets.jsx";
 import { IMG_FOND } from "./assets/images.js";
 import { AutresOutils } from "./components/AutresOutils.jsx";
 import { BudgetMensuel } from "./components/BudgetMensuel.jsx";
@@ -18,7 +18,7 @@ import { affichageDepuisParams } from "./lib/affichage.js";
 import { Bienvenue } from "./components/Bienvenue.jsx";
 import { Partager } from "./components/Partager.jsx";
 import { KbSheet } from "./components/kanban/communs.jsx";
-import { BandeauInvitation, BudgetPartage, EcranLecture, PlanningsEchanges, RaccourcisLecture } from "./components/Lecture.jsx";
+import { BandeauInvitation, BudgetPartage, EcranLecture, LectureAccueil, PlanningsEchanges } from "./components/Lecture.jsx";
 import { JETON_INVITE, JETON_VOIR, ONGLET_DE_SECTION, resumeBudget } from "./lib/partage.js";
 import { entete, lireProfil, ongletVisible } from "./lib/profil.js";
 import { Verrou } from "./components/Verrou.jsx";
@@ -1776,6 +1776,7 @@ export function App() {
     <>
       <header
         className="top"
+        hidden={MODE_PARTAGE && ong === "apercu"}
         style={{
           backgroundImage: `linear-gradient(180deg, rgba(9,42,49,.42), rgba(9,42,49,.72)), url(${IMG_FOND})`,
           backgroundSize: "cover",
@@ -1813,15 +1814,21 @@ export function App() {
       </header>
       <main className="wrap">
         {ong === "apercu" && MODE_PARTAGE && (
-          <RaccourcisLecture
-            sections={lecture && lecture.sections}
-            prenom={lireProfil(ct).prenom}
+          <LectureAccueil
+            lecture={{ ...lecture, prenom: (lecture && lecture.prenom) || lireProfil(ct).prenom }}
+            contenu={ct}
+            seances={seances}
+            evenements={evenements}
+            titreDefaut={tete.titre}
+            image={IMG_FOND}
+            installee={APP_INSTALLEE}
             aller={(N) => {
               i(N), window.scrollTo(0, 0);
             }}
+            onCreer={() => (window.location.href = window.location.origin + window.location.pathname + "?invite=" + encodeURIComponent(JETON_VOIR))}
           />
         )}
-        {ong === "apercu" && (!MODE_PARTAGE || ((lecture && lecture.sections) || []).some((x) => ["suivi", "sport", "homework", "pieces"].includes(x))) && (
+        {ong === "apercu" && !MODE_PARTAGE && (
           <Accueil
             ongletsLecture={MODE_PARTAGE ? ongletsLecture : null}
             budget={l}

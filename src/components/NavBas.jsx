@@ -27,7 +27,7 @@ export function NavBas({ onglets, actif, aller, verrou }) {
             <span>{N.label + (verrou(N.id) ? " 🔒" : "")}</span>
           </button>
         ))}
-        <button
+        {autres.length > 0 && <button
           type="button"
           className={dansPlus ? "on" : ""}
           onClick={() => setPlus(!0)}
@@ -41,7 +41,7 @@ export function NavBas({ onglets, actif, aller, verrou }) {
             {accIcone("M5 12h.01M12 12h.01M19 12h.01", 22, 3)}
           </span>
           <span>{dansPlus ? autres.find((o) => o.id === actif).label : "Plus"}</span>
-        </button>
+        </button>}
       </nav>
       {plus && (
         <KbSheet label="Autres onglets" onClose={() => setPlus(!1)}>
