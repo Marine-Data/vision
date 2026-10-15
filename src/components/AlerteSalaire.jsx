@@ -174,7 +174,7 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
           {"Budget "}
           <span aria-hidden="true">{"> "}</span>
           <span style={KB_SR}>{"au-dessus du "}</span>
-          {"salaire · "}
+          {a.salaireReel != null ? "salaire réel · " : "salaire · "}
           {euros(a.ecartPrevu)}
         </span>
         {onAjuster ? (

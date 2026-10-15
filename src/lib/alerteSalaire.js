@@ -25,7 +25,8 @@ export function alerteSalaire(modele, bmRows, tx, m) {
     engage = somme(idsDe("charge")) + somme(idsDe("epargne")),
     reste = salaire - engage,
     budgetSorties = budgetDe("charge") + budgetDe("epargne"),
-    ecartPrevu = salairePrevu - budgetSorties;
+    // Budget prévu comparé au salaire réel dès qu'il est saisi, sinon au salaire prévu.
+    ecartPrevu = salaire - budgetSorties;
   return {
     salaire,
     salaireReel,
