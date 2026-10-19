@@ -160,8 +160,8 @@ export function ScanTicket({ user, onFait }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={choisie} style={{ display: "none" }} aria-label="Photo du ticket" />
-      <button type="button" onClick={() => inputRef.current && inputRef.current.click()} disabled={busy} style={{ width: "100%", height: 48 }}>
-        {busy ? "Lecture…" : "📷 Photo du ticket"}
+      <button type="button" onClick={() => inputRef.current && inputRef.current.click()} disabled={busy} style={{ width: "100%", height: 52, borderRadius: 16, border: 0, background: "var(--teal, #0e9fb2)", color: "#fff", fontWeight: 700, fontSize: 15 }}>
+        {busy ? "Lecture…" : "📷 Prendre le ticket"}
       </button>
       {recents.length > 0 && (
         <div style={{ margin: "0 0 8px", fontSize: 13 }}>
@@ -181,9 +181,25 @@ export function ScanTicket({ user, onFait }) {
         </div>
       )}
       {reste && (
-        <div style={{ margin: "0 0 8px", fontSize: 13, opacity: 0.8 }}>
-          <div>Reste Alimentation : {(reste.alim.budget - reste.alim.depense).toFixed(2).replace(".", ",")} €</div>
-          <div>Reste Santé / pharmacie : {(reste.sante.budget - reste.sante.depense).toFixed(2).replace(".", ",")} €</div>
+        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+          {[
+            ["Alimentation", reste.alim],
+            ["Santé / pharmacie", reste.sante],
+          ].map(([nom, v]) => {
+            const restant = v.budget - v.depense;
+            const pct = v.budget > 0 ? Math.min(100, (v.depense / v.budget) * 100) : 0;
+            return (
+              <div key={nom}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}>
+                  <span>{nom}</span>
+                  <span style={{ opacity: 0.7 }}>{restant.toFixed(2).replace(".", ",")} € restants</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 99, background: "var(--line, #dbeaec)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: pct > 90 ? "var(--red, #dd5f43)" : "var(--teal, #0e9fb2)", transition: "width .3s" }} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
       {saisie !== null && (

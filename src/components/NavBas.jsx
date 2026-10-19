@@ -12,7 +12,7 @@ export function NavBas({ onglets, actif, aller, verrou }) {
     dansPlus = autres.some((o) => o.id === actif);
   return (
     <>
-      <nav className="nav" aria-label="Navigation principale">
+      <nav className="nav" aria-label="Navigation principale" style={{ gridTemplateColumns: `repeat(${principaux.length + (autres.length > 0 ? 1 : 0)}, minmax(0, 1fr))` }}>
         {principaux.map((N) => (
           <button
             type="button"
