@@ -1,20 +1,44 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
 
-export const POSTES = ["Alimentation", "Santé / pharmacie", "Autres"];
 
 const euros = (n) => Number(n || 0).toFixed(2).replace(".", ",") + " €";
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
 const versCentimes = (v) => Math.round(Number(String(v).replace(",", ".")) * 100);
+// Mois du budget : 0 = août 2026 (même convention que l'app)
+const moisIndex = (dateIso) => {
+  const [y, m] = dateIso.split("-").map(Number);
+  return (y - 2026) * 12 + m - 8;
+};
 
 // Saisie manuelle d'un ticket : lignes + poste, total contrôlé avant enregistrement.
 export function ValiderTicket({ user, onFait, onAnnuler }) {
+  const [postes, setPostes] = React.useState([]); // lignes de charge du budget
   const [lieu, setLieu] = React.useState("");
   const [date, setDate] = React.useState(aujourdhui());
   const [total, setTotal] = React.useState("");
-  const [lignes, setLignes] = React.useState([{ label: "", montant: "", poste: "Alimentation" }]);
+  const [lignes, setLignes] = React.useState([{ label: "", montant: "", poste: "" }]);
+
+  React.useEffect(() => {
+    let vivant = true;
+    supabase
+      .from("vision_budget")
+      .select("id, line_key, poste")
+      .eq("user_id", user.id)
+      .eq("kind", "charge")
+      .neq("line_key", "c_sport")
+      .order("sort", { ascending: true })
+      .then(({ data, error }) => {
+        if (!vivant || error || !data) return;
+        setPostes(data);
+        const ali = data.find((x) => x.line_key === "c_alim") || data[0];
+        if (ali) setLignes((l) => l.map((x) => (x.poste ? x : { ...x, poste: ali.id })));
+      });
+    return () => (vivant = false);
+  }, [user.id]);
   const [err, setErr] = React.useState("");
   const [envoi, setEnvoi] = React.useState(false);
+  const nomPoste = (id) => (postes.find((x) => x.id === id) || {}).poste || "";
 
   const maj = (i, champ, val) => setLignes((l) => l.map((x, k) => (k === i ? { ...x, [champ]: val } : x)));
   const sommeLignes = lignes.reduce((s, x) => s + (x.montant ? versCentimes(x.montant) : 0), 0);
@@ -29,21 +53,39 @@ export function ValiderTicket({ user, onFait, onAnnuler }) {
     if (valides.some((x) => !x.montant || versCentimes(x.montant) <= 0)) return setErr("Chaque ligne a besoin d'un montant.");
     if (ecart !== 0) return setErr(`Les lignes ne correspondent pas au total (écart ${euros(ecart / 100)}).`);
 
-    // Découpage par poste, en centimes pour éviter les arrondis
+    // Découpage par ligne de budget, en centimes pour éviter les arrondis
     const parPoste = {};
     valides.forEach((x) => (parPoste[x.poste] = (parPoste[x.poste] || 0) + versCentimes(x.montant)));
-    const decoupage = Object.entries(parPoste).map(([poste, c]) => ({ poste, montant: c / 100 }));
+    const decoupage = Object.entries(parPoste).map(([id, c]) => ({ line_id: id, poste: nomPoste(id), montant: c / 100 }));
 
     setEnvoi(true);
-    const { error } = await supabase.from("vision_courses_tickets").insert({
+    const { data: ticket, error } = await supabase
+      .from("vision_courses_tickets")
+      .insert({ user_id: user.id, lieu: lieu.trim(), date_ticket: date, total: totalC / 100, decoupage })
+      .select("id")
+      .single();
+    if (error) {
+      setEnvoi(false);
+      return setErr("Ticket non enregistré.");
+    }
+    // Une dépense par ligne de budget, pour le mois de la date du ticket
+    const depenses = decoupage.map((d) => ({
       user_id: user.id,
-      lieu: lieu.trim(),
-      date_ticket: date,
-      total: totalC / 100,
-      decoupage,
-    });
+      budget_line_id: d.line_id,
+      montant: d.montant,
+      note: lieu.trim(),
+      date_depense: date,
+      mois_index: moisIndex(date),
+      type: "depense",
+      statut: "fait",
+      exceptionnelle: false,
+    }));
+    const { error: errDep } = await supabase.from("vision_transactions").insert(depenses);
     setEnvoi(false);
-    if (error) return setErr("Ticket non enregistré.");
+    if (errDep) {
+      await supabase.from("vision_courses_tickets").delete().eq("id", ticket.id);
+      return setErr("Dépenses non enregistrées, ticket annulé.");
+    }
     onFait();
   };
 
@@ -64,14 +106,14 @@ export function ValiderTicket({ user, onFait, onAnnuler }) {
           <input aria-label={`Article ${i + 1}`} placeholder="Article" value={x.label} onChange={(e) => maj(i, "label", e.target.value)} style={{ ...champ, flex: 2, minWidth: 0 }} />
           <input aria-label={`Montant ${i + 1}`} inputMode="decimal" placeholder="€" value={x.montant} onChange={(e) => maj(i, "montant", e.target.value)} style={{ ...champ, flex: 1, minWidth: 0 }} />
           <select aria-label={`Poste ${i + 1}`} value={x.poste} onChange={(e) => maj(i, "poste", e.target.value)} style={{ ...champ, flex: 1.4, minWidth: 0 }}>
-            {POSTES.map((p) => (
-              <option key={p} value={p}>{p}</option>
+            {postes.map((p) => (
+              <option key={p.id} value={p.id}>{p.poste}</option>
             ))}
           </select>
           <button type="button" aria-label={`Retirer la ligne ${i + 1}`} disabled={lignes.length === 1} onClick={() => setLignes((l) => l.filter((_, k) => k !== i))}>×</button>
         </div>
       ))}
-      <button type="button" onClick={() => setLignes((l) => [...l, { label: "", montant: "", poste: "Alimentation" }])} style={{ marginBottom: 12 }}>+ Ajouter une ligne</button>
+      <button type="button" onClick={() => setLignes((l) => [...l, { label: "", montant: "", poste: (postes.find((x) => x.line_key === "c_alim") || postes[0] || {}).id || "" }])} style={{ marginBottom: 12 }}>+ Ajouter une ligne</button>
 
       <div style={{ fontSize: 13, marginBottom: 12 }}>
         Lignes : {euros(sommeLignes / 100)} · Total : {euros(totalC / 100)}
