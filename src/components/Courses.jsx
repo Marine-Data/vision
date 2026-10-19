@@ -180,49 +180,59 @@ export function Courses({ user }) {
 
 
   return (
-    <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined }}>
+    <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined, display: "grid", gap: 14 }}>
       <ScanTicket user={user} onFait={() => setVersion((v) => v + 1)} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <span>
-          {coches.length} sur {articles.length} achetés
-        </span>
-        <button
-          type="button"
-          onClick={async () => {
-            setArticles((a) => a.map((x) => ({ ...x, coche: false })));
-            const { error } = await supabase.from("vision_courses").update({ coche: false }).eq("user_id", uid).eq("coche", true);
-            if (error) {
-              setErr("Remise à zéro impossible.");
-              charger();
-            }
-          }}
-          disabled={!coches.length}
-        >
-          Tout décocher
-        </button>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, marginBottom: 6 }}>
+          <span>
+            <b>{coches.length}</b> / {articles.length} achetés
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              setArticles((a) => a.map((x) => ({ ...x, coche: false })));
+              const { error } = await supabase.from("vision_courses").update({ coche: false }).eq("user_id", uid).eq("coche", true);
+              if (error) {
+                setErr("Remise à zéro impossible.");
+                charger();
+              }
+            }}
+            disabled={!coches.length}
+            style={{ border: 0, background: "transparent", color: "var(--teal, #0e9fb2)", fontSize: 13, fontWeight: 600, padding: 0 }}
+          >
+            Tout décocher
+          </button>
+        </div>
+        <div style={{ height: 6, borderRadius: 99, background: "var(--line, #dbeaec)", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${articles.length ? (coches.length / articles.length) * 100 : 0}%`, background: "var(--teal, #0e9fb2)", transition: "width .3s" }} />
+        </div>
       </div>
-      <form onSubmit={ajouter} style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input
-          type="text"
-          value={saisie}
-          onChange={(e) => setSaisie(e.target.value)}
-          placeholder="Ajouter un article"
-          aria-label="Ajouter un article"
-          style={{ flex: 1, minWidth: 0 }}
-        />
-        <select aria-label="Rayon de l'article" value={rayonSaisie} onChange={(e) => setRayonSaisie(e.target.value)} style={{ width: 118 }}>
-          {RAYONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-        <button type="submit" aria-label="Ajouter">
-          +
-        </button>
+      <form onSubmit={ajouter} style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input type="text" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder="Ajouter un article" aria-label="Ajouter un article" style={{ flex: 1, minWidth: 0 }} />
+          <button type="submit" aria-label="Ajouter" style={{ width: 48 }}>
+            +
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {RAYONS.map((r) => {
+            const on = rayonSaisie === r;
+            return (
+              <button
+                key={r}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setRayonSaisie(r)}
+                style={{ fontSize: 13, padding: "6px 12px", borderRadius: 99, border: `1px solid ${on ? "var(--teal, #0e9fb2)" : "var(--line, #dbeaec)"}`, background: on ? "var(--teal-soft, #e6f5f7)" : "transparent", color: on ? "var(--teal-dark, #0a7b8a)" : "inherit", fontWeight: on ? 700 : 500 }}
+              >
+                {r}
+              </button>
+            );
+          })}
+        </div>
       </form>
       {suggestions.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14, alignItems: "center" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
           {suggestions.map(([label, rayon]) => (
             <button
               key={label}
@@ -245,27 +255,27 @@ export function Courses({ user }) {
         </div>
       )}
       {err && (
-        <p role="alert" style={{ color: "var(--red)" }}>
+        <p role="alert" style={{ color: "var(--red)", margin: 0 }}>
           {err}
         </p>
       )}
       {!charge &&
         RAYONS.map((r) => {
-          const items = restants.filter((x) => rayonDe(x) === r);
+          const items = articles
+            .filter((x) => rayonDe(x) === r)
+            .sort((x, y) => Number(x.coche) - Number(y.coche));
           const survole = glisse && glisse.over === r;
           return (
-            <div key={r} data-rayon={r} style={{ borderRadius: 12, background: survole ? "var(--teal-soft, #e6f5f7)" : "transparent", transition: "background .15s", minHeight: 44 }}>
-              <h3 style={{ margin: "14px 0 0" }}>{r}</h3>
-              {items.length ? items.map((art) => ligne(art, true)) : <div style={{ padding: "10px 0", opacity: 0.4, fontSize: 13 }}>{glisse ? "Dépose ici" : "—"}</div>}
+            <div
+              key={r}
+              data-rayon={r}
+              style={{ borderRadius: 16, padding: "4px 14px 8px", border: "1px solid var(--line, #dbeaec)", background: survole ? "var(--teal-soft, #e6f5f7)" : "var(--surface, transparent)", transition: "background .15s" }}
+            >
+              <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.6, padding: "10px 0 2px" }}>{r}</div>
+              {items.length ? items.map((art) => ligne(art, !art.coche)) : <div style={{ padding: "10px 0", opacity: 0.4, fontSize: 13 }}>{glisse ? "Dépose ici" : "—"}</div>}
             </div>
           );
         })}
-      {coches.length > 0 && (
-        <div>
-          <h3>Cochés</h3>
-          {coches.map((art) => ligne(art, false))}
-        </div>
-      )}
       <ToastAnnuler toast={toast} onFermer={fermerToast} />
       {glisse && (
         <div
