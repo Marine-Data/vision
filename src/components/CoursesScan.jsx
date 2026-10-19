@@ -19,6 +19,17 @@ const moisIndex = (dateIso) => {
   return (y - 2026) * 12 + m - 8;
 };
 
+// Date du ticket (jj/mm/aaaa ou jj/mm/aa) ; à défaut, aujourd'hui.
+export function lireDate(texte) {
+  const m = texte.match(/(\d{2})[\/.\-](\d{2})[\/.\-](\d{4}|\d{2})/);
+  if (!m) return null;
+  const jour = Number(m[1]);
+  const mois = Number(m[2]);
+  const annee = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  if (mois < 1 || mois > 12 || jour < 1 || jour > 31) return null;
+  return `${annee}-${String(mois).padStart(2, "0")}-${String(jour).padStart(2, "0")}`;
+}
+
 // Poste choisi d'après le texte du ticket : pharmacie → Santé, sinon Alimentation.
 const estSante = (texte) => /pharmac|parapharm|doliprane|santé|sante/i.test(texte);
 
@@ -29,22 +40,28 @@ export function ScanTicket({ user, onFait }) {
   const [toast, setToast] = React.useState(null);
   const [saisie, setSaisie] = React.useState(null); // montant à taper si non lu
   const [sante, setSante] = React.useState(null);
-  const [reste, setReste] = React.useState(null); // { budget, depense }
+  const [reste, setReste] = React.useState(null); // { alim: {budget, depense}, sante: {...} }
   const [msg, setMsg] = React.useState("");
   const inputRef = React.useRef(null);
 
-  const chargerReste = React.useCallback(async (idAli) => {
-    if (!idAli) return;
-    const { data: ligne } = await supabase.from("vision_budget").select("montant").eq("id", idAli).maybeSingle();
+  const resteDe = async (idLigne) => {
+    if (!idLigne) return { budget: 0, depense: 0 };
+    const { data: ligne } = await supabase.from("vision_budget").select("montant").eq("id", idLigne).maybeSingle();
     const moisCourant = moisIndex(new Date().toISOString().slice(0, 10));
     const { data: depenses } = await supabase
       .from("vision_transactions")
       .select("montant")
       .eq("user_id", user.id)
-      .eq("budget_line_id", idAli)
+      .eq("budget_line_id", idLigne)
       .eq("mois_index", moisCourant);
     const depense = (depenses || []).reduce((t, x) => t + Number(x.montant), 0);
-    setReste({ budget: ligne ? Number(ligne.montant) : 0, depense });
+    return { budget: ligne ? Number(ligne.montant) : 0, depense };
+  };
+
+  const chargerReste = React.useCallback(async (idAli, idSante) => {
+    const alim = await resteDe(idAli);
+    const sant = await resteDe(idSante);
+    setReste({ alim, sante: sant });
   }, [user.id]);
 
   React.useEffect(() => {
@@ -58,12 +75,12 @@ export function ScanTicket({ user, onFait }) {
         const sant = (data || []).find((x) => x.line_key === "c_sante");
         setAli(alim ? alim.id : null);
         setSante(sant ? sant.id : null);
-        chargerReste(alim ? alim.id : null);
+        chargerReste(alim ? alim.id : null, sant ? sant.id : null);
       });
   }, [user.id, chargerReste]);
 
-  const enregistrer = async (montant, idLigne = ali) => {
-    const aujourdhui = new Date().toISOString().slice(0, 10);
+  const enregistrer = async (montant, idLigne = ali, dateTicket = null) => {
+    const aujourdhui = dateTicket || new Date().toISOString().slice(0, 10);
     const { data, error } = await supabase
       .from("vision_transactions")
       .insert({
@@ -87,11 +104,11 @@ export function ScanTicket({ user, onFait }) {
       msg: `Ticket ${montant.toFixed(2).replace(".", ",")} € · ${estLaSante ? "Santé" : "Alimentation"}`,
       annuler: async () => {
         await supabase.from("vision_transactions").delete().eq("id", data.id);
-        chargerReste(ali);
+        chargerReste(ali, sante);
         onFait && onFait();
       },
     });
-    chargerReste(ali);
+    chargerReste(ali, sante);
     onFait && onFait();
   };
 
@@ -113,7 +130,7 @@ export function ScanTicket({ user, onFait }) {
       if (total && total > 0) {
         setMsg("");
         const ligne = estSante(text) && sante ? sante : ali;
-        enregistrer(total, ligne);
+        enregistrer(total, ligne, lireDate(text));
       } else {
         setMsg("Montant non lu, tape-le :");
         setSaisie("");
@@ -131,9 +148,10 @@ export function ScanTicket({ user, onFait }) {
         {busy ? "Lecture…" : "📷 Photo du ticket"}
       </button>
       {reste && (
-        <p style={{ margin: "0 0 8px", fontSize: 13, opacity: 0.8 }}>
-          Reste Alimentation : {(reste.budget - reste.depense).toFixed(2).replace(".", ",")} €
-        </p>
+        <div style={{ margin: "0 0 8px", fontSize: 13, opacity: 0.8 }}>
+          <div>Reste Alimentation : {(reste.alim.budget - reste.alim.depense).toFixed(2).replace(".", ",")} €</div>
+          <div>Reste Santé / pharmacie : {(reste.sante.budget - reste.sante.depense).toFixed(2).replace(".", ",")} €</div>
+        </div>
       )}
       {saisie !== null && (
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
