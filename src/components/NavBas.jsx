@@ -3,7 +3,7 @@ import { navIcon } from "../app/onglets.jsx";
 import { KB_I, KbSheet, accIcone } from "./kanban/communs.jsx";
 
 export // Barre du bas : 5 onglets fixes + « Plus ».
-const NAV_PRINCIPAUX = ["apercu", "tresorerie", "homework", "planning", "sport"];
+const NAV_PRINCIPAUX = ["apercu", "tresorerie", "homework", "planning", "sport", "courses"];
 
 export function NavBas({ onglets, actif, aller, verrou }) {
   const [plus, setPlus] = React.useState(!1),
