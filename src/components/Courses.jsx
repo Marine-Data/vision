@@ -1,6 +1,5 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
-import { HistoriqueTickets } from "./CoursesTickets.jsx";
 import { ToastAnnuler } from "./ToastAnnuler.jsx";
 import { ScanTicket } from "./CoursesScan.jsx";
 
@@ -179,20 +178,10 @@ export function Courses({ user }) {
 
   if (!uid) return <p>Connectez-vous pour voir vos courses.</p>;
 
-  if (vue === "historique")
-    return (
-      <section>
-        <button type="button" onClick={() => changerVue("liste")} style={{ marginBottom: 10 }}>‹ Retour à la liste</button>
-        <HistoriqueTickets user={user} rafraichir={version} />
-      </section>
-    );
 
   return (
     <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined }}>
       <ScanTicket user={user} onFait={() => setVersion((v) => v + 1)} />
-      <div style={{ marginBottom: 10 }}>
-        <button type="button" onClick={() => changerVue("historique")} style={{ width: "100%" }}>Historique</button>
-      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span>
           {coches.length} sur {articles.length} achetés
