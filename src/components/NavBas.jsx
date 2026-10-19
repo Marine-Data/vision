@@ -2,8 +2,12 @@ import React from "react";
 import { navIcon } from "../app/onglets.jsx";
 import { KB_I, KbSheet, accIcone } from "./kanban/communs.jsx";
 
-export // Barre du bas : 5 onglets fixes + « Plus ».
-const NAV_PRINCIPAUX = ["apercu", "tresorerie", "homework", "planning", "sport", "courses"];
+// Libellés raccourcis pour tenir sur une seule ligne.
+const LIBELLE_COURT = { tresorerie: "Budget" };
+const libelleNav = (N) => LIBELLE_COURT[N.id] || N.label;
+
+// Barre du bas : 5 onglets fixes + « Plus ».
+export const NAV_PRINCIPAUX = ["apercu", "tresorerie", "homework", "planning", "sport", "courses"];
 
 export function NavBas({ onglets, actif, aller, verrou }) {
   const [plus, setPlus] = React.useState(!1),
@@ -19,12 +23,13 @@ export function NavBas({ onglets, actif, aller, verrou }) {
             className={actif === N.id ? "on" : ""}
             onClick={() => aller(N.id)}
             aria-current={actif === N.id ? "page" : void 0}
+            aria-label={N.label}
             key={N.id}
           >
             <span className="ico" aria-hidden="true">
               {navIcon(N.icon)}
             </span>
-            <span>{N.label + (verrou(N.id) ? " 🔒" : "")}</span>
+            <span>{libelleNav(N) + (verrou(N.id) ? " 🔒" : "")}</span>
           </button>
         ))}
         {autres.length > 0 && <button

@@ -7,6 +7,21 @@ import { ScanTicket } from "./CoursesScan.jsx";
 const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
 const rayonDe = (x) => x.rayon || "Autres";
 
+// Rayon deviné depuis ce qui est tapé : d'abord l'historique, puis quelques mots courants.
+const MOTS_RAYON = {
+  "Légumes": /carott|courgett|oignon|c[ée]bett|tomat|salad|champignon|poireau|[ée]pinard|pomme de terre|patate|\bail\b|[ée]chalot|concombre|poivron|aubergine|chou|haricot|pousses?|brocoli|radis|avocat|citron|pomme|banane|fruit|l[ée]gume|herbe|persil|coriandre|gingembre/i,
+  "Frais": /lait|yaourt|fromage|beurre|\b[œo]ufs?\b|tofu|jambon|poulet|poisson|saumon|cr[èe]me|steak|saucisse|viande|dinde|lardon|mozzarella|skyr|kefir|tempeh|surimi/i,
+  "Épicerie": /p[âa]tes?|riz|farine|sucre|huile|caf[ée]|\bth[ée]\b|c[ée]r[ée]ales?|conserve|sauce|biscuit|chocolat|lentille|pois chiche|quinoa|semoule|vinaigre|sel\b|[ée]pice|miel|confiture|pain|muesli|flocons|noix|amande|bouillon|lait de coco/i,
+};
+const devinerRayon = (texte, habitudes) => {
+  const t = (texte || "").trim().toLowerCase();
+  if (t.length < 2) return null;
+  const connu = habitudes.find((h) => h.label.toLowerCase() === t);
+  if (connu && connu.rayon) return connu.rayon;
+  const trouve = Object.keys(MOTS_RAYON).find((r) => MOTS_RAYON[r].test(t));
+  return trouve || null;
+};
+
 // Historique des articles (Supabase) : sert aux suggestions, y compris supprimés et cochés.
 const memoriser = (uid, label, rayon) =>
   supabase
@@ -16,7 +31,8 @@ const memoriser = (uid, label, rayon) =>
 export function Courses({ user }) {
   const [articles, setArticles] = React.useState([]);
   const [saisie, setSaisie] = React.useState("");
-  const [rayonSaisie, setRayonSaisie] = React.useState("Autres");
+  const [rayonManuel, setRayonManuel] = React.useState(null); // choix explicite ; sinon rayon deviné
+  const champ = React.useRef(null);
   const [err, setErr] = React.useState("");
   const [charge, setCharge] = React.useState(true);
   const [vue, setVue] = React.useState("liste"); // liste | valider | historique
@@ -60,8 +76,11 @@ export function Courses({ user }) {
     e.preventDefault();
     const label = saisie.trim();
     if (!label) return;
+    const rayon = rayonManuel || devinerRayon(label, habitudes) || "Autres";
     setSaisie("");
-    creer(label, rayonSaisie);
+    setRayonManuel(null);
+    creer(label, rayon);
+    if (champ.current) champ.current.focus();
   };
 
   // La suppression part vraiment en base à la fermeture du message « Annuler »
@@ -146,6 +165,7 @@ export function Courses({ user }) {
   };
 
 
+  const rayonSaisie = rayonManuel || devinerRayon(saisie, habitudes) || "Autres";
   const restants = articles.filter((x) => !x.coche);
   const coches = articles.filter((x) => x.coche);
   const suggestions = habitudes
@@ -209,7 +229,7 @@ export function Courses({ user }) {
       </div>
       <form onSubmit={ajouter} style={{ display: "grid", gap: 8 }}>
         <div style={{ display: "flex", gap: 8 }}>
-          <input type="text" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder="Ajouter un article" aria-label="Ajouter un article" style={{ flex: 1, minWidth: 0 }} />
+          <input ref={champ} type="text" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder="Ajouter un article" aria-label="Ajouter un article" enterKeyHint="done" autoComplete="off" style={{ flex: 1, minWidth: 0 }} />
           <button type="submit" aria-label="Ajouter" style={{ width: 48 }}>
             +
           </button>
@@ -222,7 +242,7 @@ export function Courses({ user }) {
                 key={r}
                 type="button"
                 aria-pressed={on}
-                onClick={() => setRayonSaisie(r)}
+                onClick={() => setRayonManuel(rayonManuel === r ? null : r)}
                 style={{ fontSize: 13, padding: "6px 12px", borderRadius: 99, border: `1px solid ${on ? "var(--teal, #0e9fb2)" : "var(--line, #dbeaec)"}`, background: on ? "var(--teal-soft, #e6f5f7)" : "transparent", color: on ? "var(--teal-dark, #0a7b8a)" : "inherit", fontWeight: on ? 700 : 500 }}
               >
                 {r}
