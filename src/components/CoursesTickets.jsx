@@ -102,15 +102,17 @@ export function ValiderTicket({ user, onFait, onAnnuler }) {
 
       <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>Articles</div>
       {lignes.map((x, i) => (
-        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-          <input aria-label={`Article ${i + 1}`} placeholder="Article" value={x.label} onChange={(e) => maj(i, "label", e.target.value)} style={{ ...champ, flex: 2, minWidth: 0 }} />
-          <input aria-label={`Montant ${i + 1}`} inputMode="decimal" placeholder="€" value={x.montant} onChange={(e) => maj(i, "montant", e.target.value)} style={{ ...champ, flex: 1, minWidth: 0 }} />
-          <select aria-label={`Poste ${i + 1}`} value={x.poste} onChange={(e) => maj(i, "poste", e.target.value)} style={{ ...champ, flex: 1.4, minWidth: 0 }}>
+        <div key={i} style={{ marginBottom: 10, padding: 8, border: "1px solid var(--line, #dbeaec)", borderRadius: 12 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+            <input aria-label={`Article ${i + 1}`} placeholder="Article" value={x.label} onChange={(e) => maj(i, "label", e.target.value)} style={{ ...champ, flex: 1, minWidth: 0 }} />
+            <input aria-label={`Montant ${i + 1}`} inputMode="decimal" placeholder="€" value={x.montant} onChange={(e) => maj(i, "montant", e.target.value)} style={{ ...champ, width: 84, flexShrink: 0 }} />
+            <button type="button" aria-label={`Retirer la ligne ${i + 1}`} disabled={lignes.length === 1} onClick={() => setLignes((l) => l.filter((_, k) => k !== i))} style={{ width: 40, flexShrink: 0 }}>×</button>
+          </div>
+          <select aria-label={`Poste ${i + 1}`} value={x.poste} onChange={(e) => maj(i, "poste", e.target.value)} style={{ ...champ, width: "100%" }}>
             {postes.map((p) => (
               <option key={p.id} value={p.id}>{p.poste}</option>
             ))}
           </select>
-          <button type="button" aria-label={`Retirer la ligne ${i + 1}`} disabled={lignes.length === 1} onClick={() => setLignes((l) => l.filter((_, k) => k !== i))}>×</button>
         </div>
       ))}
       <button type="button" onClick={() => setLignes((l) => [...l, { label: "", montant: "", poste: (postes.find((x) => x.line_key === "c_alim") || postes[0] || {}).id || "" }])} style={{ marginBottom: 12 }}>+ Ajouter une ligne</button>
