@@ -7,6 +7,7 @@ import { BudgetMensuel } from "./components/BudgetMensuel.jsx";
 import { Connexion } from "./components/Connexion.jsx";
 import { Formations } from "./components/Formations.jsx";
 import { Historique } from "./components/Historique.jsx";
+import { Courses } from "./components/Courses.jsx";
 import { NavBas } from "./components/NavBas.jsx";
 import { Planning } from "./components/Planning.jsx";
 import { SaisieRapide } from "./components/SaisieRapide.jsx";
@@ -2070,6 +2071,7 @@ export function App() {
           />
         )}
         {ong === "historique" && gt(<Historique audit={aud} items={vi} params={c} />)}
+        {ong === "courses" && gt(<Courses user={t.user} />)}
         {ong === "homework" && (
           <DevoirsPage
             rows={hwRows}

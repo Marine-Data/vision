@@ -20,6 +20,11 @@ export const ONGLETS = [
     icon: "portefeuille",
   },
   {
+    id: "courses",
+    label: "Courses",
+    icon: "panier",
+  },
+  {
     id: "tresorerie",
     label: "Budget mois",
     icon: "curseurs",
@@ -87,6 +92,7 @@ export const NAV_ICONS = {
     "M12 6.6v12.2",
   ],
   horloge: ["M12 3.6a8.4 8.4 0 110 16.8 8.4 8.4 0 010-16.8", "M12 7.4V12l2.9 1.9"],
+  panier: ["M3.6 4.8h2.2l2.1 9.6h8.9l2-6.8H6.4", "M9 17.8a.9.9 0 100 1.8.9.9 0 000-1.8z", "M16.8 17.8a.9.9 0 100 1.8.9.9 0 000-1.8z"],
   reglages: ["M4 7h10", "M18 7h2", "M4 17h4", "M12 17h8", "M16 5v4", "M10 15v4"],
 };
 
