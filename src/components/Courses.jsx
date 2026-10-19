@@ -90,7 +90,7 @@ export function Courses({ user }) {
   if (!uid) return <p>Connectez-vous pour voir vos courses.</p>;
 
   return (
-    <section className="courses">
+    <section className="courses" style={{ paddingBottom: 110 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span>
           {coches.length} sur {articles.length} achetés
