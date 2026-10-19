@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
+import { ValiderTicket, HistoriqueTickets } from "./CoursesTickets.jsx";
 
 // Ordre d'affichage des rayons ; un article sans rayon va dans « Autres ».
 const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
@@ -9,6 +10,8 @@ export function Courses({ user }) {
   const [saisie, setSaisie] = React.useState("");
   const [err, setErr] = React.useState("");
   const [charge, setCharge] = React.useState(true);
+  const [vue, setVue] = React.useState("liste"); // liste | valider | historique
+  const [version, setVersion] = React.useState(0);
   const uid = user && user.id;
 
   const charger = React.useCallback(async () => {
@@ -89,8 +92,31 @@ export function Courses({ user }) {
 
   if (!uid) return <p>Connectez-vous pour voir vos courses.</p>;
 
+  if (vue === "valider")
+    return (
+      <ValiderTicket
+        user={user}
+        onFait={() => {
+          setVersion((v) => v + 1);
+          setVue("historique");
+        }}
+        onAnnuler={() => setVue("liste")}
+      />
+    );
+  if (vue === "historique")
+    return (
+      <section>
+        <button type="button" onClick={() => setVue("liste")} style={{ marginBottom: 10 }}>‹ Retour à la liste</button>
+        <HistoriqueTickets user={user} rafraichir={version} />
+      </section>
+    );
+
   return (
     <section className="courses">
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button type="button" onClick={() => setVue("valider")} style={{ flex: 1 }}>Valider un ticket</button>
+        <button type="button" onClick={() => setVue("historique")} style={{ flex: 1 }}>Historique</button>
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span>
           {coches.length} sur {articles.length} achetés
