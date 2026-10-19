@@ -3,6 +3,10 @@ import { supabase } from "../lib/supabase.js";
 import { ValiderTicket, HistoriqueTickets } from "./CoursesTickets.jsx";
 import { ToastAnnuler } from "./ToastAnnuler.jsx";
 
+// Ordre d'affichage des rayons. Un article sans rayon va dans « Autres ».
+const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
+const rayonDe = (x) => x.rayon || "Autres";
+
 // Historique des articles (Supabase) : sert aux suggestions, y compris supprimés et cochés.
 const memoriser = (uid, label, rayon) =>
   supabase
