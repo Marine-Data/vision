@@ -88,6 +88,13 @@ export function ScanTicket({ user, onFait }) {
       });
   }, [user.id, chargerReste]);
 
+  const supprimerTicket = async (id) => {
+    const { error } = await supabase.from("vision_transactions").delete().eq("id", id);
+    if (error) return setMsg("Suppression impossible.");
+    chargerReste(ali, sante);
+    onFait && onFait();
+  };
+
   const enregistrer = async (montant, idLigne = ali, dateTicket = null) => {
     const aujourdhui = dateTicket || new Date().toISOString().slice(0, 10);
     const { data, error } = await supabase
@@ -163,7 +170,12 @@ export function ScanTicket({ user, onFait }) {
             <div key={t.id} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
               <span>{new Date(t.date_depense + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span>
               <span>{t.budget_line_id === sante ? "Santé" : "Alimentation"}</span>
-              <span>{Number(t.montant).toFixed(2).replace(".", ",")} €</span>
+              <span>
+                {Number(t.montant).toFixed(2).replace(".", ",")} €{" "}
+                <button type="button" aria-label="Supprimer ce ticket" onClick={() => supprimerTicket(t.id)} style={{ border: 0, background: "transparent", color: "inherit", fontSize: 14, padding: "0 4px", cursor: "pointer" }}>
+                  ×
+                </button>
+              </span>
             </div>
           ))}
         </div>
