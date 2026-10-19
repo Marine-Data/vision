@@ -41,6 +41,7 @@ export function ScanTicket({ user, onFait }) {
   const [saisie, setSaisie] = React.useState(null); // montant à taper si non lu
   const [sante, setSante] = React.useState(null);
   const [reste, setReste] = React.useState(null); // { alim: {budget, depense}, sante: {...} }
+  const [recents, setRecents] = React.useState([]); // 5 derniers tickets photo
   const [msg, setMsg] = React.useState("");
   const inputRef = React.useRef(null);
 
@@ -62,6 +63,14 @@ export function ScanTicket({ user, onFait }) {
     const alim = await resteDe(idAli);
     const sant = await resteDe(idSante);
     setReste({ alim, sante: sant });
+    const { data } = await supabase
+      .from("vision_transactions")
+      .select("id, montant, date_depense, budget_line_id")
+      .eq("user_id", user.id)
+      .eq("note", "Ticket (photo)")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    setRecents(data || []);
   }, [user.id]);
 
   React.useEffect(() => {
@@ -147,6 +156,18 @@ export function ScanTicket({ user, onFait }) {
       <button type="button" onClick={() => inputRef.current && inputRef.current.click()} disabled={busy} style={{ width: "100%", height: 48 }}>
         {busy ? "Lecture…" : "📷 Photo du ticket"}
       </button>
+      {recents.length > 0 && (
+        <div style={{ margin: "0 0 8px", fontSize: 13 }}>
+          <div style={{ opacity: 0.6, marginBottom: 4 }}>Derniers tickets</div>
+          {recents.map((t) => (
+            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+              <span>{new Date(t.date_depense + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span>
+              <span>{t.budget_line_id === sante ? "Santé" : "Alimentation"}</span>
+              <span>{Number(t.montant).toFixed(2).replace(".", ",")} €</span>
+            </div>
+          ))}
+        </div>
+      )}
       {reste && (
         <div style={{ margin: "0 0 8px", fontSize: 13, opacity: 0.8 }}>
           <div>Reste Alimentation : {(reste.alim.budget - reste.alim.depense).toFixed(2).replace(".", ",")} €</div>
