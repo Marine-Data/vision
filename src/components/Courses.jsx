@@ -2,7 +2,7 @@ import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { HistoriqueTickets } from "./CoursesTickets.jsx";
 import { ToastAnnuler } from "./ToastAnnuler.jsx";
-import { PhotoTicket, ListePhotos } from "./CoursesPhotos.jsx";
+import { ScanTicket } from "./CoursesScan.jsx";
 
 // Ordre d'affichage des rayons. Un article sans rayon va dans « Autres ».
 const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
@@ -183,14 +183,13 @@ export function Courses({ user }) {
     return (
       <section>
         <button type="button" onClick={() => changerVue("liste")} style={{ marginBottom: 10 }}>‹ Retour à la liste</button>
-        <ListePhotos user={user} rafraichir={version} />
         <HistoriqueTickets user={user} rafraichir={version} />
       </section>
     );
 
   return (
     <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined }}>
-      <PhotoTicket user={user} onAjoute={() => setVersion((v) => v + 1)} />
+      <ScanTicket user={user} onFait={() => setVersion((v) => v + 1)} />
       <div style={{ marginBottom: 10 }}>
         <button type="button" onClick={() => changerVue("historique")} style={{ width: "100%" }}>Historique</button>
       </div>
