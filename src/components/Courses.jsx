@@ -1,6 +1,6 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
-import { ValiderTicket, HistoriqueTickets } from "./CoursesTickets.jsx";
+import { HistoriqueTickets } from "./CoursesTickets.jsx";
 import { ToastAnnuler } from "./ToastAnnuler.jsx";
 import { PhotoTicket, ListePhotos } from "./CoursesPhotos.jsx";
 
@@ -179,24 +179,6 @@ export function Courses({ user }) {
 
   if (!uid) return <p>Connectez-vous pour voir vos courses.</p>;
 
-  if (vue === "valider")
-    return (
-      <ValiderTicket
-        user={user}
-        onFait={async () => {
-          // Ticket enregistré : les articles cochés ont été achetés, ils sortent de la liste
-          const achetes = articles.filter((x) => x.coche).map((x) => x.id);
-          if (achetes.length) {
-            const { error } = await supabase.from("vision_courses").delete().in("id", achetes);
-            if (error) setErr("Articles cochés non retirés.");
-            else setArticles((a) => a.filter((x) => !x.coche));
-          }
-          setVersion((v) => v + 1);
-          setVue("historique");
-        }}
-        onAnnuler={() => changerVue("liste")}
-      />
-    );
   if (vue === "historique")
     return (
       <section>
@@ -209,9 +191,8 @@ export function Courses({ user }) {
   return (
     <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined }}>
       <PhotoTicket user={user} onAjoute={() => setVersion((v) => v + 1)} />
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <button type="button" onClick={() => changerVue("valider")} style={{ flex: 1 }}>Valider un ticket</button>
-        <button type="button" onClick={() => changerVue("historique")} style={{ flex: 1 }}>Historique</button>
+      <div style={{ marginBottom: 10 }}>
+        <button type="button" onClick={() => changerVue("historique")} style={{ width: "100%" }}>Historique</button>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span>
