@@ -178,7 +178,14 @@ export function Courses({ user }) {
     return (
       <ValiderTicket
         user={user}
-        onFait={() => {
+        onFait={async () => {
+          // Ticket enregistré : les articles cochés ont été achetés, ils sortent de la liste
+          const achetes = articles.filter((x) => x.coche).map((x) => x.id);
+          if (achetes.length) {
+            const { error } = await supabase.from("vision_courses").delete().in("id", achetes);
+            if (error) setErr("Articles cochés non retirés.");
+            else setArticles((a) => a.filter((x) => !x.coche));
+          }
           setVersion((v) => v + 1);
           setVue("historique");
         }}
@@ -239,7 +246,7 @@ export function Courses({ user }) {
         </button>
       </form>
       {suggestions.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14, alignItems: "center" }}>
           {suggestions.map(([label, rayon]) => (
             <button
               key={label}
@@ -250,6 +257,15 @@ export function Courses({ user }) {
               + {label}
             </button>
           ))}
+          {suggestions.length > 1 && (
+            <button
+              type="button"
+              onClick={() => suggestions.forEach(([l, r]) => creer(l, r))}
+              style={{ fontSize: 13, borderRadius: 99, padding: "4px 10px", border: "1px solid var(--teal, #0e9fb2)", background: "transparent", color: "var(--teal, #0e9fb2)" }}
+            >
+              Tout ajouter
+            </button>
+          )}
         </div>
       )}
       {err && (
