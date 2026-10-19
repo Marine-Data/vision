@@ -72,12 +72,31 @@ function trouverMontants(l) {
 
 const IGNORER = /solde|total|disponible|plafond|encours|prochain|virement re[cç]u/i;
 
+// L'OCR lit parfois un chiffre comme une lettre ou un signe juste après la virgule : « -5,/6 » pour « -5,76 ».
+const CHIFFRE_OCR = { "/": "7", O: "0", o: "0", l: "1", I: "1", "|": "1", S: "5", B: "8" };
+const corrigerDecimales = (l) =>
+  l.replace(
+    /(\d),([\dOolI|S/B]{2})(?![\w])/g,
+    (_, a, b) => a + "," + [...b].map((c) => CHIFFRE_OCR[c] || c).join(""),
+  );
+
+const jourSuivant = (iso) => {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + 1);
+  const suivant = enIso(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  const auj = new Date();
+  return suivant > enIso(auj.getFullYear(), auj.getMonth() + 1, auj.getDate()) ? iso : suivant;
+};
+
 export function parserReleve(texte) {
   const lignes = [];
+  // Opérations vues avant le premier en-tête de date (il a défilé hors de l'écran) : elles sont plus
+  // récentes que cet en-tête. On leur donne le lendemain de cette date, ou aujourd'hui s'il n'y en a aucun.
+  const sansDate = [];
   let dateCourante = null; // date d'un en-tête de groupe (« 19 octobre ») valable pour les lignes suivantes
   let libellePrecedent = ""; // libellé vu sur la ligne d'avant, si le montant est seul sur sa ligne
   for (const brut of String(texte || "").split("\n")) {
-    const l = brut.replace(/[|_]/g, " ").replace(/\s+/g, " ").trim();
+    const l = corrigerDecimales(brut.replace(/_/g, " ")).replace(/\s+/g, " ").trim();
     if (!l) continue;
     if (IGNORER.test(l)) {
       libellePrecedent = "";
@@ -87,6 +106,7 @@ export function parserReleve(texte) {
     const montants = trouverMontants(l);
     if (!montants.length) {
       if (d) {
+        if (!dateCourante) for (const x of sansDate) x.date = jourSuivant(d.iso);
         dateCourante = d.iso;
         libellePrecedent = "";
       } else if (/[A-Za-zÀ-ÿ]{3,}/.test(l)) libellePrecedent = l;
@@ -98,19 +118,27 @@ export function parserReleve(texte) {
       continue; // un crédit n'est pas une dépense à vérifier
     }
     const date = d ? d.iso : dateCourante;
-    if (d) dateCourante = d.iso;
-    if (!date) continue;
+    // sans date connue, on ne garde que les montants précédés d'un « - » (le solde en haut d'écran n'en a pas)
+    if (!date && !dernier.signe) continue;
+    if (d) {
+      if (!dateCourante) for (const x of sansDate) x.date = jourSuivant(d.iso);
+      dateCourante = d.iso;
+    }
     let libelle = l;
     if (d) libelle = libelle.replace(d.texte, " ");
     for (const m of montants) libelle = libelle.replace(m.texte, " ");
     libelle = libelle
-      .replace(/[-−–+€]/g, " ")
+      .replace(/[-−–+€>»›«©®|]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
     if (!/[A-Za-zÀ-ÿ]{2,}/.test(libelle)) libelle = libellePrecedent;
     libellePrecedent = "";
-    lignes.push({ date, montant: Math.abs(dernier.valeur), libelle: (libelle || "Dépense").slice(0, 60) });
+    const ligne = { date, montant: Math.abs(dernier.valeur), libelle: (libelle || "Dépense").slice(0, 60) };
+    lignes.push(ligne);
+    if (!date) sansDate.push(ligne);
   }
+  const auj = new Date();
+  for (const x of sansDate) if (!x.date) x.date = enIso(auj.getFullYear(), auj.getMonth() + 1, auj.getDate());
   return lignes;
 }
 
