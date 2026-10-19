@@ -2,6 +2,7 @@ import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { ToastAnnuler } from "./ToastAnnuler.jsx";
 import { ScanTicket } from "./CoursesScan.jsx";
+import { VerifierReleve } from "./VerifierReleve.jsx";
 
 // Ordre d'affichage des rayons. Un article sans rayon va dans « Autres ».
 const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
@@ -202,6 +203,7 @@ export function Courses({ user }) {
   return (
     <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined, display: "grid", gap: 14 }}>
       <ScanTicket user={user} onFait={() => setVersion((v) => v + 1)} />
+      <VerifierReleve user={user} />
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, marginBottom: 6 }}>
           <span>

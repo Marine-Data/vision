@@ -8,6 +8,7 @@ import { Connexion } from "./components/Connexion.jsx";
 import { Formations } from "./components/Formations.jsx";
 import { Historique } from "./components/Historique.jsx";
 import { Courses } from "./components/Courses.jsx";
+import { VerifierReleve } from "./components/VerifierReleve.jsx";
 import { NavBas } from "./components/NavBas.jsx";
 import { Planning } from "./components/Planning.jsx";
 import { SaisieRapide } from "./components/SaisieRapide.jsx";
@@ -1959,6 +1960,7 @@ export function App() {
           !MODE_PARTAGE &&
           gt(
             <>
+              <VerifierReleve user={t.user} />
               <BudgetMensuel
                 budget={l}
                 budgetMois={bm}
