@@ -1,6 +1,24 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { ValiderTicket, HistoriqueTickets } from "./CoursesTickets.jsx";
+import { ToastAnnuler } from "./ToastAnnuler.jsx";
+
+// Articles déjà utilisés, mémorisés dans ce navigateur (suggestions).
+const CLE_HABITUDES = "vision_courses_habitudes";
+const lireHabitudes = () => {
+  try {
+    return JSON.parse(localStorage.getItem(CLE_HABITUDES) || "{}");
+  } catch (e) {
+    return {};
+  }
+};
+const ecrireHabitudes = (h) => {
+  try {
+    localStorage.setItem(CLE_HABITUDES, JSON.stringify(h));
+  } catch (e) {
+    /* stockage indisponible : les suggestions restent vides */
+  }
+};
 
 // Ordre d'affichage des rayons. Un article sans rayon va dans « Autres ».
 const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
@@ -15,6 +33,9 @@ export function Courses({ user }) {
   const [vue, setVue] = React.useState("liste"); // liste | valider | historique
   const [version, setVersion] = React.useState(0);
   const [glisse, setGlisse] = React.useState(null); // { id, label, x, y, over }
+  const [toast, setToast] = React.useState(null);
+  const [habitudes, setHabitudes] = React.useState(() => lireHabitudes());
+  const aSupprimer = React.useRef(null); // suppression en attente (annulable)
   const uid = user && user.id;
 
   const charger = React.useCallback(async () => {
@@ -25,7 +46,13 @@ export function Courses({ user }) {
       .eq("user_id", uid)
       .order("created_at", { ascending: true });
     if (error) setErr("Impossible de charger la liste.");
-    else setArticles(data || []);
+    else {
+      setArticles(data || []);
+      const h = lireHabitudes();
+      (data || []).forEach((x) => (h[x.label] = rayonDe(x)));
+      ecrireHabitudes(h);
+      setHabitudes(h);
+    }
     setCharge(false);
   }, [uid]);
 
@@ -33,18 +60,44 @@ export function Courses({ user }) {
     charger();
   }, [charger]);
 
-  const ajouter = async (e) => {
-    e.preventDefault();
-    const label = saisie.trim();
+  const creer = async (label, rayon) => {
     if (!label || !uid) return;
     const { data, error } = await supabase
       .from("vision_courses")
-      .insert({ user_id: uid, label, rayon: rayonSaisie, poste: "Alimentation" })
+      .insert({ user_id: uid, label, rayon, poste: "Alimentation" })
       .select()
       .single();
     if (error) return setErr("Article non ajouté.");
-    setSaisie("");
     setArticles((a) => [...a, data]);
+    const h = { ...lireHabitudes(), [label]: rayon };
+    ecrireHabitudes(h);
+    setHabitudes(h);
+  };
+
+  const ajouter = async (e) => {
+    e.preventDefault();
+    const label = saisie.trim();
+    if (!label) return;
+    setSaisie("");
+    creer(label, rayonSaisie);
+  };
+
+  // La suppression part vraiment en base à la fermeture du message « Annuler »
+  const validerSuppression = async () => {
+    const art = aSupprimer.current;
+    if (!art) return;
+    aSupprimer.current = null;
+    const { error } = await supabase.from("vision_courses").delete().eq("id", art.id);
+    if (error) {
+      setErr("Suppression impossible.");
+      charger();
+    }
+  };
+
+  const changerVue = (v) => {
+    setToast(null);
+    validerSuppression();
+    setVue(v);
   };
 
   const basculer = async (art) => {
@@ -57,13 +110,22 @@ export function Courses({ user }) {
     }
   };
 
-  const supprimer = async (art) => {
+  const fermerToast = () => {
+    setToast(null);
+    validerSuppression();
+  };
+
+  const supprimer = (art) => {
+    validerSuppression();
+    aSupprimer.current = art;
     setArticles((a) => a.filter((x) => x.id !== art.id));
-    const { error } = await supabase.from("vision_courses").delete().eq("id", art.id);
-    if (error) {
-      setErr("Suppression impossible.");
-      charger();
-    }
+    setToast({
+      msg: `« ${art.label} » retiré`,
+      annuler: () => {
+        aSupprimer.current = null;
+        setArticles((a) => [...a, art].sort((x, y) => (x.created_at > y.created_at ? 1 : -1)));
+      },
+    });
   };
 
   const deplacer = async (art, rayon) => {
@@ -98,6 +160,9 @@ export function Courses({ user }) {
 
   const restants = articles.filter((x) => !x.coche);
   const coches = articles.filter((x) => x.coche);
+  const suggestions = Object.entries(habitudes)
+    .filter(([label]) => !articles.some((x) => x.label.toLowerCase() === label.toLowerCase()))
+    .slice(0, 8);
 
   const ligne = (art, avecPoignee) => (
     <div key={art.id} className="courses-ligne" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0" }}>
@@ -132,13 +197,13 @@ export function Courses({ user }) {
           setVersion((v) => v + 1);
           setVue("historique");
         }}
-        onAnnuler={() => setVue("liste")}
+        onAnnuler={() => changerVue("liste")}
       />
     );
   if (vue === "historique")
     return (
       <section>
-        <button type="button" onClick={() => setVue("liste")} style={{ marginBottom: 10 }}>‹ Retour à la liste</button>
+        <button type="button" onClick={() => changerVue("liste")} style={{ marginBottom: 10 }}>‹ Retour à la liste</button>
         <HistoriqueTickets user={user} rafraichir={version} />
       </section>
     );
@@ -146,8 +211,8 @@ export function Courses({ user }) {
   return (
     <section className="courses" style={{ paddingBottom: 110, userSelect: glisse ? "none" : undefined }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <button type="button" onClick={() => setVue("valider")} style={{ flex: 1 }}>Valider un ticket</button>
-        <button type="button" onClick={() => setVue("historique")} style={{ flex: 1 }}>Historique</button>
+        <button type="button" onClick={() => changerVue("valider")} style={{ flex: 1 }}>Valider un ticket</button>
+        <button type="button" onClick={() => changerVue("historique")} style={{ flex: 1 }}>Historique</button>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span>
@@ -188,6 +253,20 @@ export function Courses({ user }) {
           +
         </button>
       </form>
+      {suggestions.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+          {suggestions.map(([label, rayon]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => creer(label, rayon)}
+              style={{ fontSize: 13, borderRadius: 99, padding: "4px 10px", border: "1px solid var(--line, #dbeaec)", background: "transparent" }}
+            >
+              + {label}
+            </button>
+          ))}
+        </div>
+      )}
       {err && (
         <p role="alert" style={{ color: "var(--red)" }}>
           {err}
@@ -210,6 +289,7 @@ export function Courses({ user }) {
           {coches.map((art) => ligne(art, false))}
         </div>
       )}
+      <ToastAnnuler toast={toast} onFermer={fermerToast} />
       {glisse && (
         <div
           style={{
