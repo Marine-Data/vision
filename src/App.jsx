@@ -18,7 +18,7 @@ import { PlanningGrille } from "./components/PlanningGrille.jsx";
 import { affichageDepuisParams } from "./lib/affichage.js";
 import { Bienvenue } from "./components/Bienvenue.jsx";
 import { Partager } from "./components/Partager.jsx";
-import { KbSheet } from "./components/kanban/communs.jsx";
+import { KbSheet, accIcone } from "./components/kanban/communs.jsx";
 import { BandeauInvitation, BudgetPartage, EcranLecture, LectureAccueil, PlanningsEchanges } from "./components/Lecture.jsx";
 import { JETON_INVITE, JETON_VOIR, ONGLET_DE_SECTION, resumeBudget } from "./lib/partage.js";
 import { entete, lireProfil, ongletVisible } from "./lib/profil.js";
@@ -1815,37 +1815,34 @@ export function App() {
           backgroundPosition: "center",
         }}
       >
-        <div className="wrap">
+        <div className="wrap tophead">
           {ong !== "apercu" && (
-            <button type="button" className="logout retour" onClick={retour} aria-label="Retour à l'écran précédent">
-              ‹ Retour
+            <button type="button" className="topbtn retour" onClick={retour} aria-label="Retour à l'écran précédent">
+              {accIcone("M15 18l-6-6 6-6", 22, 2.6)}
             </button>
           )}
-          <div className="kick">{tete.kicker}</div>
-          <h1>{tete.titre}</h1>
+          <div className="toptxt">
+            <div className="kick">{tete.kicker}</div>
+            <h1>{tete.titre}</h1>
+            {MODE_PARTAGE && <div className="who">👁 Lecture seule</div>}
+          </div>
           {MODE_PARTAGE ? (
-            <>
-              <div className="who">👁 Lecture seule</div>
-              {lecture && lecture.formule === "deux" && (
-                <div className="topact">
-                  <button className="logout" onClick={() => (window.location.href = window.location.origin + window.location.pathname + "?invite=" + encodeURIComponent(JETON_VOIR))}>
-                    ✨ Créer mon app
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="who">{t.user.email}</div>
+            lecture && lecture.formule === "deux" && (
               <div className="topact">
-                <button className="logout" onClick={() => setPartagerOuvert(!0)}>
-                  Partager
-                </button>
-                <button className="logout" onClick={() => supabase.auth.signOut()}>
-                  Déconnexion
+                <button className="logout" onClick={() => (window.location.href = window.location.origin + window.location.pathname + "?invite=" + encodeURIComponent(JETON_VOIR))}>
+                  ✨ Créer mon app
                 </button>
               </div>
-            </>
+            )
+          ) : (
+            <div className="topact">
+              <button type="button" className="topbtn" onClick={() => setPartagerOuvert(!0)} aria-label="Partager">
+                {accIcone("M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13", 20, 2.2)}
+              </button>
+              <button type="button" className="topbtn" onClick={() => supabase.auth.signOut()} aria-label="Déconnexion">
+                {accIcone("M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9", 20, 2.2)}
+              </button>
+            </div>
           )}
         </div>
       </header>

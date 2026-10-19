@@ -268,6 +268,13 @@ function Accueil({
       erreur(err);
     }
   }
+  // Un seul tap : passe la tâche à « fait », quelle que soit son origine.
+  function faitEnUnTap(c) {
+    const liste =
+        c.src === "hw" ? HW_ETAPES : c.src === "piece" ? PIECE_ETAPES : c.src === "suivi" ? SUIVI_ETAPES : ACC_ETAPES,
+      cible = liste.find((x) => (x.kan || x.k) === "fait");
+    if (cible) choisir(c, cible.k);
+  }
   async function supprimer(c) {
     if (!confSuppr) {
       setConfSuppr(!0);
@@ -447,8 +454,8 @@ function Accueil({
             width: "100%",
             display: "grid",
             gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-            gap: 6,
-            marginBottom: 12,
+            gap: 8,
+            marginBottom: 14,
             fontFamily: "inherit",
             cursor: "pointer",
             color: "var(--ink)",
@@ -458,8 +465,8 @@ function Accueil({
             <span
               style={{
                 background: k.alerte === "rouge" ? "var(--rouge-doux)" : k.alerte === "orange" ? "var(--orange-doux)" : "var(--surface)",
-                borderRadius: 16,
-                padding: "10px 6px",
+                borderRadius: 18,
+                padding: "14px 6px 12px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -482,7 +489,7 @@ function Accueil({
               <span
                 style={{
                   fontFamily: "Georgia,serif",
-                  fontSize: 19,
+                  fontSize: 24,
                   fontWeight: 700,
                   lineHeight: 1.1,
                   fontVariantNumeric: "tabular-nums",
@@ -508,71 +515,76 @@ function Accueil({
         </button>
       )}
       {prochaine && (
-        <button
-          type="button"
-          onClick={() => ouvrir(prochaine.c)}
-          aria-label={"Prochaine échéance : " + prochaine.c.t + ", " + prochaine.e.aria}
+        <div
+          className="prochaine"
           style={{
-            width: "100%",
             border: prochaine.e.late ? "3px solid #ffd2c7" : 0,
-            borderRadius: 22,
             background: prochaine.e.late ? "var(--c-rouge)" : "var(--teal-dark)",
-            color: "#ffffff",
-            padding: 14,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            textAlign: "left",
-            marginBottom: 12,
-            boxShadow: "0 10px 24px rgba(10,123,138,.25)",
-            fontFamily: "inherit",
-            cursor: "pointer",
           }}
         >
-          <span
-            style={{
-              flex: "none",
-              width: 50,
-              height: 50,
-              borderRadius: 16,
-              background: "rgba(255,255,255,.16)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+          <button
+            type="button"
+            className="p-main"
+            onClick={() => ouvrir(prochaine.c)}
+            aria-label={"Prochaine échéance : " + prochaine.c.t + ", " + prochaine.e.aria}
           >
-            {accIcone(ACC_THEMES[prochaine.c.theme].i, 24, 2)}
-          </span>
-          <span
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontFamily: "Georgia,serif",
-              fontSize: 19,
-              fontWeight: 700,
-              lineHeight: 1.2,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {prochaine.c.t}
-          </span>
-          <span
-            style={{
-              flex: "none",
-              padding: "6px 10px",
-              borderRadius: 12,
-              background: "var(--surface)",
-              color: prochaine.e.urgent ? "var(--t-rouge)" : "var(--teal-dark)",
-              fontSize: 15,
-              fontWeight: 900,
-            }}
-          >
-            {prochaine.e.l}
-          </span>
-        </button>
+            <span
+              style={{
+                flex: "none",
+                width: 46,
+                height: 46,
+                borderRadius: 15,
+                background: "rgba(255,255,255,.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {accIcone(ACC_THEMES[prochaine.c.theme].i, 22, 2)}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span
+                style={{
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  fontFamily: "Georgia,serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  lineHeight: 1.2,
+                }}
+              >
+                {prochaine.c.t}
+              </span>
+              <span
+                style={{
+                  display: "inline-block",
+                  marginTop: 5,
+                  padding: "2px 9px",
+                  borderRadius: 99,
+                  background: "var(--surface)",
+                  color: prochaine.e.urgent ? "var(--t-rouge)" : "var(--teal-dark)",
+                  fontSize: 12.5,
+                  fontWeight: 900,
+                }}
+              >
+                {prochaine.e.l}
+              </span>
+            </span>
+          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="p-fait"
+              onClick={() => faitEnUnTap(prochaine.c)}
+              aria-label={"Marquer fait : " + prochaine.c.t}
+            >
+              {accIcone("M5 12.5l4.5 4.5L19 7.5", 18, 3)}
+              Fait
+            </button>
+          )}
+        </div>
       )}
       {kbCompteurs(cartes, ACC_ETAPES, "", null, (k) => cartes.filter((c) => c.etape === k).length)}
       <div
