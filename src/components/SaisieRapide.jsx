@@ -1,4 +1,5 @@
 import React from "react";
+import { lireTotal, lireDate, estSante } from "./CoursesScan.jsx";
 import { budgetDuMois, montantSigne } from "../lib/calculs.js";
 import { catIcone, euros, num } from "../lib/format.js";
 import { MOIS, isoAujourdhui, moisDepuisAncre, moisNow } from "../lib/mois.js";
@@ -38,7 +39,38 @@ export function SaisieRapide({
     [aVenir, setAVenir] = React.useState(!!(initial && initial.statut === "prevu")),
     [etat, setEtat] = React.useState(""),
     [erreur, setErreur] = React.useState(""),
-    champMontant = React.useRef(null);
+    champMontant = React.useRef(null),
+    fichierRef = React.useRef(null),
+    [lecture, setLecture] = React.useState("");
+
+  // Photo du ticket : lit le montant, le poste et la date, puis laisse enregistrer.
+  const lireFichier = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    setLecture("Lecture du ticket…");
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("fra");
+      const {
+        data: { text },
+      } = await worker.recognize(f);
+      await worker.terminate();
+      const total = lireTotal(text);
+      if (!total) return setLecture("Montant non lu, tape-le.");
+      const alim = categories.find((c) => c.line_key === "c_alim");
+      const sante = categories.find((c) => c.line_key === "c_sante");
+      const choisie = estSante(text) && sante ? sante : alim;
+      setMontant(String(total).replace(".", ","));
+      if (choisie) setLigneId(choisie.budget_line_id);
+      const dateLue = lireDate(text);
+      if (dateLue) setDateDep(dateLue);
+      setNote("Ticket (photo)");
+      setLecture("Vérifie le montant, puis enregistre.");
+    } catch (err) {
+      setLecture("Lecture impossible, réessaie.");
+    }
+  };
   React.useEffect(() => {
     champMontant.current && champMontant.current.focus();
   }, []);
@@ -158,6 +190,20 @@ export function SaisieRapide({
             ×
           </button>
         </div>
+        {!edition && !remb && (
+          <div style={{ marginBottom: 12 }}>
+            <input ref={fichierRef} type="file" accept="image/*" capture="environment" onChange={lireFichier} style={{ display: "none" }} aria-label="Photo du ticket" />
+            <button
+              type="button"
+              onClick={() => fichierRef.current && fichierRef.current.click()}
+              disabled={lecture === "Lecture du ticket…"}
+              style={{ width: "100%", height: 48, borderRadius: 14, border: 0, background: "var(--teal, #0e9fb2)", color: "#fff", fontWeight: 700 }}
+            >
+              📷 Photo du ticket
+            </button>
+            {lecture && <div style={{ fontSize: 13, marginTop: 6 }}>{lecture}</div>}
+          </div>
+        )}
         {!edition && (
           <div
             className="detail"

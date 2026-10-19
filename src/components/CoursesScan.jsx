@@ -31,7 +31,7 @@ export function lireDate(texte) {
 }
 
 // Poste choisi d'après le texte du ticket : pharmacie → Santé, sinon Alimentation.
-const estSante = (texte) => /pharmac|parapharm|doliprane|santé|sante/i.test(texte);
+export const estSante = (texte) => /pharmac|parapharm|doliprane|santé|sante/i.test(texte);
 
 // Photo du ticket → montant lu → dépense « Alimentation » du mois, avec Annuler.
 export function ScanTicket({ user, onFait }) {
