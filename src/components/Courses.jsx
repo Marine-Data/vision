@@ -3,26 +3,11 @@ import { supabase } from "../lib/supabase.js";
 import { ValiderTicket, HistoriqueTickets } from "./CoursesTickets.jsx";
 import { ToastAnnuler } from "./ToastAnnuler.jsx";
 
-// Articles déjà utilisés, mémorisés dans ce navigateur (suggestions).
-const CLE_HABITUDES = "vision_courses_habitudes";
-const lireHabitudes = () => {
-  try {
-    return JSON.parse(localStorage.getItem(CLE_HABITUDES) || "{}");
-  } catch (e) {
-    return {};
-  }
-};
-const ecrireHabitudes = (h) => {
-  try {
-    localStorage.setItem(CLE_HABITUDES, JSON.stringify(h));
-  } catch (e) {
-    /* stockage indisponible : les suggestions restent vides */
-  }
-};
-
-// Ordre d'affichage des rayons. Un article sans rayon va dans « Autres ».
-const RAYONS = ["Légumes", "Frais", "Épicerie", "Autres"];
-const rayonDe = (x) => x.rayon || "Autres";
+// Historique des articles (Supabase) : sert aux suggestions, y compris supprimés et cochés.
+const memoriser = (uid, label, rayon) =>
+  supabase
+    .from("vision_courses_habitudes")
+    .upsert({ user_id: uid, label, rayon, derniere_utilisation: new Date().toISOString() }, { onConflict: "user_id,label" });
 
 export function Courses({ user }) {
   const [articles, setArticles] = React.useState([]);
@@ -34,25 +19,19 @@ export function Courses({ user }) {
   const [version, setVersion] = React.useState(0);
   const [glisse, setGlisse] = React.useState(null); // { id, label, x, y, over }
   const [toast, setToast] = React.useState(null);
-  const [habitudes, setHabitudes] = React.useState(() => lireHabitudes());
+  const [habitudes, setHabitudes] = React.useState([]); // { label, rayon }
   const aSupprimer = React.useRef(null); // suppression en attente (annulable)
   const uid = user && user.id;
 
   const charger = React.useCallback(async () => {
     if (!uid) return;
-    const { data, error } = await supabase
-      .from("vision_courses")
-      .select("id, label, rayon, coche, created_at")
-      .eq("user_id", uid)
-      .order("created_at", { ascending: true });
-    if (error) setErr("Impossible de charger la liste.");
-    else {
-      setArticles(data || []);
-      const h = lireHabitudes();
-      (data || []).forEach((x) => (h[x.label] = rayonDe(x)));
-      ecrireHabitudes(h);
-      setHabitudes(h);
-    }
+    const [liste, hab] = await Promise.all([
+      supabase.from("vision_courses").select("id, label, rayon, coche, created_at").eq("user_id", uid).order("created_at", { ascending: true }),
+      supabase.from("vision_courses_habitudes").select("label, rayon").eq("user_id", uid).order("derniere_utilisation", { ascending: false }).limit(40),
+    ]);
+    if (liste.error) setErr("Impossible de charger la liste.");
+    else setArticles(liste.data || []);
+    if (!hab.error) setHabitudes(hab.data || []);
     setCharge(false);
   }, [uid]);
 
@@ -69,9 +48,8 @@ export function Courses({ user }) {
       .single();
     if (error) return setErr("Article non ajouté.");
     setArticles((a) => [...a, data]);
-    const h = { ...lireHabitudes(), [label]: rayon };
-    ecrireHabitudes(h);
-    setHabitudes(h);
+    memoriser(uid, label, rayon);
+    setHabitudes((h) => [{ label, rayon }, ...h.filter((x) => x.label !== label)]);
   };
 
   const ajouter = async (e) => {
@@ -87,6 +65,8 @@ export function Courses({ user }) {
     const art = aSupprimer.current;
     if (!art) return;
     aSupprimer.current = null;
+    memoriser(uid, art.label, rayonDe(art));
+    setHabitudes((h) => [{ label: art.label, rayon: rayonDe(art) }, ...h.filter((x) => x.label !== art.label)]);
     const { error } = await supabase.from("vision_courses").delete().eq("id", art.id);
     if (error) {
       setErr("Suppression impossible.");
@@ -103,6 +83,10 @@ export function Courses({ user }) {
   const basculer = async (art) => {
     const coche = !art.coche;
     setArticles((a) => a.map((x) => (x.id === art.id ? { ...x, coche } : x)));
+    if (coche) {
+      memoriser(uid, art.label, rayonDe(art));
+      setHabitudes((h) => [{ label: art.label, rayon: rayonDe(art) }, ...h.filter((x) => x.label !== art.label)]);
+    }
     const { error } = await supabase.from("vision_courses").update({ coche, updated_at: new Date().toISOString() }).eq("id", art.id);
     if (error) {
       setErr("Modification non enregistrée.");
@@ -160,9 +144,10 @@ export function Courses({ user }) {
 
   const restants = articles.filter((x) => !x.coche);
   const coches = articles.filter((x) => x.coche);
-  const suggestions = Object.entries(habitudes)
-    .filter(([label]) => !articles.some((x) => x.label.toLowerCase() === label.toLowerCase()))
-    .slice(0, 8);
+  const suggestions = habitudes
+    .filter((h) => !articles.some((x) => x.label.toLowerCase() === h.label.toLowerCase()))
+    .slice(0, 8)
+    .map((h) => [h.label, h.rayon]);
 
   const ligne = (art, avecPoignee) => (
     <div key={art.id} className="courses-ligne" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0" }}>
