@@ -2088,7 +2088,7 @@ export function App() {
           />
         )}
       </main>
-      {!MODE_PARTAGE && (
+      {!MODE_PARTAGE && ong !== "courses" && (
         <button
           className="fab"
           onClick={() => {
