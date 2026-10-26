@@ -1,8 +1,18 @@
 # Vision
 
-Application personnelle de suivi : budget, épargne, reconversion, devoirs, pièces à fournir, sport.
+Application web personnelle (PWA) de suivi de budget, d'épargne et d'objectifs : budget mensuel, provisions, alerte de dépassement, réconciliation avec le relevé bancaire, planning et suivi sportif.
 
-En ligne : https://marine-data.github.io/vision/
+**Stack** : React, Vite, Supabase (PostgreSQL + authentification + RLS), déploiement GitHub Pages, build automatisé par GitHub Actions.
+
+**Points techniques** :
+- Données isolées par utilisatrice grâce aux règles RLS de Supabase (`auth.uid() = user_id`).
+- Calculs de provisions et d'épargne séparés de l'affichage (`src/lib/calculs.js`).
+- Import de relevé bancaire et rapprochement avec les dépenses saisies.
+- Export Excel du tableau de budget mensuel.
+
+**Démo** : un compte de démonstration avec des données fictives est disponible (lien à ajouter).
+
+Application personnelle : les données réelles ne sont pas publiques et l'accès exige une connexion.
 
 ## Comment c'est organisé
 
