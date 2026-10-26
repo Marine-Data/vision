@@ -29,7 +29,7 @@ export function Formations({ items: gi = [], contenu = [], evenements = [] }) {
         montant: eurosCourt(gForm),
       },
       {
-        poste: "Sport — En Avant! de Paris",
+        poste: "Sport",
         montant: eurosCourt(gSport),
       },
       {

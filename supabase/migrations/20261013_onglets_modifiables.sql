@@ -193,21 +193,19 @@ create trigger trg_vision_budget_garde before delete on public.vision_budget
   for each row execute function public.vision_garde_poste();
 
 -- 10. Mots-clés de base de l'import (repris à l'identique des règles du code).
+-- Copie publique : les mots-clés personnels (virements internes, employeur, club)
+-- ont été retirés de ce fichier le 26/10/2026 ; ils sont en base.
 insert into public.vision_import_regles (user_id, motif, groupe, budget_line_id, poste, source, sort)
 select u.user_id, r.motif, r.groupe, b.id, coalesce(r.poste, r.groupe), 'base', r.sort
   from (select distinct user_id from public.vision_budget) u
   cross join (values
-    ('ignorer', null, 'VIR ZINZEN', 1),
-    ('ignorer', null, 'VIR INST ZINZEN', 2),
-    ('ignorer', null, 'VIR SEPA ZINZEN', 3),
-    ('ignorer', null, 'VIREMENT DE MARINE ZINZEN', 4),
     ('ignorer', null, 'VIREMENT DEPUIS LIVRET', 5),
     ('ignorer', null, 'REJ VIR', 6),
     ('ignorer', null, 'EPARGNE AUTOMATIQUE', 7),
     ('ignorer', null, 'PROVISION VACANCES', 8),
     ('ignorer', null, 'VIR VIR POUR', 9),
     ('ignorer', null, 'VIR COURSES', 10),
-    ('salaire', null, 'ADEDOM', 11),
+    ('salaire', null, 'SALAIRE', 11),
     ('vacances', null, 'TAP AIR', 12),
     ('vacances', null, 'TRANSAVIA', 13),
     ('vacances', null, 'AIRBNB', 14),
@@ -219,7 +217,6 @@ select u.user_id, r.motif, r.groupe, b.id, coalesce(r.poste, r.groupe), 'base', 
     ('vacances', null, 'HOTEL', 20),
     ('sport', null, 'MANGOPAY', 21),
     ('sport', null, 'MONCLUB', 22),
-    ('sport', null, 'EN AVANT', 23),
     (null, 'Alimentation', 'LIDL', 24),
     (null, 'Alimentation', 'INTERMARCHE', 25),
     (null, 'Alimentation', 'CARREFOUR', 26),
@@ -316,9 +313,10 @@ update public.vision_contenu c set date_iso = v.d::date, date_fin = v.f::date
  where c.type = 'suivi' and c.item_key = v.k and c.date_iso is null;
 
 -- Fiche d'adhésion sport (reprise de la note existante, qui reste en place).
+-- Copie publique : nom et adresse du club retirés le 26/10/2026 ; ils sont en base.
 insert into public.vision_contenu (user_id, type, item_key, groupe, titre, detail, extra, date_iso, complement, sort)
-select distinct user_id, 'note', 'adhesion:sport', 'adhesion', 'En Avant! de Paris', 'Free Style Gym · 2 cours/semaine',
-       '10 rue Huyghens, 75014 Paris', date '2027-08-31', 'certificat:ok', 0
+select distinct user_id, 'note', 'adhesion:sport', 'adhesion', 'Club de sport', '2 cours/semaine',
+       '(adresse retirée de la copie publique)', date '2027-08-31', 'certificat:ok', 0
   from public.vision_budget
 on conflict (user_id, type, item_key) do nothing;
 
