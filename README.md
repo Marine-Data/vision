@@ -67,6 +67,5 @@ Les données (budget, dépenses, tâches…) sont dans Supabase, pas dans ce dé
 
 | Dossier | Contenu |
 |---|---|
-| `archive/ancienne-version/` | Version d'avant octobre 2026, ne plus utiliser. |
 | `supabase/` | Scripts de la base de données (référence). |
 | `public/` | Anciennes icônes (non utilisées par l'app). |
