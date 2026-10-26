@@ -68,4 +68,3 @@ Les données (budget, dépenses, tâches…) sont dans Supabase, pas dans ce dé
 | Dossier | Contenu |
 |---|---|
 | `supabase/` | Scripts de la base de données (référence). |
-| `public/` | Anciennes icônes (non utilisées par l'app). |
