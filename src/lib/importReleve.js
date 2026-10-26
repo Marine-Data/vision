@@ -65,15 +65,17 @@ export async function lireFichierPdf(fichier) {
 }
 
 // ---- Classement ----
+// Règles de secours, génériques : les règles de chaque utilisatrice (dont ses virements
+// internes, son employeur, son club) sont en base, table vision_import_regles.
 // Groupes spéciaux : salaire, vacances, sport, ignorer. Sinon : nom d'un poste du budget.
 export const REGLES = [
   [
     "ignorer",
-    /^VIR (INST |SEPA )?ZINZEN|Virement de Marine ZINZEN|Virement depuis LIVRET|^REJ VIR|EPARGNE AUTOMATIQUE|PROVISION VACANCES|^VIR VIR pour|^VIR Vir pour|^VIR Courses/i,
+    /Virement depuis LIVRET|^REJ VIR|EPARGNE AUTOMATIQUE|PROVISION VACANCES|^VIR VIR pour|^VIR Vir pour|^VIR Courses/i,
   ],
-  ["salaire", /ADEDOM/i],
+  ["salaire", /SALAIRE/i],
   ["vacances", /TAP AIR|TRANSAVIA|AIRBNB|CLICKANDBOAT|BOOKING|EASYJET|RYANAIR|VUELING|HOTEL/i],
-  ["sport", /MANGOPAY|MONCLUB|EN AVANT/i],
+  ["sport", /MANGOPAY|MONCLUB/i],
   [
     "Alimentation",
     /LIDL|INTERMARCHE|CARREFOUR|DISTRIBEN|FP PARIS|PATISSERIE|TABAC|ACE MART|HUGO PRIMEUR|BELLE VIE|G20|MONOP|FRANPRIX|NOUS PARIS|DISTRI LABRO|CHEZ DOLLY|SUMUP|BOULANG|PICARD|NATURALIA|BIOCOOP|AUCHAN|LECLERC|CASINO|PRIMEUR/i,
