@@ -26,7 +26,13 @@ export function GraphVacances({ params, items, indices }) {
       Math.max(...indices) + 1,
     ),
     postes = (items || []).filter((x) => x.pocket === "vacances" && itemCompte(x)),
-    montant = (x) => (x.paid && x.montant_reel != null ? num(x.montant_reel) : num(x.montant_prevu)),
+    // « Grand voyage » non payé : montant = provision disponible à son mois (calcul direct).
+    estVoyage = (x) => /grand voyage/i.test(x.label || ""),
+    montant = (x) => {
+      if (x.paid && x.montant_reel != null) return num(x.montant_reel);
+      if (!x.paid && estVoyage(x)) return Math.max(0, calc.solde[num(x.mois_index)] || 0);
+      return num(x.montant_prevu);
+    },
     depensesDu = (i) => postes.filter((x) => num(x.mois_index) === i).reduce((s, x) => s + montant(x), 0),
     prevuNonPaye = (i) =>
       postes
