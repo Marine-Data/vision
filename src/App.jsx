@@ -28,7 +28,6 @@ import { Graphiques } from "./components/graphiques/Graphiques.jsx";
 import { Accueil } from "./components/kanban/Accueil.jsx";
 import { DevoirsPage, hwkSetStatus } from "./components/kanban/DevoirsPage.jsx";
 import { PiecesPage } from "./components/kanban/PiecesPage.jsx";
-import { BUDGET_DEFAUT, PARAMS_DEFAUT, VOYAGES_DEFAUT, contenuDefauts } from "./data/contenu.js";
 import { alerteSalaire } from "./lib/alerteSalaire.js";
 import {
   VISION_DEFICITS,
@@ -305,18 +304,7 @@ export function App() {
             .select("*")
             .order("mois_index")
             .order("sort");
-          (!K || K.length === 0) &&
-            (await supabase.from("vision_voyages").upsert(
-              VOYAGES_DEFAUT.map((H) => ({
-                ...H,
-                user_id: N,
-              })),
-              {
-                onConflict: "user_id,line_key",
-              },
-            ),
-            (K = (await supabase.from("vision_voyages").select("*").order("mois_index").order("sort")).data)),
-            m(K || []);
+          m(K || []);
         },
         (async () => {
           const { data: K } = await supabase.from("vision_contenu").select("*").order("type").order("sort");
