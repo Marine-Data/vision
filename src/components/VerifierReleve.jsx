@@ -1,7 +1,7 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { parserReleve, preparerImage } from "../lib/releveImage.js";
-import { lireFichierPdf, nomOperation } from "../lib/importReleve.js";
+import { classer, lireFichierPdf, nomOperation } from "../lib/importReleve.js";
 
 const moisIndex = (iso) => {
   const [y, m] = iso.split("-").map(Number);
@@ -28,6 +28,8 @@ export function VerifierReleve({ user, onSupprimer }) {
   const [lignesRel, setLignesRel] = React.useState(null); // relevé lu
   const [resultat, setResultat] = React.useState(null); // { ok, manquants, enPlus }
   const [lignesBudget, setLignesBudget] = React.useState([]);
+  const [regles, setRegles] = React.useState([]); // règles du relevé (virements internes, postes…)
+  const [paiementsEnveloppe, setPaiementsEnveloppe] = React.useState([]); // sport, formation, vacances payés
   const [choix, setChoix] = React.useState({}); // index manquant -> line_key
   const [msg, setMsg] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -45,6 +47,20 @@ export function VerifierReleve({ user, onSupprimer }) {
       .neq("line_key", "c_sport")
       .order("sort", { ascending: true })
       .then(({ data }) => setLignesBudget(data || []));
+    supabase
+      .from("vision_import_regles")
+      .select("motif, groupe, poste, source, sort")
+      .eq("user_id", user.id)
+      .order("sort")
+      .then(({ data }) => setRegles(data || []));
+    supabase
+      .from("vision_items")
+      .select("id, pocket, label, montant_reel, mois_index, statut")
+      .eq("user_id", user.id)
+      .eq("paid", true)
+      .then(({ data }) =>
+        setPaiementsEnveloppe((data || []).filter((x) => x.montant_reel != null && x.statut !== "abandonne")),
+      );
   }, [user.id]);
 
   const comparer = async (rel) => {
@@ -62,6 +78,9 @@ export function VerifierReleve({ user, onSupprimer }) {
     const libres = [...(tx || [])];
     const ok = [];
     const manquants = [];
+    const enveloppes = []; // payés par une enveloppe (sport, formation, vacances)
+    const internes = []; // virements entre tes comptes : ni dépense, ni absent
+    const items = [...paiementsEnveloppe];
     for (const r of rel) {
       const i = libres.findIndex(
         (t) => Math.abs(Number(t.montant) - r.montant) < 0.005 && ecart(t, r) <= TOLERANCE,
@@ -69,12 +88,28 @@ export function VerifierReleve({ user, onSupprimer }) {
       if (i >= 0) {
         ok.push(r);
         libres.splice(i, 1);
-      } else manquants.push(r);
+        continue;
+      }
+      const j = items.findIndex(
+        (x) =>
+          Math.abs(Number(x.montant_reel) - r.montant) < 0.005 &&
+          Math.abs(x.mois_index - moisIndex(r.date)) <= 1,
+      );
+      if (j >= 0) {
+        enveloppes.push({ ...r, enveloppe: items[j].label });
+        items.splice(j, 1);
+      } else if (r.groupe === "ignorer") internes.push(r);
+      else manquants.push(r);
     }
     // « Seulement dans Vision » : uniquement sur la période du relevé.
     const enPlus = libres.filter((t) => t.date_depense >= debut && t.date_depense <= fin);
-    setResultat({ ok, manquants, enPlus });
-    setChoix(Object.fromEntries(manquants.map((m) => [rel.indexOf(m), devine(m.libelle)])));
+    setResultat({ ok, manquants, enPlus, enveloppes, internes });
+    // Poste proposé : règles du relevé d'abord, sinon mots-clés.
+    const posteDe = (m) => {
+      const l = m.groupe && lignesBudget.find((b) => b.poste === m.groupe);
+      return l ? l.line_key : devine(m.libelle);
+    };
+    setChoix(Object.fromEntries(manquants.map((m) => [rel.indexOf(m), posteDe(m)])));
   };
 
   const lireFichier = async (e) => {
@@ -99,6 +134,7 @@ export function VerifierReleve({ user, onSupprimer }) {
           dateOp: o.date,
           libelle: nomOperation(o.libelle),
           montant: o.montant,
+          groupe: classer(o, regles),
         }));
         setTexteLu("");
         setLignesRel(rel);
@@ -262,6 +298,18 @@ export function VerifierReleve({ user, onSupprimer }) {
             ✅ {resultat.ok.length} enregistrées · ❌ {resultat.manquants.length} absentes · ⚠️{" "}
             {resultat.enPlus.length} seulement dans Vision
           </div>
+          {resultat.enveloppes.length > 0 && (
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
+              💼 Payés par une enveloppe :{" "}
+              {resultat.enveloppes.map((x) => `${x.enveloppe} ${eur(x.montant)}`).join(" · ")}
+            </div>
+          )}
+          {resultat.internes.length > 0 && (
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
+              ↔️ Virements entre tes comptes (ignorés) :{" "}
+              {resultat.internes.map((x) => `${x.libelle} ${eur(x.montant)}`).join(" · ")}
+            </div>
+          )}
           {resultat.manquants.map((m, k) => {
             const idx = lignesRel.indexOf(m);
             return ligneRel(
