@@ -437,6 +437,7 @@ export function BudgetMensuel({
             setRows={setBudgetMois}
             modele={budget}
             verrouille={ferme}
+            transactions={transactions}
           />
         </div>
       )}

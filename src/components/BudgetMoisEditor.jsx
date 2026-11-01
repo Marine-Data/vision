@@ -1,9 +1,30 @@
 import React from "react";
 import { MOIS, anneeMoisDe } from "../lib/mois.js";
-import { debounceSave } from "../lib/outils.js";
 import { supabase } from "../lib/supabase.js";
 
-export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille }) {
+// Postes sans suggestion (dépenses trop irrégulières d'un mois à l'autre).
+const SANS_SUGGESTION = ["c_plaisir"];
+
+// Suggestion d'un poste : moyenne des 3 derniers mois passés qui ont des dépenses saisies
+// (un mois sans dépense sur ce poste compte 0), arrondie aux 5 € supérieurs.
+function suggestion(ligne, transactions, moisIndex) {
+  if (ligne.kind !== "charge" || !ligne.budget_line_id || SANS_SUGGESTION.includes(ligne.line_key))
+    return null;
+  const faits = (transactions || []).filter((t) => t.statut !== "prevu" && Number(t.mois_index) < moisIndex);
+  const moisAvecDonnees = [...new Set(faits.map((t) => Number(t.mois_index)))]
+    .sort((a, b) => b - a)
+    .slice(0, 3);
+  if (!moisAvecDonnees.length) return null;
+  const total = faits
+    .filter(
+      (t) => t.budget_line_id === ligne.budget_line_id && moisAvecDonnees.includes(Number(t.mois_index)),
+    )
+    .reduce((s, t) => s + (t.type === "remboursement" ? -1 : 1) * Number(t.montant), 0);
+  const moyenne = total / moisAvecDonnees.length;
+  return moyenne > 0 ? Math.ceil(moyenne / 5) * 5 : null;
+}
+
+export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille, transactions }) {
   const { annee, mois } = anneeMoisDe(moisIndex),
     lignes = (rows || [])
       .filter((x) => x.annee === annee && x.mois === mois)
@@ -11,35 +32,29 @@ export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille 
     [etat, setEtat] = React.useState(""),
     modeleDe = (l) =>
       (modele || []).find((b) => (l.budget_line_id ? b.id === l.budget_line_id : b.line_key === l.line_key));
+  // Modifications en attente : rien n'est enregistré avant le bouton « Enregistrer ».
+  const [brouillon, setBrouillon] = React.useState({});
+  React.useEffect(() => setBrouillon({}), [moisIndex]);
+  const aEnregistrer = Object.keys(brouillon).length;
+  const vue = (l) => ({ ...l, ...(brouillon[l.id] || {}) });
   function maj(id, patch) {
     if (verrouille) return;
-    setRows((p) =>
-      p.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              ...patch,
-            }
-          : x,
-      ),
-    ),
-      debounceSave(
-        "bm:" + id,
-        async () => {
-          if (verrouille) return;
-          setEtat("Enregistrement…");
-          const { error: E } = await supabase
-            .from("vision_budget_mois")
-            .update({
-              ...patch,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", id);
-          setEtat(E ? "Échec : " + E.message : "✓ Enregistré"),
-            setTimeout(() => setEtat((p) => (p.startsWith("✓") ? "" : p)), 2500);
-        },
-        500,
-      );
+    setBrouillon((b) => ({ ...b, [id]: { ...(b[id] || {}), ...patch } }));
+  }
+  async function enregistrer() {
+    setEtat("Enregistrement…");
+    const ids = Object.keys(brouillon);
+    for (const id of ids) {
+      const { error: E } = await supabase
+        .from("vision_budget_mois")
+        .update({ ...brouillon[id], updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (E) return setEtat("Échec : " + E.message);
+    }
+    setRows((p) => p.map((x) => (brouillon[x.id] ? { ...x, ...brouillon[x.id] } : x)));
+    setBrouillon({});
+    setEtat("✓ Enregistré");
+    setTimeout(() => setEtat((p) => (p.startsWith("✓") ? "" : p)), 2500);
   }
   async function initialiser() {
     setEtat("Initialisation…");
@@ -124,7 +139,22 @@ export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille 
             <p className="detail">
               Ces montants ne valent que pour ce mois. Le modèle général n'est pas modifié.
             </p>
-            {lignes.map((l) => (
+            {!verrouille && lignes.some((l) => suggestion(l, transactions, moisIndex) != null) && (
+              <button
+                className="btn-outline btn-sm"
+                style={{ marginBottom: 8 }}
+                onClick={() =>
+                  lignes.forEach((l) => {
+                    const s = suggestion(l, transactions, moisIndex);
+                    if (s != null && s !== Number(vue(l).montant))
+                      maj(l.id, { montant: s, est_override: !0 });
+                  })
+                }
+              >
+                Appliquer toutes les suggestions
+              </button>
+            )}
+            {lignes.map(vue).map((l) => (
               <div className="brow" key={l.id}>
                 <div className="bcol">
                   <input
@@ -140,6 +170,19 @@ export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille 
                     }
                   />
                   <div className="bdet">
+                    {(() => {
+                      const s = verrouille ? null : suggestion(l, transactions, moisIndex);
+                      return s != null && s !== Number(l.montant) ? (
+                        <button
+                          className="chip"
+                          style={{ border: "none", marginRight: 6, cursor: "pointer" }}
+                          aria-label={"Appliquer la suggestion " + s + " € pour " + l.poste}
+                          onClick={() => maj(l.id, { montant: s, est_override: !0 })}
+                        >
+                          💡 {s} €
+                        </button>
+                      ) : null;
+                    })()}
                     {l.kind}
                     {l.est_override ? " · " : ""}
                     {l.est_override && <span className="chip">ajusté</span>}
@@ -182,6 +225,16 @@ export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille 
             {!verrouille && (
               <button className="badd" onClick={ajouterPonctuelle}>
                 + Ajouter une ligne ponctuelle
+              </button>
+            )}
+            {!verrouille && (
+              <button
+                className="btn"
+                style={{ width: "100%", marginTop: 10 }}
+                disabled={!aEnregistrer}
+                onClick={enregistrer}
+              >
+                {aEnregistrer ? `Enregistrer (${aEnregistrer})` : "Enregistré"}
               </button>
             )}
           </div>
