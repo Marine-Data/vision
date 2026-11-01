@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { parserReleve, preparerImage } from "../lib/releveImage.js";
+import { lireFichierPdf } from "../lib/importReleve.js";
 
 const moisIndex = (iso) => {
   const [y, m] = iso.split("-").map(Number);
@@ -73,6 +74,22 @@ export function VerifierReleve({ user }) {
     setBusy(true);
     setMsg("Lecture du relevé…");
     try {
+      // Relevé PDF BoursoBank : lecture directe du texte, sans OCR.
+      if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+        const { ops } = await lireFichierPdf(f);
+        const rel = ops
+          .filter((o) => o.sens === "debit")
+          .map((o) => ({ date: o.dateAchat || o.date, libelle: o.libelle, montant: o.montant }));
+        setTexteLu("");
+        setLignesRel(rel);
+        if (!rel.length) setMsg("Aucune ligne lue dans ce PDF.");
+        else {
+          setMsg("");
+          await comparer(rel);
+        }
+        setBusy(false);
+        return;
+      }
       const image = await preparerImage(f);
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker("fra");
@@ -146,10 +163,10 @@ export function VerifierReleve({ user }) {
       <input
         ref={fichierRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf,.pdf"
         onChange={lireFichier}
         style={{ display: "none" }}
-        aria-label="Screenshot du relevé"
+        aria-label="Relevé (PDF ou screenshot)"
       />
       <button
         type="button"
