@@ -1,13 +1,19 @@
 import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { parserReleve, preparerImage } from "../lib/releveImage.js";
-import { lireFichierPdf } from "../lib/importReleve.js";
+import { lireFichierPdf, nomOperation } from "../lib/importReleve.js";
 
 const moisIndex = (iso) => {
   const [y, m] = iso.split("-").map(Number);
   return (y - 2026) * 12 + m - 8;
 };
 const eur = (n) => n.toFixed(2).replace(".", ",") + " €";
+const JOUR = 86400000;
+const TOLERANCE = 4 * JOUR; // carte débitée jusqu'à quelques jours après l'achat
+const decaler = (iso, j) => new Date(new Date(iso).getTime() + j * JOUR).toISOString().slice(0, 10);
+// Écart de date entre une dépense Vision et une ligne du relevé (date d'achat ou date de débit).
+const ecart = (t, r) =>
+  Math.min(...[r.date, r.dateOp || r.date].map((d) => Math.abs(new Date(t.date_depense) - new Date(d))));
 
 // Choix de ligne de budget d'après le libellé (modifiable avant ajout).
 const devine = (libelle) => {
@@ -43,27 +49,28 @@ export function VerifierReleve({ user }) {
     const dates = rel.map((x) => x.date).sort();
     const debut = dates[0];
     const fin = dates[dates.length - 1];
+    // Recherche élargie autour du relevé : une dépense saisie un peu avant ou après est retrouvée.
     const { data: tx } = await supabase
       .from("vision_transactions")
       .select("id, montant, date_depense, note")
       .eq("user_id", user.id)
-      .gte("date_depense", debut)
-      .lte("date_depense", fin);
+      .gte("date_depense", decaler(debut, -4))
+      .lte("date_depense", decaler(fin, 4));
     const libres = [...(tx || [])];
     const ok = [];
     const manquants = [];
     for (const r of rel) {
       const i = libres.findIndex(
-        (t) =>
-          Math.abs(Number(t.montant) - r.montant) < 0.005 &&
-          Math.abs(new Date(t.date_depense) - new Date(r.date)) <= 86400000,
+        (t) => Math.abs(Number(t.montant) - r.montant) < 0.005 && ecart(t, r) <= TOLERANCE,
       );
       if (i >= 0) {
         ok.push(r);
         libres.splice(i, 1);
       } else manquants.push(r);
     }
-    setResultat({ ok, manquants, enPlus: libres });
+    // « Seulement dans Vision » : uniquement sur la période du relevé.
+    const enPlus = libres.filter((t) => t.date_depense >= debut && t.date_depense <= fin);
+    setResultat({ ok, manquants, enPlus });
     setChoix(Object.fromEntries(manquants.map((m) => [rel.indexOf(m), devine(m.libelle)])));
   };
 
@@ -77,9 +84,19 @@ export function VerifierReleve({ user }) {
       // Relevé PDF BoursoBank : lecture directe du texte, sans OCR.
       if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
         const { ops } = await lireFichierPdf(f);
-        const rel = ops
-          .filter((o) => o.sens === "debit")
-          .map((o) => ({ date: o.dateAchat || o.date, libelle: o.libelle, montant: o.montant }));
+        const debits = ops.filter((o) => o.sens === "debit");
+        // Une annulation (« ANNUL CARTE … ») efface le débit identique.
+        for (const a of ops.filter((o) => o.sens === "credit" && /^ANNUL /.test(o.libelle))) {
+          const cible = a.libelle.replace(/^ANNUL /, "");
+          const i = debits.findIndex((d) => d.libelle === cible && Math.abs(d.montant - a.montant) < 0.005);
+          if (i >= 0) debits.splice(i, 1);
+        }
+        const rel = debits.map((o) => ({
+          date: o.dateAchat || o.date,
+          dateOp: o.date,
+          libelle: nomOperation(o.libelle),
+          montant: o.montant,
+        }));
         setTexteLu("");
         setLignesRel(rel);
         if (!rel.length) setMsg("Aucune ligne lue dans ce PDF.");
@@ -118,6 +135,19 @@ export function VerifierReleve({ user }) {
   const ajouter = async (m, k) => {
     const cle = lignesBudget.find((x) => x.line_key === choix[k]);
     if (!cle) return setMsg("Ligne introuvable.");
+    // Garde-fou : même montant déjà saisi à ± 4 jours → demander avant d'ajouter.
+    const { data: proches } = await supabase
+      .from("vision_transactions")
+      .select("montant, date_depense, note")
+      .eq("user_id", user.id)
+      .eq("montant", m.montant)
+      .gte("date_depense", decaler(m.date, -4))
+      .lte("date_depense", decaler(m.dateOp || m.date, 4));
+    if (proches && proches.length) {
+      const p = proches[0];
+      const deja = `${p.date_depense.slice(8)}/${p.date_depense.slice(5, 7)} (${p.note || "sans note"})`;
+      if (!window.confirm(`Déjà saisi : ${eur(Number(p.montant))} le ${deja}. Ajouter quand même ?`)) return;
+    }
     const { error } = await supabase.from("vision_transactions").insert({
       user_id: user.id,
       budget_line_id: cle.budget_line_id,
