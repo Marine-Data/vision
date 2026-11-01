@@ -32,29 +32,45 @@ export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille,
     [etat, setEtat] = React.useState(""),
     modeleDe = (l) =>
       (modele || []).find((b) => (l.budget_line_id ? b.id === l.budget_line_id : b.line_key === l.line_key));
-  // Modifications en attente : rien n'est enregistré avant le bouton « Enregistrer ».
-  const [brouillon, setBrouillon] = React.useState({});
-  React.useEffect(() => setBrouillon({}), [moisIndex]);
-  const aEnregistrer = Object.keys(brouillon).length;
-  const vue = (l) => ({ ...l, ...(brouillon[l.id] || {}) });
+  // Enregistrement automatique (0,5 s après la dernière frappe) ; le bouton « Enregistrer »
+  // envoie tout de suite ce qui est encore en attente.
+  const attente = React.useRef({}); // id -> modifications pas encore envoyées
+  const minuteurs = React.useRef({});
+  const [aEnregistrer, setAEnregistrer] = React.useState(0);
+  const vue = (l) => l;
+  async function envoyer(id) {
+    clearTimeout(minuteurs.current[id]);
+    const patch = attente.current[id];
+    if (!patch) return true;
+    delete attente.current[id];
+    setAEnregistrer(Object.keys(attente.current).length);
+    setEtat("Enregistrement…");
+    const { error: E } = await supabase
+      .from("vision_budget_mois")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (E) {
+      attente.current[id] = { ...patch, ...(attente.current[id] || {}) };
+      setAEnregistrer(Object.keys(attente.current).length);
+      setEtat("Échec : " + E.message);
+      return false;
+    }
+    if (!Object.keys(attente.current).length) {
+      setEtat("✓ Enregistré");
+      setTimeout(() => setEtat((p) => (p.startsWith("✓") ? "" : p)), 2500);
+    }
+    return true;
+  }
   function maj(id, patch) {
     if (verrouille) return;
-    setBrouillon((b) => ({ ...b, [id]: { ...(b[id] || {}), ...patch } }));
+    setRows((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    attente.current[id] = { ...(attente.current[id] || {}), ...patch };
+    setAEnregistrer(Object.keys(attente.current).length);
+    clearTimeout(minuteurs.current[id]);
+    minuteurs.current[id] = setTimeout(() => envoyer(id), 500);
   }
   async function enregistrer() {
-    setEtat("Enregistrement…");
-    const ids = Object.keys(brouillon);
-    for (const id of ids) {
-      const { error: E } = await supabase
-        .from("vision_budget_mois")
-        .update({ ...brouillon[id], updated_at: new Date().toISOString() })
-        .eq("id", id);
-      if (E) return setEtat("Échec : " + E.message);
-    }
-    setRows((p) => p.map((x) => (brouillon[x.id] ? { ...x, ...brouillon[x.id] } : x)));
-    setBrouillon({});
-    setEtat("✓ Enregistré");
-    setTimeout(() => setEtat((p) => (p.startsWith("✓") ? "" : p)), 2500);
+    for (const id of Object.keys(attente.current)) if (!(await envoyer(id))) return;
   }
   async function initialiser() {
     setEtat("Initialisation…");
@@ -234,7 +250,7 @@ export function BudgetMoisEditor({ moisIndex, rows, setRows, modele, verrouille,
                 disabled={!aEnregistrer}
                 onClick={enregistrer}
               >
-                {aEnregistrer ? `Enregistrer (${aEnregistrer})` : "Enregistré"}
+                {aEnregistrer ? "Enregistrer" : "✓ Tout est enregistré"}
               </button>
             )}
           </div>
