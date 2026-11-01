@@ -33,6 +33,8 @@ export function VerifierReleve({ user }) {
   const [busy, setBusy] = React.useState(false);
   const [texteLu, setTexteLu] = React.useState("");
   const fichierRef = React.useRef(null);
+  const enCours = React.useRef(new Set()); // lignes en cours d'ajout : bloque les tapes répétées
+  const [ajoutEnCours, setAjoutEnCours] = React.useState({});
 
   React.useEffect(() => {
     supabase
@@ -133,6 +135,18 @@ export function VerifierReleve({ user }) {
   };
 
   const ajouter = async (m, k) => {
+    if (enCours.current.has(k)) return;
+    enCours.current.add(k);
+    setAjoutEnCours((a) => ({ ...a, [k]: true }));
+    try {
+      await ajouterUne(m, k);
+    } finally {
+      enCours.current.delete(k);
+      setAjoutEnCours((a) => ({ ...a, [k]: false }));
+    }
+  };
+
+  const ajouterUne = async (m, k) => {
     const cle = lignesBudget.find((x) => x.line_key === choix[k]);
     if (!cle) return setMsg("Ligne introuvable.");
     // Garde-fou : même montant déjà saisi à ± 4 jours → demander avant d'ajouter.
@@ -250,9 +264,10 @@ export function VerifierReleve({ user }) {
                 <button
                   type="button"
                   onClick={() => ajouter(m, idx)}
+                  disabled={!!ajoutEnCours[idx]}
                   style={{ fontSize: 12, padding: "2px 8px" }}
                 >
-                  Ajouter
+                  {ajoutEnCours[idx] ? "…" : "Ajouter"}
                 </button>
               </span>,
             );
