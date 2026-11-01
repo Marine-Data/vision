@@ -1948,7 +1948,7 @@ export function App() {
           !MODE_PARTAGE &&
           gt(
             <>
-              <VerifierReleve user={t.user} />
+              <VerifierReleve user={t.user} onSupprimer={txDelete} />
               <BudgetMensuel
                 budget={l}
                 budgetMois={bm}

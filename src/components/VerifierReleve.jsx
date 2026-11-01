@@ -24,7 +24,7 @@ const devine = (libelle) => {
   return "c_plaisir";
 };
 
-export function VerifierReleve({ user }) {
+export function VerifierReleve({ user, onSupprimer }) {
   const [lignesRel, setLignesRel] = React.useState(null); // relevé lu
   const [resultat, setResultat] = React.useState(null); // { ok, manquants, enPlus }
   const [lignesBudget, setLignesBudget] = React.useState([]);
@@ -48,6 +48,7 @@ export function VerifierReleve({ user }) {
   }, [user.id]);
 
   const comparer = async (rel) => {
+    rel.forEach((r, i) => (r.id = r.id || "r" + i)); // clé unique, même pour deux lignes identiques
     const dates = rel.map((x) => x.date).sort();
     const debut = dates[0];
     const fin = dates[dates.length - 1];
@@ -146,6 +147,23 @@ export function VerifierReleve({ user }) {
     }
   };
 
+  // Supprimer une dépense présente dans Vision mais absente du relevé (ex. doublon).
+  const supprimer = async (t) => {
+    const quand = `${t.date_depense.slice(8)}/${t.date_depense.slice(5, 7)}`;
+    if (!window.confirm(`Supprimer ${eur(Number(t.montant))} du ${quand} (${t.note || "sans note"}) ?`))
+      return;
+    try {
+      if (onSupprimer) await onSupprimer(t.id);
+      else {
+        const { error } = await supabase.from("vision_transactions").delete().eq("id", t.id);
+        if (error) throw error;
+      }
+      setResultat((r) => ({ ...r, enPlus: r.enPlus.filter((x) => x.id !== t.id) }));
+    } catch (e) {
+      setMsg("Suppression impossible.");
+    }
+  };
+
   const ajouterUne = async (m, k) => {
     const cle = lignesBudget.find((x) => x.line_key === choix[k]);
     if (!cle) return setMsg("Ligne introuvable.");
@@ -179,7 +197,7 @@ export function VerifierReleve({ user }) {
 
   const ligneRel = (x, extra) => (
     <div
-      key={x.date + x.montant + x.libelle}
+      key={x.id || x.date + x.montant + x.libelle}
       style={{
         display: "flex",
         gap: 8,
@@ -273,9 +291,25 @@ export function VerifierReleve({ user }) {
             );
           })}
           {resultat.enPlus.length > 0 && (
-            <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
-              ⚠️ Dans Vision mais pas sur ce relevé :{" "}
-              {resultat.enPlus.map((t) => `${eur(Number(t.montant))} (${t.note || "sans note"})`).join(" · ")}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>⚠️ Dans Vision mais pas sur ce relevé</div>
+              {resultat.enPlus.map((t) =>
+                ligneRel(
+                  {
+                    id: t.id,
+                    date: t.date_depense,
+                    libelle: t.note || "sans note",
+                    montant: Number(t.montant),
+                  },
+                  <button
+                    type="button"
+                    onClick={() => supprimer(t)}
+                    style={{ fontSize: 12, padding: "2px 8px", marginLeft: 6 }}
+                  >
+                    Supprimer
+                  </button>,
+                ),
+              )}
             </div>
           )}
         </div>
