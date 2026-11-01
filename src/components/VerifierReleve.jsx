@@ -35,6 +35,8 @@ export function VerifierReleve({ user, onSupprimer }) {
   const [busy, setBusy] = React.useState(false);
   const [texteLu, setTexteLu] = React.useState("");
   const fichierRef = React.useRef(null);
+  const pdfRef = React.useRef(null); // sélecteur de fichiers (le PDF n'est jamais dans la galerie photos)
+  const [source, setSource] = React.useState(""); // ce qui a été lu, affiché au-dessus du résultat
   const enCours = React.useRef(new Set()); // lignes en cours d'ajout : bloque les tapes répétées
   const [ajoutEnCours, setAjoutEnCours] = React.useState({});
 
@@ -138,6 +140,7 @@ export function VerifierReleve({ user, onSupprimer }) {
         }));
         setTexteLu("");
         setLignesRel(rel);
+        setSource(`📄 Relevé PDF « ${f.name} » : ${rel.length} débits lus`);
         if (!rel.length) setMsg("Aucune ligne lue dans ce PDF.");
         else {
           setMsg("");
@@ -160,6 +163,9 @@ export function VerifierReleve({ user, onSupprimer }) {
       await worker.terminate();
       setTexteLu(text);
       setLignesRel(rel);
+      setSource(
+        `📷 Capture d'écran lue par reconnaissance de texte : ${rel.length} lignes (moins fiable que le PDF)`,
+      );
       if (!rel.length) setMsg("Aucune ligne lue sur cette image.");
       else {
         setMsg("");
@@ -259,28 +265,45 @@ export function VerifierReleve({ user, onSupprimer }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <input
-        ref={fichierRef}
+        ref={pdfRef}
         type="file"
-        accept="image/*,application/pdf,.pdf"
+        accept="application/pdf,.pdf"
         onChange={lireFichier}
         style={{ display: "none" }}
-        aria-label="Relevé (PDF ou screenshot)"
+        aria-label="Relevé PDF"
       />
-      <button
-        type="button"
-        onClick={() => fichierRef.current && fichierRef.current.click()}
-        disabled={busy}
-        style={{
-          width: "100%",
-          height: 48,
-          borderRadius: 14,
-          border: "1px solid var(--line, #dbeaec)",
-          background: "transparent",
-          fontWeight: 700,
-        }}
-      >
-        {busy ? "Lecture…" : "🏦 Vérifier le relevé"}
-      </button>
+      <input
+        ref={fichierRef}
+        type="file"
+        accept="image/*"
+        onChange={lireFichier}
+        style={{ display: "none" }}
+        aria-label="Capture d'écran du relevé"
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        {[
+          [pdfRef, "🏦 Relevé PDF", 2],
+          [fichierRef, "📷 Capture", 1],
+        ].map(([ref, texte, flex]) => (
+          <button
+            key={texte}
+            type="button"
+            onClick={() => ref.current && ref.current.click()}
+            disabled={busy}
+            style={{
+              flex,
+              height: 48,
+              borderRadius: 14,
+              border: "1px solid var(--line, #dbeaec)",
+              background: "transparent",
+              fontWeight: 700,
+            }}
+          >
+            {busy ? "Lecture…" : texte}
+          </button>
+        ))}
+      </div>
+      {source && !busy && <p style={{ fontSize: 12, opacity: 0.7, margin: "6px 0 0" }}>{source}</p>}
       {msg && (
         <p role="status" style={{ fontSize: 13, margin: "6px 0 0" }}>
           {msg}
