@@ -1,6 +1,8 @@
 import React from "react";
 import { AlerteSalaire } from "./AlerteSalaire.jsx";
 import { BudgetMoisEditor } from "./BudgetMoisEditor.jsx";
+import { VerifierSoldes } from "./VerifierSoldes.jsx";
+import { depassementsPoches } from "../lib/soldes.js";
 import { BudgetCartes } from "./budget/BudgetCartes.jsx";
 import { etatMatelas } from "../lib/matelas.js";
 import { alerteSalaire } from "../lib/alerteSalaire.js";
@@ -429,6 +431,12 @@ export function BudgetMensuel({
         vacSolde={vacSolde}
         onAjuster={readOnly || ferme ? null : () => setAjusterOuvert(!0)}
       />
+      {depassementsPoches(items, params, moisNow()).map((x) => (
+        <div className="bwarn" key={x.label + x.mois} style={{ marginTop: 8 }}>
+          ⚠️ {x.label} ({euros(x.montant)}, {(mois[x.mois] || "").replace(/ \d\d$/, "")}) : il manquera{" "}
+          <b>{euros(x.manque)}</b> dans la {x.poche}.
+        </div>
+      ))}
       {!readOnly && ajusterOuvert && (
         <div style={{ marginTop: 10 }}>
           <BudgetMoisEditor
@@ -440,6 +448,13 @@ export function BudgetMensuel({
             transactions={transactions}
           />
         </div>
+      )}
+      {!readOnly && moisSel === moisNow() && (
+        <VerifierSoldes
+          donnees={{ items, params, poches, budget, budgetMois, transactions }}
+          moisIndex={moisSel}
+          salairePrevu={salaire}
+        />
       )}
       <BudgetCartes
         moisSel={moisSel}

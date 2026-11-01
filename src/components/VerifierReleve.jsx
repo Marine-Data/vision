@@ -2,6 +2,7 @@ import React from "react";
 import { supabase } from "../lib/supabase.js";
 import { parserReleve, preparerImage } from "../lib/releveImage.js";
 import { classer, lireFichierPdf, nomOperation } from "../lib/importReleve.js";
+import { trouverGroupes } from "../lib/rapprochement.js";
 
 const moisIndex = (iso) => {
   const [y, m] = iso.split("-").map(Number);
@@ -104,8 +105,11 @@ export function VerifierReleve({ user, onSupprimer }) {
       else manquants.push(r);
     }
     // « Seulement dans Vision » : uniquement sur la période du relevé.
-    const enPlus = libres.filter((t) => t.date_depense >= debut && t.date_depense <= fin);
-    setResultat({ ok, manquants, enPlus, enveloppes, internes });
+    const { groupes, restants } = trouverGroupes(libres, manquants, (t, r) => ecart(t, r) <= TOLERANCE);
+    const groupees = new Set(groupes.map((g) => g.vision));
+    manquants.splice(0, manquants.length, ...restants);
+    const enPlus = libres.filter((t) => !groupees.has(t) && t.date_depense >= debut && t.date_depense <= fin);
+    setResultat({ ok, manquants, enPlus, enveloppes, internes, groupes });
     // Poste proposé : règles du relevé d'abord, sinon mots-clés.
     const posteDe = (m) => {
       const l = m.groupe && lignesBudget.find((b) => b.poste === m.groupe);
@@ -325,6 +329,18 @@ export function VerifierReleve({ user, onSupprimer }) {
             <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
               💼 Payés par une enveloppe :{" "}
               {resultat.enveloppes.map((x) => `${x.enveloppe} ${eur(x.montant)}`).join(" · ")}
+            </div>
+          )}
+          {resultat.groupes.length > 0 && (
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
+              🧩 Saisies groupées :{" "}
+              {resultat.groupes
+                .map(
+                  (g) =>
+                    `${eur(Number(g.vision.montant))} (${g.vision.note || "sans note"}) = ` +
+                    g.lignes.map((l) => `${l.libelle} ${eur(l.montant)}`).join(" + "),
+                )
+                .join(" · ")}
             </div>
           )}
           {resultat.internes.length > 0 && (

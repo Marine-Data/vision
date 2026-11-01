@@ -2,6 +2,7 @@ import "./index.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.jsx";
+import { NouvelleVersion } from "./components/NouvelleVersion.jsx";
 import { IMG_ICONE } from "./assets/images.js";
 import { GardeErreur } from "./components/GardeErreur.js";
 import { enregistrerServiceWorker } from "./lib/notifications.js";
@@ -37,3 +38,8 @@ enregistrerServiceWorker();
 createRoot(document.getElementById("root")).render(
   React.createElement(GardeErreur, null, React.createElement(App)),
 );
+
+// Bandeau « Nouvelle version » : racine à part, indépendante de l'app.
+const zoneVersion = document.createElement("div");
+document.body.appendChild(zoneVersion);
+createRoot(zoneVersion).render(React.createElement(NouvelleVersion));
