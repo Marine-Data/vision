@@ -3,6 +3,7 @@ import { KbSheet } from "../kanban/communs.jsx";
 import { CarteMatelas, FeuilleMatelas } from "./Matelas.jsx";
 import { catIcone, euros, hwkFmt, num } from "../../lib/format.js";
 import { EP_AUTO_NOTE } from "../../lib/epargneAuto.js";
+import { moisNow } from "../../lib/mois.js";
 
 // Budget du mois en cartes : le reste sur le salaire, la projection, une carte par
 // poste (triées du plus consommé au moins consommé), l'épargne programmée.
@@ -198,25 +199,27 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
     moisDepartEpargne,
   } = ctx;
   const epargne = mode === "epargne",
-    depuis = epargne ? moisDepartEpargne : moisSel,
+    // Épargne : on peut changer le mois affiché (s'il n'est ni passé ni clôturé) ou les mois suivants.
+    epCeMoisOk = epargne && !ferme && moisSel >= moisNow() && moisSel < moisDepartEpargne,
+    [epPortee, setEpPortee] = React.useState(epCeMoisOk ? "mois" : "suite"),
+    epCeMois = epCeMoisOk && epPortee === "mois",
+    depuis = epargne && !epCeMois ? moisDepartEpargne : moisSel,
     bloque = readOnly || (ferme && !epargne),
     [nom, setNom] = React.useState(w.poste || ""),
     [icone, setIcone] = React.useState(catIcone(w.poste)),
-    [montant, setMontant] = React.useState(
-      String(epargne && w.bDepart != null ? w.bDepart : w.b).replace(".", ","),
-    ),
+    base = epargne && !epCeMois && w.bDepart != null ? w.bDepart : w.b,
+    [montant, setMontant] = React.useState(String(base).replace(".", ",")),
     [portee, setPortee] = React.useState("suite"),
     [choix, setChoix] = React.useState({}),
     [etat, setEtat] = React.useState(""),
     [archiver, setArchiver] = React.useState(!1),
     [pasVerseId, setPasVerseId] = React.useState(null);
   const v = nombre(montant),
-    montantChange =
-      Number.isFinite(v) &&
-      Math.round(v * 100) !== Math.round(num(w.bDepart != null ? w.bDepart : w.b) * 100),
+    montantChange = Number.isFinite(v) && Math.round(v * 100) !== Math.round(num(base) * 100),
     nomChange = nom.trim() && nom.trim() !== w.poste,
     iconeChange = icone !== catIcone(w.poste),
-    conflits = montantChange && (portee === "suite" || epargne) ? actions.conflits(w.lid, depuis) : [],
+    conflits =
+      montantChange && (epargne ? !epCeMois : portee === "suite") ? actions.conflits(w.lid, depuis) : [],
     manque = conflits.filter((c) => !choix[c.m]).length,
     txs = txDe(w.lid),
     rembOk = /santé|sante|transport/i.test(w.poste || "");
@@ -232,7 +235,7 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
         poste: nomChange ? nom : null,
         icone: iconeChange ? icone : undefined,
         montant: montantChange ? v : null,
-        portee: epargne ? "suite" : portee,
+        portee: epargne ? (epCeMois ? "mois" : "suite") : portee,
         garder: conflits.filter((c) => choix[c.m] === "garder").map((c) => c.m),
       });
       onClose();
@@ -265,9 +268,29 @@ function FeuillePoste({ w, ctx, onClose, mode }) {
             style={{ ...champ, flex: 1 }}
           />
         </div>
+        {epCeMoisOk && (
+          <Segment
+            label="Changer"
+            valeur={epPortee}
+            onChange={(p) => {
+              setEpPortee(p);
+              setMontant(String(p === "mois" || w.bDepart == null ? w.b : w.bDepart).replace(".", ","));
+            }}
+            options={[
+              ["mois", nomMois(moisSel) + " seulement"],
+              ["suite", "Dès " + nomMois(moisDepartEpargne)],
+            ]}
+          />
+        )}
         <LigneMontant
           id="montant-poste"
-          label={epargne ? "Montant · dès " + nomMois(depuis) : "Budget de " + nomMois(moisSel)}
+          label={
+            epargne
+              ? epCeMois
+                ? "Montant · " + nomMois(moisSel) + " seulement"
+                : "Montant · dès " + nomMois(depuis)
+              : "Budget de " + nomMois(moisSel)
+          }
           valeur={montant}
           onChange={setMontant}
           disabled={bloque}

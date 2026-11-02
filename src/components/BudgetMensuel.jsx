@@ -115,7 +115,13 @@ export function BudgetMensuel({
     courantes = avecReel(lignes.filter((w) => catDe(w) === "courantes" && w.line_key !== "c_sport")).sort(
       (a, b) => (a.poste || "").localeCompare(b.poste || "", "fr"),
     ),
-    epargne = avecReel(lignes.filter((w) => catDe(w) === "epargne")).filter((w) => w.b !== 0 || w.r !== 0),
+    // Un virement mis à 0 pour ce mois seulement reste visible (pour pouvoir le remettre).
+    epargne = avecReel(lignes.filter((w) => catDe(w) === "epargne")).filter(
+      (w) =>
+        w.b !== 0 ||
+        w.r !== 0 ||
+        num(((budget || []).find((b) => b.id === ligneBudgetId(w)) || {}).montant) > 0,
+    ),
     somme = (l, k) => l.reduce((s, w) => s + w[k], 0),
     totC = {
       b: somme(courantes, "b"),
