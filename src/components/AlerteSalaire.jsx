@@ -3,7 +3,7 @@ import { euros } from "../lib/format.js";
 
 export // Bandeau d'alerte (Budget mois) : un chiffre, une jauge, presque pas de mots.
 function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
-  if (!a || (!a.niveau && !a.prevu)) return null;
+  if (!a || !(a.salaire > 0)) return null;
   const pct = a.salaire > 0 ? Math.min(100, Math.round((a.engage / a.salaire) * 100)) : 0,
     triangle = "M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17h.01",
     cal =
@@ -192,6 +192,27 @@ function AlerteSalaire({ a, moisLabel, vacSolde, onAjuster }) {
             Ajuster
           </button>
         ) : null}
+      </div>,
+    );
+  // Budget prévu dans le salaire : on le dit aussi, avec ce qui reste non affecté.
+  if (!a.prevu)
+    blocs.push(
+      <div
+        role="status"
+        key="equilibre"
+        style={{
+          borderRadius: 16,
+          padding: "10px 12px",
+          marginBottom: 10,
+          background: "var(--vert-doux)",
+          color: "var(--t-vert)",
+          fontSize: 14.5,
+          fontWeight: 800,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {"✓ Budget prévu à l'équilibre"}
+        {a.ecartPrevu >= 1 ? " · " + rond(a.ecartPrevu) + " non affectés" : ""}
       </div>,
     );
   return <div>{blocs}</div>;
